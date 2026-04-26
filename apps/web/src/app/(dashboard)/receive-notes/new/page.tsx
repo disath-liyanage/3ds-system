@@ -5,6 +5,7 @@ import { useFieldArray, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 
 type ReceiveNoteForm = {
   supplier_name: string;
@@ -17,6 +18,7 @@ type ReceiveNoteForm = {
 };
 
 export default function NewReceiveNotePage() {
+  const { permissions, isLoading } = useCurrentUserPermissions();
   const { control, register, handleSubmit } = useForm<ReceiveNoteForm>({
     defaultValues: {
       supplier_name: "",
@@ -33,6 +35,15 @@ export default function NewReceiveNotePage() {
   const onSubmit = async (values: ReceiveNoteForm) => {
     console.log("new receive note payload", values);
   };
+
+  if (!isLoading && !permissions?.canManageReceiveNotes) {
+    return (
+      <section className="space-y-4">
+        <h1 className="text-2xl font-bold">New Receive Note</h1>
+        <p className="text-sm text-muted-foreground">You do not have permission to create receive notes.</p>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-6">

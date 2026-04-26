@@ -1,8 +1,11 @@
+"use client";
+
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 
 const rows = [
   { id: "i1", invoice_number: 5001, customer: "City Paint Mart", total: "LKR 25,000", status: "issued" },
@@ -10,6 +13,17 @@ const rows = [
 ];
 
 export default function InvoicesPage() {
+  const { permissions, isLoading } = useCurrentUserPermissions();
+
+  if (!isLoading && !permissions?.canCreateInvoices) {
+    return (
+      <section className="space-y-4">
+        <h1 className="text-2xl font-bold">Invoices</h1>
+        <p className="text-sm text-muted-foreground">You do not have permission to view invoices.</p>
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-4">
       <header>

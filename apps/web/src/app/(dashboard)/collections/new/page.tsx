@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 
 type NewCollectionForm = {
   customer_id: string;
@@ -13,11 +14,21 @@ type NewCollectionForm = {
 };
 
 export default function NewCollectionPage() {
+  const { permissions, isLoading } = useCurrentUserPermissions();
   const { register, handleSubmit } = useForm<NewCollectionForm>();
 
   const onSubmit = async (values: NewCollectionForm) => {
     console.log("new collection payload", values);
   };
+
+  if (!isLoading && !permissions?.canRecordCollections) {
+    return (
+      <section className="space-y-4">
+        <h1 className="text-2xl font-bold">New Collection</h1>
+        <p className="text-sm text-muted-foreground">You do not have permission to record collections.</p>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-6">

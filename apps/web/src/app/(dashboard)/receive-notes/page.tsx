@@ -1,7 +1,10 @@
+"use client";
+
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 
 const rows = [
   { id: "rn1", rn_number: 9001, supplier: "Asian Paints", received_at: "2026-04-18" },
@@ -9,6 +12,18 @@ const rows = [
 ];
 
 export default function ReceiveNotesPage() {
+  const { permissions, isLoading } = useCurrentUserPermissions();
+  const canManageReceiveNotes = permissions?.canManageReceiveNotes ?? false;
+
+  if (!isLoading && !canManageReceiveNotes) {
+    return (
+      <section className="space-y-4">
+        <h1 className="text-2xl font-bold">Receive Notes</h1>
+        <p className="text-sm text-muted-foreground">You do not have permission to access receive notes.</p>
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
@@ -16,9 +31,11 @@ export default function ReceiveNotesPage() {
           <h1 className="text-2xl font-bold">Receive Notes</h1>
           <p className="text-sm text-muted-foreground">Stock intake log from suppliers.</p>
         </div>
-        <Button asChild>
-          <Link href="/receive-notes/new">New Receive Note</Link>
-        </Button>
+        {canManageReceiveNotes ? (
+          <Button asChild>
+            <Link href="/receive-notes/new">New Receive Note</Link>
+          </Button>
+        ) : null}
       </div>
 
       <Table>

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 
 const orderStatusOptions = [
   { value: "all", label: "All" },
@@ -25,11 +26,24 @@ const rows = [
 
 export default function OrdersPage() {
   const [status, setStatus] = useState("all");
+  const { permissions, isLoading } = useCurrentUserPermissions();
+
+  const canCreateOrders = permissions?.canCreateOrders ?? false;
+  const canViewOrders = permissions ? permissions.canViewAllOrders || permissions.canCreateOrders : false;
 
   const filteredRows = useMemo(
     () => (status === "all" ? rows : rows.filter((row) => row.status === status)),
     [status]
   );
+
+  if (!isLoading && !canViewOrders) {
+    return (
+      <section className="space-y-4">
+        <h1 className="text-2xl font-bold">Orders</h1>
+        <p className="text-sm text-muted-foreground">You do not have permission to view orders.</p>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-4">
@@ -38,9 +52,11 @@ export default function OrdersPage() {
           <h1 className="text-2xl font-bold">Orders</h1>
           <p className="text-sm text-muted-foreground">Track and review sales orders.</p>
         </div>
-        <Button asChild>
-          <Link href="/orders/new">New Order</Link>
-        </Button>
+        {canCreateOrders ? (
+          <Button asChild>
+            <Link href="/orders/new">New Order</Link>
+          </Button>
+        ) : null}
       </div>
 
       <div className="max-w-xs">

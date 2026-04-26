@@ -7,10 +7,21 @@ import type { Invoice } from "@paintdist/shared";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { InvoiceTemplate, type InvoicePdfItem } from "@/lib/pdf/invoice-template";
 
 export default function InvoiceDetailPage() {
   const params = useParams<{ id: string }>();
+  const { permissions, isLoading } = useCurrentUserPermissions();
+
+  if (!isLoading && !permissions?.canCreateInvoices) {
+    return (
+      <section className="space-y-4">
+        <h1 className="text-2xl font-bold">Invoice Detail</h1>
+        <p className="text-sm text-muted-foreground">You do not have permission to view invoice details.</p>
+      </section>
+    );
+  }
 
   const invoice: Invoice = {
     id: params.id,

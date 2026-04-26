@@ -1,9 +1,36 @@
+export type UserRole = "admin" | "manager" | "sales_rep" | "cashier" | "custom";
+
+export interface CustomRole {
+  id: string;
+  name: string;
+  description: string | null;
+  created_by: string | null;
+  created_at: string;
+  perm_create_orders: boolean;
+  perm_approve_orders: boolean;
+  perm_view_all_orders: boolean;
+  perm_record_collections: boolean;
+  perm_validate_collections: boolean;
+  perm_manage_products: boolean;
+  perm_manage_customers: boolean;
+  perm_create_invoices: boolean;
+  perm_manage_receive_notes: boolean;
+  perm_view_reports: boolean;
+  perm_export_reports: boolean;
+  perm_manage_users: boolean;
+  perm_view_users: boolean;
+}
+
 export interface User {
   id: string;
   email: string;
-  role: "admin" | "manager" | "sales_rep" | "cashier";
+  role: UserRole;
   full_name: string;
-  phone: string;
+  phone: string | null;
+  custom_role_id?: string | null;
+  custom_role?: CustomRole | null;
+  is_active?: boolean;
+  created_by?: string | null;
   created_at: string;
 }
 

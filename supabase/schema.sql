@@ -401,3 +401,80 @@ create policy collections_cashier_update on public.collections
 for update
 using (public.current_user_role() = 'cashier')
 with check (public.current_user_role() = 'cashier');
+
+alter type public.app_role add value if not exists 'custom';
+
+create table if not exists public.custom_roles (
+  id uuid primary key default gen_random_uuid(),
+  name varchar(50) not null unique,
+  description text,
+  created_by uuid references auth.users (id),
+  created_at timestamptz default now(),
+  perm_create_orders boolean default false,
+  perm_approve_orders boolean default false,
+  perm_view_all_orders boolean default false,
+  perm_record_collections boolean default false,
+  perm_validate_collections boolean default false,
+  perm_manage_products boolean default false,
+  perm_manage_customers boolean default false,
+  perm_create_invoices boolean default false,
+  perm_manage_receive_notes boolean default false,
+  perm_view_reports boolean default false,
+  perm_export_reports boolean default false,
+  perm_manage_users boolean default false,
+  perm_view_users boolean default false
+);
+
+alter table public.users_profile
+  add column if not exists custom_role_id uuid references public.custom_roles (id),
+  add column if not exists is_active boolean default true,
+  add column if not exists created_by uuid references auth.users (id);
+
+create index if not exists idx_users_profile_custom_role_id on public.users_profile (custom_role_id);
+
+alter table public.custom_roles enable row level security;
+
+drop policy if exists "admin_all_custom_roles" on public.custom_roles;
+drop policy if exists "manager_view_custom_roles" on public.custom_roles;
+
+create policy "admin_all_custom_roles" on public.custom_roles
+  for all
+  using (
+    (select role from public.users_profile where id = auth.uid()) = 'admin'
+  )
+  with check (
+    (select role from public.users_profile where id = auth.uid()) = 'admin'
+  );
+
+create policy "manager_view_custom_roles" on public.custom_roles
+  for select
+  using (
+    (select role from public.users_profile where id = auth.uid()) in ('admin', 'manager')
+  );
+
+drop policy if exists "users_view_own_profile" on public.users_profile;
+drop policy if exists users_profile_admin_manager_all on public.users_profile;
+drop policy if exists users_profile_self_select on public.users_profile;
+drop policy if exists users_profile_self_update on public.users_profile;
+drop policy if exists "admin_all_profiles" on public.users_profile;
+drop policy if exists "manager_view_profiles" on public.users_profile;
+drop policy if exists "own_profile" on public.users_profile;
+
+create policy "admin_all_profiles" on public.users_profile
+  for all
+  using (
+    (select role from public.users_profile where id = auth.uid()) = 'admin'
+  )
+  with check (
+    (select role from public.users_profile where id = auth.uid()) = 'admin'
+  );
+
+create policy "manager_view_profiles" on public.users_profile
+  for select
+  using (
+    (select role from public.users_profile where id = auth.uid()) in ('admin', 'manager')
+  );
+
+create policy "own_profile" on public.users_profile
+  for select
+  using (auth.uid() = id);

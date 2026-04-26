@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 
 const customers = [
   { id: "u1", name: "City Paint Mart", phone: "+94 77111222", area: "Colombo", balance: "LKR 15,000" },
@@ -13,6 +14,7 @@ const customers = [
 
 export default function CustomersPage() {
   const [query, setQuery] = useState("");
+  const { permissions, isLoading } = useCurrentUserPermissions();
 
   const filtered = useMemo(
     () =>
@@ -21,6 +23,15 @@ export default function CustomersPage() {
       ),
     [query]
   );
+
+  if (!isLoading && !permissions?.canManageCustomers) {
+    return (
+      <section className="space-y-4">
+        <h1 className="text-2xl font-bold">Customers</h1>
+        <p className="text-sm text-muted-foreground">You do not have permission to view customers.</p>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-4">

@@ -8,6 +8,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 
 const orderItemSchema = z.object({
   product_id: z.string().min(1, "Product is required"),
@@ -24,6 +25,8 @@ const newOrderSchema = z.object({
 type NewOrderInput = z.infer<typeof newOrderSchema>;
 
 export default function NewOrderPage() {
+  const { permissions, isLoading } = useCurrentUserPermissions();
+
   const {
     control,
     register,
@@ -46,6 +49,15 @@ export default function NewOrderPage() {
   const onSubmit = async (values: NewOrderInput) => {
     console.log("new order payload", values);
   };
+
+  if (!isLoading && !permissions?.canCreateOrders) {
+    return (
+      <section className="space-y-4">
+        <h1 className="text-2xl font-bold">New Order</h1>
+        <p className="text-sm text-muted-foreground">You do not have permission to create orders.</p>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-6">

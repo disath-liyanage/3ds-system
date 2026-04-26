@@ -1,5 +1,8 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 
 const rows = [
   { id: "p1", name: "WeatherGuard", stock_qty: 8, threshold: 10, unit: "bucket" },
@@ -8,6 +11,17 @@ const rows = [
 ];
 
 export default function ProductsPage() {
+  const { permissions, isLoading } = useCurrentUserPermissions();
+
+  if (!isLoading && !permissions?.canManageProducts) {
+    return (
+      <section className="space-y-4">
+        <h1 className="text-2xl font-bold">Products</h1>
+        <p className="text-sm text-muted-foreground">You do not have permission to manage products.</p>
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-4">
       <header>

@@ -1,13 +1,38 @@
 import { z } from "zod";
 
-export const userRoleSchema = z.enum(["admin", "manager", "sales_rep", "cashier"]);
+export const userRoleSchema = z.enum(["admin", "manager", "sales_rep", "cashier", "custom"]);
+
+export const customRoleSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  description: z.string().nullable(),
+  created_by: z.string().uuid().nullable(),
+  created_at: z.string(),
+  perm_create_orders: z.boolean(),
+  perm_approve_orders: z.boolean(),
+  perm_view_all_orders: z.boolean(),
+  perm_record_collections: z.boolean(),
+  perm_validate_collections: z.boolean(),
+  perm_manage_products: z.boolean(),
+  perm_manage_customers: z.boolean(),
+  perm_create_invoices: z.boolean(),
+  perm_manage_receive_notes: z.boolean(),
+  perm_view_reports: z.boolean(),
+  perm_export_reports: z.boolean(),
+  perm_manage_users: z.boolean(),
+  perm_view_users: z.boolean()
+});
 
 export const userSchema = z.object({
   id: z.string().uuid(),
   email: z.string().email(),
   role: userRoleSchema,
   full_name: z.string().min(1),
-  phone: z.string().min(1),
+  phone: z.string().nullable(),
+  custom_role_id: z.string().uuid().nullable().optional(),
+  custom_role: customRoleSchema.nullable().optional(),
+  is_active: z.boolean().optional(),
+  created_by: z.string().uuid().nullable().optional(),
   created_at: z.string()
 });
 
@@ -99,6 +124,7 @@ export const receiveNoteItemSchema = z.object({
 });
 
 export type UserSchemaType = z.infer<typeof userSchema>;
+export type CustomRoleSchemaType = z.infer<typeof customRoleSchema>;
 export type CustomerSchemaType = z.infer<typeof customerSchema>;
 export type ProductSchemaType = z.infer<typeof productSchema>;
 export type OrderSchemaType = z.infer<typeof orderSchema>;

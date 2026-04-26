@@ -20,6 +20,7 @@ Web app (`apps/web/.env.local`):
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only)
 
 Mobile app (`apps/mobile/.env`):
 
@@ -66,3 +67,17 @@ pnpm build:web
 5. Start web (`pnpm dev:web`) and confirm login route loads.
 6. Start mobile (`pnpm dev:mobile`) and confirm Expo Router screens load.
 7. Create initial users in `auth.users`, then add matching rows in `users_profile` with roles.
+
+## 5) Vercel env var reminder (admin user management)
+
+For production deploys, set this in Vercel:
+
+1. Go to Vercel -> Project -> Settings -> Environment Variables.
+2. Add `SUPABASE_SERVICE_ROLE_KEY`.
+3. Get the value from Supabase -> Project Settings -> API -> `service_role` secret.
+
+Important:
+
+- `SUPABASE_SERVICE_ROLE_KEY` is server-only.
+- Never expose it to the browser.
+- Never commit it to git.
