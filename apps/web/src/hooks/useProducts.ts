@@ -4,6 +4,11 @@ import type { Product } from "@paintdist/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo } from "react";
 
+import {
+  createProduct as createProductAction,
+  type ProductInput,
+  updateProduct as updateProductAction
+} from "@/app/actions/products";
 import { createClient } from "@/lib/supabase/client";
 
 const PRODUCTS_QUERY_KEY = ["products"] as const;
@@ -28,28 +33,27 @@ export function useProducts() {
   });
 
   const createProduct = useMutation({
-    mutationFn: async (payload: Partial<Product>) => {
-      const { data, error } = await supabase.from("products").insert(payload).select("*").single();
-      if (error) throw error;
-      return data as Product;
+    mutationFn: async (payload: ProductInput) => {
+      const result = await createProductAction(payload);
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to create product");
+      }
+
+      return result;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY })
   });
 
   const updateProduct = useMutation({
-    mutationFn: async ({ id, payload }: { id: string; payload: Partial<Product> }) => {
-      const { data, error } = await supabase.from("products").update(payload).eq("id", id).select("*").single();
-      if (error) throw error;
-      return data as Product;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY })
-  });
+    mutationFn: async ({ id, payload }: { id: string; payload: ProductInput }) => {
+      const result = await updateProductAction(id, payload);
 
-  const deleteProduct = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("products").delete().eq("id", id);
-      if (error) throw error;
-      return id;
+      if (!result.success) {
+        throw new Error(result.error || "Failed to update product");
+      }
+
+      return result;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY })
   });
@@ -70,7 +74,6 @@ export function useProducts() {
   return {
     ...productsQuery,
     createProduct,
-    updateProduct,
-    deleteProduct
+    updateProduct
   };
 }
