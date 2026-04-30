@@ -2,7 +2,7 @@
 
 import type { FormEvent } from "react";
 import type { Product } from "@paintdist/shared";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { toast } from "@/lib/toast";
 type ProductFormState = {
   name: string;
   category: string;
+  subCategory: string;
   unit: string;
   price: string;
   stock_qty: string;
@@ -62,6 +63,11 @@ type ParseNumberResult =
       error: string;
     };
 
+type SearchableSelectOption = {
+  value: string;
+  label: string;
+};
+
 type ProductFormDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -81,6 +87,7 @@ type ProductFormDialogProps = {
 const initialProductFormState: ProductFormState = {
   name: "",
   category: "",
+  subCategory: "",
   unit: "",
   price: "",
   stock_qty: "",
@@ -93,6 +100,29 @@ const initialProductSizeState: ProductSizeFormState = {
   stock_qty: "",
   low_stock_threshold: "10"
 };
+
+const categoryOptions = [
+  { value: "Hardware", label: "Hardware" },
+  { value: "Cash", label: "Cash" },
+  { value: "Bathware", label: "Bathware" },
+  { value: "Fast moving", label: "Fast moving" }
+];
+
+function composeCategory(category: string, subCategory: string) {
+  return `${category.trim()} / ${subCategory.trim()}`;
+}
+
+function splitCategory(value: string) {
+  const trimmedValue = value.trim();
+  const parts = trimmedValue.split("/");
+  if (parts.length < 2) {
+    return { category: trimmedValue, subCategory: "" };
+  }
+
+  const category = parts[0]?.trim() ?? "";
+  const subCategory = parts.slice(1).join("/").trim();
+  return { category, subCategory };
+}
 
 function toNumber(value: number | string | null | undefined): number {
   const parsed = typeof value === "number" ? value : Number(value ?? 0);
@@ -155,10 +185,148 @@ function parseNonNegativeNumber(
   return { ok: true, value: parsed };
 }
 
+type SearchableSelectProps = {
+  id?: string;
+  value: string;
+  options: SearchableSelectOption[];
+  placeholder?: string;
+  onChange: (value: string) => void;
+};
+
+function SearchableSelect({ id, value, options, placeholder, onChange }: SearchableSelectProps) {
+  const [query, setQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const selectedOption = useMemo(
+    () => options.find((option) => option.value === value) ?? null,
+    [options, value]
+  );
+
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return options;
+
+    return options.filter((option) => option.label.toLowerCase().includes(normalizedQuery));
+  }, [options, query]);
+
+  useEffect(() => {
+    if (selectedOption) {
+      setQuery(selectedOption.label);
+    }
+  }, [selectedOption]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setHighlightedIndex(0);
+  }, [query, isOpen]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!containerRef.current || containerRef.current.contains(event.target as Node)) return;
+      setIsOpen(false);
+      if (selectedOption) {
+        setQuery(selectedOption.label);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [selectedOption]);
+
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const nextValue = event.target.value;
+    setQuery(nextValue);
+    setIsOpen(true);
+
+    if (selectedOption && nextValue !== selectedOption.label) {
+      onChange("");
+    }
+  };
+
+  const handleSelect = (option: SearchableSelectOption) => {
+    onChange(option.value);
+    setQuery(option.label);
+    setIsOpen(false);
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isOpen && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+      setIsOpen(true);
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setHighlightedIndex((prev) => (prev + 1) % Math.max(filteredOptions.length, 1));
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setHighlightedIndex((prev) => (prev - 1 + Math.max(filteredOptions.length, 1)) % Math.max(filteredOptions.length, 1));
+    }
+
+    if (event.key === "Enter") {
+      if (!isOpen) return;
+      event.preventDefault();
+      const option = filteredOptions[highlightedIndex];
+      if (option) {
+        handleSelect(option);
+      }
+    }
+
+    if (event.key === "Escape") {
+      setIsOpen(false);
+      if (selectedOption) {
+        setQuery(selectedOption.label);
+      }
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <Input
+        id={id}
+        value={query}
+        placeholder={placeholder}
+        onChange={handleInputChange}
+        onFocus={() => setIsOpen(true)}
+        onKeyDown={handleKeyDown}
+      />
+      {isOpen ? (
+        <div className="absolute z-20 mt-2 w-full rounded-md border border-border bg-white shadow-lg">
+          {filteredOptions.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-muted-foreground">No matches found.</div>
+          ) : (
+            <div className="max-h-56 overflow-auto py-1">
+              {filteredOptions.map((option, index) => (
+                <div
+                  key={option.value}
+                  className={`cursor-pointer px-3 py-2 text-sm transition ${
+                    index === highlightedIndex ? "bg-muted" : ""
+                  }`}
+                  onMouseEnter={() => setHighlightedIndex(index)}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => handleSelect(option)}
+                >
+                  {option.label}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function toProductFormState(product: Product): ProductFormState {
+  const { category, subCategory } = splitCategory(product.category);
   return {
     name: product.name,
-    category: product.category,
+    category,
+    subCategory,
     unit: product.unit,
     price: toNumber(product.price).toString(),
     stock_qty: toNumber(product.stock_qty).toString(),
@@ -261,6 +429,7 @@ function ProductFormDialog({
 
     const name = form.name.trim();
     const category = form.category.trim();
+    const subCategory = form.subCategory.trim();
     const unit = form.unit.trim();
 
     if (!name) {
@@ -273,7 +442,12 @@ function ProductFormDialog({
       return;
     }
 
-    const isMultiSizeEdit = isEditMode && existingSizes.filter((item) => !item.isRemoved).length > 1;
+    if (!subCategory) {
+      setSubmitError("Sub category is required");
+      return;
+    }
+
+    const isMultiSizeEdit = isEditMode;
 
     if (!isMultiSizeEdit) {
       if (!unit) {
@@ -283,13 +457,14 @@ function ProductFormDialog({
     }
 
     let payload: ProductFormPayload;
+    const composedCategory = composeCategory(category, subCategory);
 
     if (isMultiSizeEdit) {
       const fallbackSize = existingSizes.find((item) => !item.isRemoved) || existingSizes[0];
 
       payload = {
         name,
-        category,
+        category: composedCategory,
         unit: fallbackSize?.unit ?? unit,
         price: toNumber(fallbackSize?.price ?? form.price),
         stock_qty: toNumber(fallbackSize?.stock_qty ?? form.stock_qty),
@@ -316,7 +491,7 @@ function ProductFormDialog({
 
       payload = {
         name,
-        category,
+        category: composedCategory,
         unit,
         price: priceResult.value,
         stock_qty: stockResult.value,
@@ -374,7 +549,7 @@ function ProductFormDialog({
 
         extraPayloads.push({
           name,
-          category,
+          category: composedCategory,
           unit: extraUnit,
           price: extraPrice.value,
           stock_qty: extraStock.value,
@@ -386,7 +561,7 @@ function ProductFormDialog({
     let existingSizeEdits: ExistingSizeUpdate[] | undefined;
     let existingSizeDeletes: ExistingSizeDelete[] | undefined;
 
-    if (isEditMode && isMultiSizeEdit) {
+    if (isEditMode) {
       existingSizeEdits = [];
       existingSizeDeletes = [];
 
@@ -435,7 +610,7 @@ function ProductFormDialog({
           id: size.id,
           payload: {
             name,
-            category,
+            category: composedCategory,
             unit: trimmedUnit,
             price: priceResult.value,
             stock_qty: stockResult.value,
@@ -517,12 +692,25 @@ function ProductFormDialog({
           <label htmlFor={`${mode}-product-category`} className="text-sm font-medium">
             Category
           </label>
-          <Input
+          <SearchableSelect
             id={`${mode}-product-category`}
-            required
             value={form.category}
-            onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value }))}
-            placeholder="e.g. Paints"
+            options={categoryOptions}
+            placeholder="Select department"
+            onChange={(value) => setForm((prev) => ({ ...prev, category: value }))}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label htmlFor={`${mode}-product-sub-category`} className="text-sm font-medium">
+            Sub category
+          </label>
+          <Input
+            id={`${mode}-product-sub-category`}
+            required
+            value={form.subCategory}
+            onChange={(event) => setForm((prev) => ({ ...prev, subCategory: event.target.value }))}
+            placeholder="e.g. Screws"
           />
         </div>
 
@@ -812,6 +1000,7 @@ type MultiSizeProductDialogProps = {
 function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProductDialogProps) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
+  const [subCategory, setSubCategory] = useState("");
   const [sizes, setSizes] = useState<ProductSizeFormState[]>([initialProductSizeState]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -820,6 +1009,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
     if (!open) return;
     setName("");
     setCategory("");
+    setSubCategory("");
     setSizes([initialProductSizeState]);
     setSubmitError(null);
     setIsSubmitting(false);
@@ -852,6 +1042,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
 
     const trimmedName = name.trim();
     const trimmedCategory = category.trim();
+    const trimmedSubCategory = subCategory.trim();
 
     if (!trimmedName) {
       setSubmitError("Name is required");
@@ -860,6 +1051,11 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
 
     if (!trimmedCategory) {
       setSubmitError("Category is required");
+      return;
+    }
+
+    if (!trimmedSubCategory) {
+      setSubmitError("Sub category is required");
       return;
     }
 
@@ -901,7 +1097,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
 
       payloads.push({
         name: trimmedName,
-        category: trimmedCategory,
+        category: composeCategory(trimmedCategory, trimmedSubCategory),
         unit,
         price: priceResult.value,
         stock_qty: stockResult.value,
@@ -955,12 +1151,25 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
           <label htmlFor="multi-product-category" className="text-sm font-medium">
             Category
           </label>
-          <Input
+          <SearchableSelect
             id="multi-product-category"
-            required
             value={category}
-            onChange={(event) => setCategory(event.target.value)}
-            placeholder="e.g. Paints"
+            options={categoryOptions}
+            placeholder="Select department"
+            onChange={setCategory}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label htmlFor="multi-product-sub-category" className="text-sm font-medium">
+            Sub category
+          </label>
+          <Input
+            id="multi-product-sub-category"
+            required
+            value={subCategory}
+            onChange={(event) => setSubCategory(event.target.value)}
+            placeholder="e.g. Screws"
           />
         </div>
 
@@ -1095,7 +1304,6 @@ export default function ProductsPage() {
     deleteProduct
   } = useProducts();
 
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAddMultiDialogOpen, setIsAddMultiDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -1303,7 +1511,6 @@ export default function ProductsPage() {
     }
 
     setIsDuplicateDialogOpen(false);
-    setIsAddDialogOpen(false);
     setIsAddMultiDialogOpen(false);
     setEditingProduct(duplicateProduct);
     setIsEditDialogOpen(true);
