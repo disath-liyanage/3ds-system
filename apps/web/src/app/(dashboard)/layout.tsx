@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
+import { adminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type DashboardLayoutProps = {
@@ -19,11 +20,23 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
 
   const { data: profile } = await supabase
     .from("users_profile")
-    .select("role, full_name")
+    .select("role, full_name, email")
     .eq("id", user.id)
     .maybeSingle();
 
-  const role = profile?.role ?? "sales_rep";
+  let resolvedProfile = profile;
+
+  if (!resolvedProfile && user.email) {
+    const { data: fallbackProfile } = await adminClient
+      .from("users_profile")
+      .select("role, full_name, email")
+      .eq("email", user.email)
+      .maybeSingle();
+
+    resolvedProfile = fallbackProfile ?? null;
+  }
+
+  const role = resolvedProfile?.role ?? "sales_rep";
   const isAdmin = role === "admin";
 
   return (
@@ -31,7 +44,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
       <DashboardSidebar
         isAdmin={isAdmin}
         user={{
-          fullName: profile?.full_name ?? null,
+          fullName: resolvedProfile?.full_name ?? null,
           email: user.email ?? "",
           role
         }}
