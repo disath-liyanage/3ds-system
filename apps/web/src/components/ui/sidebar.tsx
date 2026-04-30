@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -17,9 +18,10 @@ type SidebarProps = {
   items: SidebarItem[];
   adminItems?: SidebarItem[];
   adminTitle?: string;
+  footer?: ReactNode;
 };
 
-export function Sidebar({ title, items, adminItems = [], adminTitle = "Admin" }: SidebarProps) {
+export function Sidebar({ title, items, adminItems = [], adminTitle = "Admin", footer }: SidebarProps) {
   const pathname = usePathname();
 
   const renderItem = (item: SidebarItem) => {
@@ -42,20 +44,24 @@ export function Sidebar({ title, items, adminItems = [], adminTitle = "Admin" }:
   };
 
   return (
-    <aside className="w-full border-b border-border bg-white p-4 lg:min-h-screen lg:w-72 lg:border-b-0 lg:border-r">
+    <aside className="flex w-full flex-col border-b border-border bg-white p-4 lg:min-h-screen lg:w-72 lg:border-b-0 lg:border-r">
       <div className="mb-6 flex items-center gap-2">
         <div className="h-8 w-8 rounded-md bg-primary" />
         <h2 className="text-lg font-semibold">{title}</h2>
       </div>
 
-      <nav className="grid gap-1">{items.map(renderItem)}</nav>
+      <div className="flex-1">
+        <nav className="grid gap-1">{items.map(renderItem)}</nav>
 
-      {adminItems.length > 0 ? (
-        <div className="mt-6 border-t border-border pt-4">
-          <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{adminTitle}</p>
-          <nav className="grid gap-1">{adminItems.map(renderItem)}</nav>
-        </div>
-      ) : null}
+        {adminItems.length > 0 ? (
+          <div className="mt-6 border-t border-border pt-4">
+            <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{adminTitle}</p>
+            <nav className="grid gap-1">{adminItems.map(renderItem)}</nav>
+          </div>
+        ) : null}
+      </div>
+
+      {footer ? <div className="mt-6 border-t border-border pt-4">{footer}</div> : null}
     </aside>
   );
 }

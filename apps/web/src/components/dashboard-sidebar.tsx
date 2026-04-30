@@ -6,16 +6,26 @@ import {
   FileText,
   HandCoins,
   Home,
+  LogOut,
   Package,
   ReceiptText,
   ShieldCheck,
   Users
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { Sidebar, type SidebarItem } from "@/components/ui/sidebar";
+import { createClient } from "@/lib/supabase/client";
+import { cn } from "@/lib/utils";
 
 type DashboardSidebarProps = {
   isAdmin: boolean;
+  user: {
+    fullName: string | null;
+    email: string;
+    role: string;
+  };
 };
 
 const navItems: SidebarItem[] = [
@@ -34,6 +44,49 @@ const adminNavItems: SidebarItem[] = [
   { href: "/admin/roles", label: "Roles", icon: ShieldCheck }
 ];
 
-export function DashboardSidebar({ isAdmin }: DashboardSidebarProps) {
-  return <Sidebar title="PaintDist" items={navItems} adminItems={isAdmin ? adminNavItems : []} />;
+export function DashboardSidebar({ isAdmin, user }: DashboardSidebarProps) {
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const router = useRouter();
+
+  const displayName = user.fullName?.trim() || user.email;
+  const secondaryText = displayName === user.email ? user.role : `${user.email} · ${user.role}`;
+
+  const handleSignOut = async () => {
+    if (isSigningOut) return;
+
+    setIsSigningOut(true);
+    const supabase = createClient();
+
+    await supabase.auth.signOut();
+    router.replace("/login");
+    router.refresh();
+  };
+
+  return (
+    <Sidebar
+      title="PaintDist"
+      items={navItems}
+      adminItems={isAdmin ? adminNavItems : []}
+      footer={
+        <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
+            <p className="truncate text-xs text-muted-foreground">{secondaryText}</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            disabled={isSigningOut}
+            className={cn(
+              "inline-flex items-center justify-center rounded-md border border-border px-2 py-1 text-xs font-medium transition hover:bg-muted",
+              isSigningOut ? "cursor-not-allowed opacity-70" : ""
+            )}
+            aria-label="Sign out"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        </div>
+      }
+    />
+  );
 }

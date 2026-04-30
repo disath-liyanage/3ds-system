@@ -334,6 +334,7 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   const canManageProducts = permissions?.canManageProducts ?? false;
+  const canAddProducts = canManageProducts;
 
   const sortedProducts = useMemo(
     () => [...products].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
@@ -404,12 +405,13 @@ export default function ProductsPage() {
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Products</h1>
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold">Products</h1>
+            {canAddProducts ? <Button onClick={() => setIsAddDialogOpen(true)}>Add Product</Button> : null}
+          </div>
           <p className="text-sm text-muted-foreground">Track inventory levels and pricing in real time.</p>
         </div>
-
-        {canManageProducts ? <Button onClick={() => setIsAddDialogOpen(true)}>Add Product</Button> : null}
       </div>
 
       {error ? <p className="text-sm text-red-600">Failed to load products: {error.message}</p> : null}

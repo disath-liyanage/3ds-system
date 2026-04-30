@@ -440,16 +440,16 @@ drop policy if exists "manager_view_custom_roles" on public.custom_roles;
 create policy "admin_all_custom_roles" on public.custom_roles
   for all
   using (
-    (select role from public.users_profile where id = auth.uid()) = 'admin'
+    public.current_user_role() = 'admin'
   )
   with check (
-    (select role from public.users_profile where id = auth.uid()) = 'admin'
+    public.current_user_role() = 'admin'
   );
 
 create policy "manager_view_custom_roles" on public.custom_roles
   for select
   using (
-    (select role from public.users_profile where id = auth.uid()) in ('admin', 'manager')
+    public.current_user_role() in ('admin', 'manager')
   );
 
 drop policy if exists "users_view_own_profile" on public.users_profile;
@@ -463,16 +463,16 @@ drop policy if exists "own_profile" on public.users_profile;
 create policy "admin_all_profiles" on public.users_profile
   for all
   using (
-    (select role from public.users_profile where id = auth.uid()) = 'admin'
+    public.current_user_role() = 'admin'
   )
   with check (
-    (select role from public.users_profile where id = auth.uid()) = 'admin'
+    public.current_user_role() = 'admin'
   );
 
 create policy "manager_view_profiles" on public.users_profile
   for select
   using (
-    (select role from public.users_profile where id = auth.uid()) in ('admin', 'manager')
+    public.current_user_role() in ('admin', 'manager')
   );
 
 create policy "own_profile" on public.users_profile
