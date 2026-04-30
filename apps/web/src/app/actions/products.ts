@@ -67,15 +67,29 @@ async function requireManageProductsPermission() {
     .eq("id", user.id)
     .maybeSingle<ProfilePermissionRow>();
 
-  if (profileError || !profile) {
+  let resolvedProfile = profile;
+
+  if ((!resolvedProfile || profileError) && user.email) {
+    const { data: fallbackProfile } = await adminClient
+      .from("users_profile")
+      .select("role, custom_role:custom_roles(perm_manage_products)")
+      .eq("email", user.email)
+      .maybeSingle<ProfilePermissionRow>();
+
+    resolvedProfile = fallbackProfile ?? null;
+  }
+
+  if (!resolvedProfile) {
     return { error: "Unauthorized" as const };
   }
 
-  const roleRelation = profile.custom_role;
+  const roleRelation = resolvedProfile.custom_role;
   const customRole = Array.isArray(roleRelation) ? roleRelation[0] || null : roleRelation;
 
   const canManageProducts =
-    profile.role === "admin" || profile.role === "manager" || Boolean(customRole?.perm_manage_products);
+    resolvedProfile.role === "admin" ||
+    resolvedProfile.role === "manager" ||
+    Boolean(customRole?.perm_manage_products);
 
   if (!canManageProducts) {
     return { error: "You do not have permission to manage products" as const };

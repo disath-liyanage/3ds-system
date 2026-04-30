@@ -15,6 +15,11 @@ type CurrentUserProfileResult = {
 
 type RawCustomRoleRelation = CustomRole | CustomRole[] | null;
 
+type CurrentUserProfileResponse = {
+  user: User;
+  customRole?: CustomRole | null;
+};
+
 const emptyUser: User = {
   id: "",
   email: "",
@@ -44,25 +49,38 @@ export function useCurrentUserPermissions() {
         .eq("id", user.id)
         .maybeSingle();
 
-      if (error || !profile) {
+      if (!error && profile) {
+        const roleRelation = profile.custom_role as RawCustomRoleRelation;
+        const customRole = Array.isArray(roleRelation) ? roleRelation[0] || undefined : roleRelation || undefined;
+
+        return {
+          user: {
+            id: profile.id,
+            email: profile.email,
+            role: profile.role,
+            full_name: profile.full_name,
+            phone: profile.phone,
+            custom_role_id: profile.custom_role_id,
+            is_active: profile.is_active ?? true,
+            created_at: profile.created_at
+          },
+          customRole
+        };
+      }
+
+      const fallbackResponse = await fetch("/api/current-user-profile", {
+        cache: "no-store"
+      });
+
+      if (!fallbackResponse.ok) {
         throw new Error(error?.message || "Could not load current user profile");
       }
 
-      const roleRelation = profile.custom_role as RawCustomRoleRelation;
-      const customRole = Array.isArray(roleRelation) ? roleRelation[0] || undefined : roleRelation || undefined;
+      const fallbackData = (await fallbackResponse.json()) as CurrentUserProfileResponse;
 
       return {
-        user: {
-          id: profile.id,
-          email: profile.email,
-          role: profile.role,
-          full_name: profile.full_name,
-          phone: profile.phone,
-          custom_role_id: profile.custom_role_id,
-          is_active: profile.is_active ?? true,
-          created_at: profile.created_at
-        },
-        customRole
+        user: fallbackData.user,
+        customRole: fallbackData.customRole ?? undefined
       };
     }
   });
