@@ -105,7 +105,8 @@ const categoryOptions = [
   { value: "Hardware", label: "Hardware" },
   { value: "Cash", label: "Cash" },
   { value: "Bathware", label: "Bathware" },
-  { value: "Fast moving", label: "Fast moving" }
+  { value: "Fast moving", label: "Fast moving" },
+  { value: "Pantry Cupboard", label: "Pantry Cupboard"}
 ];
 
 function composeCategory(category: string, subCategory: string) {
@@ -714,7 +715,7 @@ function ProductFormDialog({
           />
         </div>
 
-        {!(mode === "edit" && existingSizes.filter((item) => !item.isRemoved).length > 1) ? (
+        {!isEditMode ? (
           <>
             <div className="space-y-1">
               <label htmlFor={`${mode}-product-unit`} className="text-sm font-medium">
