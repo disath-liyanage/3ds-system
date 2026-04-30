@@ -193,3 +193,21 @@ export async function updateProduct(id: string, data: ProductInput): Promise<Act
   revalidatePath("/products");
   return { success: true };
 }
+
+export async function deleteProduct(id: string): Promise<ActionResult> {
+  const access = await requireManageProductsPermission();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!id) {
+    return { success: false, error: "Product id is required" };
+  }
+
+  const { error } = await adminClient.from("products").delete().eq("id", id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/products");
+  return { success: true };
+}

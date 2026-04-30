@@ -6,6 +6,7 @@ import { useEffect, useMemo } from "react";
 
 import {
   createProduct as createProductAction,
+  deleteProduct as deleteProductAction,
   type ProductInput,
   updateProduct as updateProductAction
 } from "@/app/actions/products";
@@ -58,6 +59,19 @@ export function useProducts() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY })
   });
 
+  const deleteProduct = useMutation({
+    mutationFn: async (id: string) => {
+      const result = await deleteProductAction(id);
+
+      if (!result.success) {
+        throw new Error(result.error || "Failed to delete product");
+      }
+
+      return result;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY })
+  });
+
   useEffect(() => {
     const channel = supabase
       .channel("products-realtime")
@@ -74,6 +88,7 @@ export function useProducts() {
   return {
     ...productsQuery,
     createProduct,
-    updateProduct
+    updateProduct,
+    deleteProduct
   };
 }
