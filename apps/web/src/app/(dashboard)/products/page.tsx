@@ -803,33 +803,6 @@ function ProductFormDialog({
   );
 }
 
-type AddProductChoiceDialogProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSelectSingle: () => void;
-  onSelectMulti: () => void;
-};
-
-function AddProductChoiceDialog({ open, onOpenChange, onSelectSingle, onSelectMulti }: AddProductChoiceDialogProps) {
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Add products"
-      description="Choose how you want to add products to your catalog."
-    >
-      <div className="space-y-3">
-        <Button className="w-full" onClick={onSelectSingle}>
-          Add single size product
-        </Button>
-        <Button variant="outline" className="w-full" onClick={onSelectMulti}>
-          Add multi-size product
-        </Button>
-      </div>
-    </Dialog>
-  );
-}
-
 type MultiSizeProductDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -955,12 +928,14 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
     handleOpenChange(false);
   };
 
+  const submitLabel = sizes.length > 1 ? "Add products" : "Add product";
+
   return (
     <Dialog
       open={open}
       onOpenChange={handleOpenChange}
-      title="Add multi-size product"
-      description="Add one product with multiple size and price variants."
+      title="Add product"
+      description="Add a product with one or more size and price variants."
     >
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-1">
@@ -1072,7 +1047,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
         {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting ? "Adding products..." : "Add products"}
+          {isSubmitting ? "Adding..." : submitLabel}
         </Button>
       </form>
     </Dialog>
@@ -1120,7 +1095,6 @@ export default function ProductsPage() {
     deleteProduct
   } = useProducts();
 
-  const [isAddChoiceOpen, setIsAddChoiceOpen] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAddMultiDialogOpen, setIsAddMultiDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -1343,7 +1317,7 @@ export default function ProductsPage() {
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-2xl font-bold">Products</h1>
-            {canAddProducts ? <Button onClick={() => setIsAddChoiceOpen(true)}>Add Product</Button> : null}
+            {canAddProducts ? <Button onClick={() => setIsAddMultiDialogOpen(true)}>Add Product</Button> : null}
           </div>
           <p className="text-sm text-muted-foreground">Track inventory levels and pricing in real time.</p>
         </div>
@@ -1412,19 +1386,6 @@ export default function ProductsPage() {
         </Table>
       )}
 
-      <AddProductChoiceDialog
-        open={isAddChoiceOpen}
-        onOpenChange={setIsAddChoiceOpen}
-        onSelectSingle={() => {
-          setIsAddChoiceOpen(false);
-          setIsAddDialogOpen(true);
-        }}
-        onSelectMulti={() => {
-          setIsAddChoiceOpen(false);
-          setIsAddMultiDialogOpen(true);
-        }}
-      />
-
       <MultiSizeProductDialog
         open={isAddMultiDialogOpen}
         onOpenChange={setIsAddMultiDialogOpen}
@@ -1437,14 +1398,6 @@ export default function ProductsPage() {
         product={duplicateProduct}
         onChooseRename={handleDuplicateRename}
         onChooseAddSizes={handleDuplicateAddSizes}
-      />
-
-      <ProductFormDialog
-        open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
-        mode="create"
-        product={null}
-        onSubmit={handleCreateProduct}
       />
 
       <ProductFormDialog
