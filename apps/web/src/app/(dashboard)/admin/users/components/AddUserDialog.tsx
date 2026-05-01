@@ -6,7 +6,7 @@ import { createUser } from "@/app/actions/users";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { toast } from "@/lib/toast";
 
 import type { CustomRoleSelectOption, UserRoleOption } from "./types";
@@ -23,11 +23,12 @@ type AddUserFormState = {
   email: string;
   password: string;
   phone: string;
-  role: Exclude<UserRoleOption, "admin">;
+  role: UserRoleOption;
   custom_role_id: string;
 };
 
 const roleOptions = [
+  { value: "admin", label: "Admin" },
   { value: "manager", label: "Manager" },
   { value: "cashier", label: "Cashier" },
   { value: "sales_rep", label: "Sales Representative" },
@@ -39,7 +40,7 @@ const initialState: AddUserFormState = {
   email: "",
   password: "",
   phone: "",
-  role: "manager",
+  role: "sales_rep",
   custom_role_id: ""
 };
 
@@ -117,7 +118,7 @@ export function AddUserDialog({ open, onOpenChange, customRoles, onCreated }: Ad
 
         <div className="space-y-1">
           <label htmlFor="add-user-email" className="text-sm font-medium">
-            Email
+            Email / Username
           </label>
           <Input
             id="add-user-email"
@@ -160,12 +161,13 @@ export function AddUserDialog({ open, onOpenChange, customRoles, onCreated }: Ad
           <label htmlFor="add-user-role" className="text-sm font-medium">
             Role
           </label>
-          <Select
+          <SearchableSelect
             id="add-user-role"
             value={form.role}
+            placeholder="Select role"
             options={roleOptions.map((option) => ({ value: option.value, label: option.label }))}
-            onChange={(event) => {
-              const nextRole = event.target.value as AddUserFormState["role"];
+            onChange={(value) => {
+              const nextRole = value as AddUserFormState["role"];
               setForm((prev) => ({
                 ...prev,
                 role: nextRole,
@@ -180,13 +182,13 @@ export function AddUserDialog({ open, onOpenChange, customRoles, onCreated }: Ad
             <label htmlFor="add-user-custom-role" className="text-sm font-medium">
               Custom Role
             </label>
-            <Select
+            <SearchableSelect
               id="add-user-custom-role"
               required
               value={form.custom_role_id}
               placeholder="Select custom role"
               options={customRoleOptions}
-              onChange={(event) => setForm((prev) => ({ ...prev, custom_role_id: event.target.value }))}
+              onChange={(value) => setForm((prev) => ({ ...prev, custom_role_id: value }))}
             />
           </div>
         ) : null}

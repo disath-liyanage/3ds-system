@@ -27,7 +27,7 @@ export type CustomRolePermissionKey =
   | "perm_manage_users"
   | "perm_view_users";
 
-export const customRolePermissionKeys: CustomRolePermissionKey[] = [
+const customRolePermissionKeys: CustomRolePermissionKey[] = [
   "perm_create_orders",
   "perm_approve_orders",
   "perm_view_all_orders",
@@ -53,6 +53,8 @@ export type CreateUserInput = {
 };
 
 export type UpdateUserInput = {
+  email: string;
+  password?: string;
   full_name: string;
   phone?: string;
   role: UserRole;
@@ -77,18 +79,38 @@ async function requireAdmin() {
     return { error: "Unauthorized" as const };
   }
 
-  const { data: profile, error: profileError } = await supabase
+  const { data: profileById, error: profileByIdError } = await adminClient
     .from("users_profile")
     .select("role")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (profileError || !profile || profile.role !== "admin") {
+  if (profileByIdError) {
+    return { error: "Unauthorized" as const };
+  }
+
+  let profile = profileById;
+
+  if (!profile && user.email) {
+    const { data: profileByEmail, error: profileByEmailError } = await adminClient
+      .from("users_profile")
+      .select("role")
+      .eq("email", user.email)
+      .maybeSingle();
+
+    if (profileByEmailError) {
+      return { error: "Unauthorized" as const };
+    }
+
+    profile = profileByEmail;
+  }
+
+  if (!profile || profile.role !== "admin") {
     return { error: "Unauthorized" as const };
   }
 
   return {
-    supabase,
+    supabase: adminClient,
     userId: user.id
   };
 }
@@ -159,24 +181,64 @@ export async function updateUser(id: string, data: UpdateUserInput): Promise<Act
   if ("error" in admin) return { success: false, error: admin.error };
 
   if (!id) return { success: false, error: "User id is required" };
+  if (!data.email) return { success: false, error: "Email is required" };
   if (!data.full_name) return { success: false, error: "Full name is required" };
+  if (data.password && data.password.length < 6) {
+    return { success: false, error: "Password must be at least 6 characters" };
+  }
   if (data.role === "custom" && !data.custom_role_id) {
     return { success: false, error: "Please select a custom role" };
+  }
+  if (id === admin.userId && (!data.is_active || data.role !== "admin")) {
+    return { success: false, error: "You cannot remove admin access from your own account" };
   }
 
   const { data: existingUser, error: existingUserError } = await admin.supabase
     .from("users_profile")
-    .select("is_active")
+    .select("email, is_active")
     .eq("id", id)
     .maybeSingle();
 
   if (existingUserError) {
     return { success: false, error: existingUserError.message };
   }
+  if (!existingUser) {
+    return { success: false, error: "User profile was not found" };
+  }
+
+  const authUpdate: {
+    email?: string;
+    password?: string;
+    email_confirm?: boolean;
+    ban_duration?: string;
+  } = {};
+  const nextEmail = data.email.trim();
+
+  if (existingUser?.email !== nextEmail) {
+    authUpdate.email = nextEmail;
+    authUpdate.email_confirm = true;
+  }
+
+  if (data.password) {
+    authUpdate.password = data.password;
+  }
+
+  if (existingUser?.is_active !== data.is_active) {
+    authUpdate.ban_duration = data.is_active ? "0s" : "none";
+  }
+
+  if (Object.keys(authUpdate).length > 0) {
+    const { error: updateAuthError } = await adminClient.auth.admin.updateUserById(id, authUpdate);
+
+    if (updateAuthError) {
+      return { success: false, error: updateAuthError.message };
+    }
+  }
 
   const { error: updateProfileError } = await admin.supabase
     .from("users_profile")
     .update({
+      email: nextEmail,
       full_name: data.full_name.trim(),
       phone: data.phone?.trim() || null,
       role: data.role,
@@ -187,16 +249,6 @@ export async function updateUser(id: string, data: UpdateUserInput): Promise<Act
 
   if (updateProfileError) {
     return { success: false, error: updateProfileError.message };
-  }
-
-  if (existingUser?.is_active !== false && data.is_active === false) {
-    const { error: suspendError } = await adminClient.auth.admin.updateUserById(id, {
-      ban_duration: "none"
-    });
-
-    if (suspendError) {
-      return { success: false, error: suspendError.message };
-    }
   }
 
   revalidatePath("/admin/users");

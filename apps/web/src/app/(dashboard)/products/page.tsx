@@ -44,6 +44,13 @@ type ExistingSizeDelete = {
   id: string;
 };
 
+type SortKey = "name" | "unit" | "price" | "stock" | "status";
+
+type SortState = {
+  key: SortKey;
+  direction: "asc" | "desc";
+} | null;
+
 type ProductFormPayload = {
   name: string;
   category: string;
@@ -164,6 +171,19 @@ function getStockStatus(stockQty: number | string, lowStockThreshold: number | s
   }
 
   return { label: "In Stock", variant: "success" as const };
+}
+
+function getStockStatusRank(label: string) {
+  switch (label) {
+    case "Out of Stock":
+      return 0;
+    case "Low Stock":
+      return 1;
+    case "In Stock":
+      return 2;
+    default:
+      return 3;
+  }
 }
 
 function parseNonNegativeNumber(
@@ -1310,14 +1330,58 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
   const [duplicateProduct, setDuplicateProduct] = useState<Product | null>(null);
+  const [sortState, setSortState] = useState<SortState>(null);
 
   const canManageProducts = permissions?.canManageProducts ?? false;
   const canAddProducts = canManageProducts;
 
-  const sortedProducts = useMemo(
-    () => [...products].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
-    [products]
-  );
+  const sortedProducts = useMemo(() => {
+    const list = [...products];
+
+    if (!sortState) {
+      return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+
+    const direction = sortState.direction === "asc" ? 1 : -1;
+
+    return list.sort((a, b) => {
+      switch (sortState.key) {
+        case "name":
+          return a.name.localeCompare(b.name) * direction;
+        case "unit":
+          return a.unit.localeCompare(b.unit) * direction;
+        case "price":
+          return (toNumber(a.price) - toNumber(b.price)) * direction;
+        case "stock":
+          return (toNumber(a.stock_qty) - toNumber(b.stock_qty)) * direction;
+        case "status": {
+          const statusA = getStockStatusRank(getStockStatus(a.stock_qty, a.low_stock_threshold).label);
+          const statusB = getStockStatusRank(getStockStatus(b.stock_qty, b.low_stock_threshold).label);
+          return (statusA - statusB) * direction;
+        }
+        default:
+          return 0;
+      }
+    });
+  }, [products, sortState]);
+
+  const handleSort = (key: SortKey) => {
+    setSortState((prev) => {
+      if (prev?.key === key) {
+        return { key, direction: prev.direction === "asc" ? "desc" : "asc" };
+      }
+      return { key, direction: "asc" };
+    });
+  };
+
+  const resetSort = () => {
+    setSortState(null);
+  };
+
+  const getSortLabel = (key: SortKey) => {
+    if (sortState?.key !== key) return "";
+    return sortState.direction === "asc" ? " \u2191" : " \u2193";
+  };
 
   const relatedProducts = useMemo(() => {
     if (!editingProduct) return [] as Product[];
@@ -1536,62 +1600,92 @@ export default function ProductsPage() {
       {isLoading ? (
         <div className="rounded-md border border-border bg-white p-4 text-sm text-muted-foreground">Loading products...</div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Unit</TableHead>
-              <TableHead>Price (LKR)</TableHead>
-              <TableHead>Stock Qty</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedProducts.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
-                  No products found.
-                </TableCell>
-              </TableRow>
-            ) : (
-              sortedProducts.map((product) => {
-                const stockStatus = getStockStatus(product.stock_qty, product.low_stock_threshold);
+        <div className="space-y-3">
+          {sortState ? (
+            <div className="flex justify-end">
+              <Button variant="outline" size="sm" onClick={resetSort}>
+                Reset sort
+              </Button>
+            </div>
+          ) : null}
 
-                return (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
-                    <TableCell>{product.category}</TableCell>
-                    <TableCell>{product.unit}</TableCell>
-                    <TableCell>{formatCurrencyLKR(product.price)}</TableCell>
-                    <TableCell>{formatQuantity(product.stock_qty)}</TableCell>
-                    <TableCell>
-                      <Badge variant={stockStatus.variant}>{stockStatus.label}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {canManageProducts ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={updateProduct.isPending}
-                          onClick={() => {
-                            setEditingProduct(product);
-                            setIsEditDialogOpen(true);
-                          }}
-                        >
-                          Edit
-                        </Button>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>
+                  <button type="button" className="font-semibold" onClick={() => handleSort("name")}>
+                    Name{getSortLabel("name")}
+                  </button>
+                </TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>
+                  <button type="button" className="font-semibold" onClick={() => handleSort("unit")}>
+                    Unit{getSortLabel("unit")}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button type="button" className="font-semibold" onClick={() => handleSort("price")}>
+                    Price (LKR){getSortLabel("price")}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button type="button" className="font-semibold" onClick={() => handleSort("stock")}>
+                    Stock Qty{getSortLabel("stock")}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button type="button" className="font-semibold" onClick={() => handleSort("status")}>
+                    Status{getSortLabel("status")}
+                  </button>
+                </TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedProducts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    No products found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                sortedProducts.map((product) => {
+                  const stockStatus = getStockStatus(product.stock_qty, product.low_stock_threshold);
+
+                  return (
+                    <TableRow key={product.id}>
+                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell>{product.category}</TableCell>
+                      <TableCell>{product.unit}</TableCell>
+                      <TableCell>{formatCurrencyLKR(product.price)}</TableCell>
+                      <TableCell>{formatQuantity(product.stock_qty)}</TableCell>
+                      <TableCell>
+                        <Badge variant={stockStatus.variant}>{stockStatus.label}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {canManageProducts ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={updateProduct.isPending}
+                            onClick={() => {
+                              setEditingProduct(product);
+                              setIsEditDialogOpen(true);
+                            }}
+                          >
+                            Edit
+                          </Button>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       <MultiSizeProductDialog

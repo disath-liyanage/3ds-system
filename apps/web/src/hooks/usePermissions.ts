@@ -20,10 +20,19 @@ export function usePermissions(user: User, customRole?: CustomRole) {
     canValidateCollections:
       isAdmin || isManager || user.role === "cashier" || Boolean(customRole?.perm_validate_collections),
     canManageProducts: isAdmin || isManager || Boolean(customRole?.perm_manage_products),
-    canManageCustomers:
-      isAdmin || isManager || user.role === "cashier" || Boolean(customRole?.perm_manage_customers),
+    canViewCustomers: true,
+    canAddCustomers:
+      isAdmin ||
+      isManager ||
+      user.role === "sales_rep" ||
+      Boolean(customRole?.perm_manage_customers),
+    canManageCustomers: true,
     canCreateInvoices:
-      isAdmin || isManager || user.role === "cashier" || Boolean(customRole?.perm_create_invoices),
+      isAdmin ||
+      isManager ||
+      user.role === "cashier" ||
+      user.role === "sales_rep" ||
+      Boolean(customRole?.perm_create_invoices),
     canManageReceiveNotes: isAdmin || isManager || Boolean(customRole?.perm_manage_receive_notes),
     canViewReports: isAdmin || isManager || Boolean(customRole?.perm_view_reports),
     canExportReports: isAdmin || isManager || Boolean(customRole?.perm_export_reports),

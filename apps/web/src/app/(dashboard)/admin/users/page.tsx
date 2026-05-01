@@ -1,6 +1,7 @@
 import type { User } from "@paintdist/shared";
 import { redirect } from "next/navigation";
 
+import { adminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 import { UsersTableClient } from "./components/UsersTableClient";
@@ -29,24 +30,44 @@ export default async function AdminUsersPage() {
     redirect("/login");
   }
 
-  const { data: currentProfile, error: currentProfileError } = await supabase
+  const { data: profileById, error: profileByIdError } = await adminClient
     .from("users_profile")
     .select("id, email, role, full_name, phone, created_at, custom_role_id")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (currentProfileError || !currentProfile || currentProfile.role !== "admin") {
+  if (profileByIdError) {
     redirect("/dashboard");
   }
 
-  const { data: users, error: usersError } = await supabase
+  let currentProfile = profileById;
+
+  if (!currentProfile && user.email) {
+    const { data: profileByEmail, error: profileByEmailError } = await adminClient
+      .from("users_profile")
+      .select("id, email, role, full_name, phone, created_at, custom_role_id")
+      .eq("email", user.email)
+      .maybeSingle();
+
+    if (profileByEmailError) {
+      redirect("/dashboard");
+    }
+
+    currentProfile = profileByEmail;
+  }
+
+  if (!currentProfile || currentProfile.role !== "admin") {
+    redirect("/dashboard");
+  }
+
+  const { data: users, error: usersError } = await adminClient
     .from("users_profile")
     .select(
       "id, email, role, full_name, phone, is_active, created_at, custom_role_id, custom_role:custom_roles(id, name)"
     )
     .order("created_at", { ascending: false });
 
-  const { data: customRoles, error: customRolesError } = await supabase
+  const { data: customRoles, error: customRolesError } = await adminClient
     .from("custom_roles")
     .select("id, name")
     .order("name", { ascending: true });

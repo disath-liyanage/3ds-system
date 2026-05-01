@@ -6,7 +6,7 @@ import { updateUser } from "@/app/actions/users";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { toast } from "@/lib/toast";
 
 import type { AdminUserRow, CustomRoleSelectOption, UserRoleOption } from "./types";
@@ -21,6 +21,8 @@ type EditUserDialogProps = {
 
 type EditUserFormState = {
   full_name: string;
+  email: string;
+  password: string;
   phone: string;
   role: UserRoleOption;
   custom_role_id: string;
@@ -28,6 +30,7 @@ type EditUserFormState = {
 };
 
 const baseRoleOptions = [
+  { value: "admin", label: "Admin" },
   { value: "manager", label: "Manager" },
   { value: "cashier", label: "Cashier" },
   { value: "sales_rep", label: "Sales Representative" },
@@ -36,6 +39,8 @@ const baseRoleOptions = [
 
 const initialState: EditUserFormState = {
   full_name: "",
+  email: "",
+  password: "",
   phone: "",
   role: "manager",
   custom_role_id: "",
@@ -52,6 +57,8 @@ export function EditUserDialog({ open, onOpenChange, user, customRoles, onUpdate
 
     setForm({
       full_name: user.full_name,
+      email: user.email,
+      password: "",
       phone: user.phone || "",
       role: user.role,
       custom_role_id: user.custom_role_id || "",
@@ -60,18 +67,14 @@ export function EditUserDialog({ open, onOpenChange, user, customRoles, onUpdate
     setSubmitError(null);
   }, [open, user]);
 
-  const roleOptions = useMemo(() => {
-    const options = baseRoleOptions.map((option) => ({
-      value: option.value,
-      label: option.label
-    }));
-
-    if (user?.role === "admin") {
-      return [{ value: "admin", label: "Admin" }, ...options];
-    }
-
-    return options;
-  }, [user?.role]);
+  const roleOptions = useMemo(
+    () =>
+      baseRoleOptions.map((option) => ({
+        value: option.value,
+        label: option.label
+      })),
+    []
+  );
 
   const customRoleOptions = useMemo(
     () => customRoles.map((role) => ({ value: role.id, label: role.name })),
@@ -90,6 +93,8 @@ export function EditUserDialog({ open, onOpenChange, user, customRoles, onUpdate
     setIsSubmitting(true);
 
     const result = await updateUser(user.id, {
+      email: form.email,
+      password: form.password || undefined,
       full_name: form.full_name,
       phone: form.phone,
       role: form.role,
@@ -136,9 +141,29 @@ export function EditUserDialog({ open, onOpenChange, user, customRoles, onUpdate
 
         <div className="space-y-1">
           <label htmlFor="edit-user-email" className="text-sm font-medium">
-            Email
+            Email / Username
           </label>
-          <Input id="edit-user-email" value={user?.email || ""} disabled />
+          <Input
+            id="edit-user-email"
+            required
+            type="email"
+            value={form.email}
+            onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label htmlFor="edit-user-password" className="text-sm font-medium">
+            Reset Password
+          </label>
+          <Input
+            id="edit-user-password"
+            type="password"
+            minLength={6}
+            value={form.password}
+            onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
+            placeholder="Leave blank to keep current password"
+          />
         </div>
 
         <div className="space-y-1">
@@ -157,12 +182,13 @@ export function EditUserDialog({ open, onOpenChange, user, customRoles, onUpdate
           <label htmlFor="edit-user-role" className="text-sm font-medium">
             Role
           </label>
-          <Select
+          <SearchableSelect
             id="edit-user-role"
             value={form.role}
+            placeholder="Select role"
             options={roleOptions}
-            onChange={(event) => {
-              const nextRole = event.target.value as UserRoleOption;
+            onChange={(value) => {
+              const nextRole = value as UserRoleOption;
               setForm((prev) => ({
                 ...prev,
                 role: nextRole,
@@ -177,13 +203,13 @@ export function EditUserDialog({ open, onOpenChange, user, customRoles, onUpdate
             <label htmlFor="edit-user-custom-role" className="text-sm font-medium">
               Custom Role
             </label>
-            <Select
+            <SearchableSelect
               id="edit-user-custom-role"
               required
               value={form.custom_role_id}
               placeholder="Select custom role"
               options={customRoleOptions}
-              onChange={(event) => setForm((prev) => ({ ...prev, custom_role_id: event.target.value }))}
+              onChange={(value) => setForm((prev) => ({ ...prev, custom_role_id: value }))}
             />
           </div>
         ) : null}
@@ -192,14 +218,15 @@ export function EditUserDialog({ open, onOpenChange, user, customRoles, onUpdate
           <label htmlFor="edit-user-status" className="text-sm font-medium">
             Status
           </label>
-          <Select
+          <SearchableSelect
             id="edit-user-status"
             value={form.is_active ? "active" : "inactive"}
+            placeholder="Select status"
             options={[
               { value: "active", label: "Active" },
               { value: "inactive", label: "Inactive" }
             ]}
-            onChange={(event) => setForm((prev) => ({ ...prev, is_active: event.target.value === "active" }))}
+            onChange={(value) => setForm((prev) => ({ ...prev, is_active: value === "active" }))}
           />
         </div>
 

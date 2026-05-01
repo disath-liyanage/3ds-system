@@ -73,6 +73,7 @@ export function UsersTableClient({ users, customRoles, currentUser }: UsersTable
     setProcessingUserId(user.id);
 
     const result = await updateUser(user.id, {
+      email: user.email,
       full_name: user.full_name,
       phone: user.phone || "",
       role: user.role,
@@ -182,7 +183,7 @@ export function UsersTableClient({ users, customRoles, currentUser }: UsersTable
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={isProcessing || !permissions.canManageUsers}
+                      disabled={isProcessing || isSelf || !permissions.canManageUsers}
                       onClick={() => handleToggleActive(user)}
                     >
                       {user.is_active ? "Deactivate" : "Activate"}

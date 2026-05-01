@@ -44,6 +44,10 @@ export const customerSchema = z.object({
   area: z.string().min(1),
   credit_limit: z.number(),
   balance: z.number(),
+  status: z.enum(["pending_approval", "active", "rejected"]).optional(),
+  created_by: z.string().uuid().optional(),
+  approved_by: z.string().uuid().nullable().optional(),
+  approved_at: z.string().nullable().optional(),
   created_at: z.string()
 });
 
@@ -123,6 +127,19 @@ export const receiveNoteItemSchema = z.object({
   unit_cost: z.number()
 });
 
+export const notificationSchema = z.object({
+  id: z.string().uuid(),
+  recipient_id: z.string().uuid(),
+  title: z.string().min(1),
+  message: z.string().min(1),
+  type: z.string().min(1),
+  customer_id: z.string().uuid().nullable(),
+  is_read: z.boolean(),
+  read_at: z.string().nullable(),
+  created_by: z.string().uuid().nullable(),
+  created_at: z.string()
+});
+
 export type UserSchemaType = z.infer<typeof userSchema>;
 export type CustomRoleSchemaType = z.infer<typeof customRoleSchema>;
 export type CustomerSchemaType = z.infer<typeof customerSchema>;
@@ -133,3 +150,4 @@ export type CollectionSchemaType = z.infer<typeof collectionSchema>;
 export type InvoiceSchemaType = z.infer<typeof invoiceSchema>;
 export type ReceiveNoteSchemaType = z.infer<typeof receiveNoteSchema>;
 export type ReceiveNoteItemSchemaType = z.infer<typeof receiveNoteItemSchema>;
+export type NotificationSchemaType = z.infer<typeof notificationSchema>;

@@ -2,6 +2,7 @@
 
 import {
   BarChart3,
+  Bell,
   ClipboardList,
   FileText,
   HandCoins,
@@ -36,6 +37,7 @@ const navItems: SidebarItem[] = [
   { href: "/receive-notes", label: "Receive Notes", icon: ReceiptText },
   { href: "/products", label: "Products", icon: Package },
   { href: "/customers", label: "Customers", icon: Users },
+  { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/reports", label: "Reports", icon: BarChart3 }
 ];
 

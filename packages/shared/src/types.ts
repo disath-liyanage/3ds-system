@@ -42,6 +42,10 @@ export interface Customer {
   area: string;
   credit_limit: number;
   balance: number;
+  status?: "pending_approval" | "active" | "rejected";
+  created_by?: string;
+  approved_by?: string | null;
+  approved_at?: string | null;
   created_at: string;
 }
 
@@ -95,6 +99,19 @@ export interface Invoice {
   issued_by: string;
   total_amount: number;
   status: "draft" | "issued" | "paid";
+  created_at: string;
+}
+
+export interface Notification {
+  id: string;
+  recipient_id: string;
+  title: string;
+  message: string;
+  type: string;
+  customer_id: string | null;
+  is_read: boolean;
+  read_at: string | null;
+  created_by: string | null;
   created_at: string;
 }
 
