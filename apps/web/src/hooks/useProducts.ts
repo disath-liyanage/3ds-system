@@ -2,7 +2,7 @@
 
 import type { Product } from "@paintdist/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 
 import {
   createProduct as createProductAction,
@@ -11,6 +11,7 @@ import {
   updateProduct as updateProductAction
 } from "@/app/actions/products";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeInvalidate } from "@/hooks/useRealtimeInvalidate";
 
 const PRODUCTS_QUERY_KEY = ["products"] as const;
 
@@ -72,18 +73,11 @@ export function useProducts() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY })
   });
 
-  useEffect(() => {
-    const channel = supabase
-      .channel("products-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "products" }, () => {
-        queryClient.invalidateQueries({ queryKey: PRODUCTS_QUERY_KEY });
-      })
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [queryClient, supabase]);
+  useRealtimeInvalidate({
+    channel: "products-realtime",
+    table: "products",
+    queryKeys: [PRODUCTS_QUERY_KEY]
+  });
 
   return {
     ...productsQuery,

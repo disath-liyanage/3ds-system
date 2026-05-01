@@ -15,6 +15,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
+import { useRealtimeInvalidate } from "@/hooks/useRealtimeInvalidate";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/lib/toast";
 
@@ -29,6 +30,10 @@ type CustomerRow = {
   status: "pending_approval" | "active" | "rejected";
   created_by: string | null;
 };
+
+const CUSTOMERS_QUERY_KEY = ["customers"] as const;
+const NOTIFICATIONS_QUERY_KEY = ["notifications"] as const;
+const NOTIFICATIONS_UNREAD_QUERY_KEY = ["notifications-unread-count"] as const;
 
 export default function CustomersPage() {
   const [query, setQuery] = useState("");
@@ -56,8 +61,14 @@ export default function CustomersPage() {
   const supabase = useMemo(() => createClient(), []);
   const queryClient = useQueryClient();
 
+  useRealtimeInvalidate({
+    channel: "customers-realtime",
+    table: "customers",
+    queryKeys: [CUSTOMERS_QUERY_KEY, NOTIFICATIONS_QUERY_KEY, NOTIFICATIONS_UNREAD_QUERY_KEY]
+  });
+
   const customersQuery = useQuery({
-    queryKey: ["customers"],
+    queryKey: CUSTOMERS_QUERY_KEY,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")

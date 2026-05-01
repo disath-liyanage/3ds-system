@@ -2,9 +2,10 @@
 
 import type { Collection } from "@paintdist/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeInvalidate } from "@/hooks/useRealtimeInvalidate";
 
 const COLLECTIONS_QUERY_KEY = ["collections"] as const;
 
@@ -59,18 +60,11 @@ export function useCollections() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: COLLECTIONS_QUERY_KEY })
   });
 
-  useEffect(() => {
-    const channel = supabase
-      .channel("collections-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "collections" }, () => {
-        queryClient.invalidateQueries({ queryKey: COLLECTIONS_QUERY_KEY });
-      })
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [queryClient, supabase]);
+  useRealtimeInvalidate({
+    channel: "collections-realtime",
+    table: "collections",
+    queryKeys: [COLLECTIONS_QUERY_KEY]
+  });
 
   return {
     ...collectionsQuery,

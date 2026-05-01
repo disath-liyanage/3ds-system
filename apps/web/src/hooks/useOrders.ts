@@ -2,9 +2,10 @@
 
 import type { Order } from "@paintdist/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeInvalidate } from "@/hooks/useRealtimeInvalidate";
 
 const ORDERS_QUERY_KEY = ["orders"] as const;
 
@@ -54,18 +55,11 @@ export function useOrders() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ORDERS_QUERY_KEY })
   });
 
-  useEffect(() => {
-    const channel = supabase
-      .channel("orders-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
-        queryClient.invalidateQueries({ queryKey: ORDERS_QUERY_KEY });
-      })
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [queryClient, supabase]);
+  useRealtimeInvalidate({
+    channel: "orders-realtime",
+    table: "orders",
+    queryKeys: [ORDERS_QUERY_KEY]
+  });
 
   return {
     ...ordersQuery,
