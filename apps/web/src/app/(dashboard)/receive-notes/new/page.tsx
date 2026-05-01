@@ -98,35 +98,55 @@ export default function NewReceiveNotePage() {
             <CardTitle>Items</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="hidden gap-2 text-xs font-semibold text-muted-foreground md:grid md:grid-cols-12">
+              <div className="md:col-span-4">Product</div>
+              <div className="md:col-span-1">Qty</div>
+              <div className="md:col-span-2">Product cost</div>
+              <div className="md:col-span-2">Item discount price</div>
+              <div className="md:col-span-2">Sales discount for rep</div>
+              <div className="md:col-span-1">Collection for rep</div>
+            </div>
             {fields.map((field, index) => (
-              <div key={field.id} className="grid gap-2 rounded-md border border-border p-3 md:grid-cols-7">
-                <SearchableSelect
-                  value={watchedItems?.[index]?.product_id ?? ""}
-                  options={productOptions}
-                  placeholder={isProductsLoading ? "Loading products..." : "Select product"}
-                  disabled={isProductsLoading}
-                  onChange={(value) => setValue(`items.${index}.product_id`, value)}
-                />
-                <Input type="number" step="0.01" placeholder="Qty" {...register(`items.${index}.qty`)} />
+              <div key={field.id} className="grid gap-2 rounded-md border border-border p-3 md:grid-cols-12">
+                <div className="md:col-span-4">
+                  <SearchableSelect
+                    value={watchedItems?.[index]?.product_id ?? ""}
+                    options={productOptions}
+                    placeholder={isProductsLoading ? "Loading products..." : "Select product"}
+                    disabled={isProductsLoading}
+                    onChange={(value) => setValue(`items.${index}.product_id`, value)}
+                  />
+                </div>
                 <Input
+                  className="md:col-span-1"
+                  type="number"
+                  step="0.01"
+                  placeholder="Qty"
+                  {...register(`items.${index}.qty`)}
+                />
+                <Input
+                  className="md:col-span-2"
                   type="number"
                   step="0.01"
                   placeholder="Product cost"
                   {...register(`items.${index}.product_cost`)}
                 />
                 <Input
+                  className="md:col-span-2"
                   type="number"
                   step="0.01"
                   placeholder="Item discount price"
                   {...register(`items.${index}.item_discount_price`)}
                 />
                 <Input
+                  className="md:col-span-2"
                   type="number"
                   step="0.01"
                   placeholder="Sales discount for rep"
                   {...register(`items.${index}.rep_sales_discount`)}
                 />
                 <Input
+                  className="md:col-span-1"
                   type="number"
                   step="0.01"
                   placeholder="Collection for rep"
