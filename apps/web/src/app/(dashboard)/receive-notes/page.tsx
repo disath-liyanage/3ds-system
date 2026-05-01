@@ -18,8 +18,8 @@ export default function ReceiveNotesPage() {
   if (!isLoading && !canManageReceiveNotes) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">Receive Notes</h1>
-        <p className="text-sm text-muted-foreground">You do not have permission to access receive notes.</p>
+        <h1 className="text-2xl font-bold">GRN</h1>
+        <p className="text-sm text-muted-foreground">You do not have permission to access GRN.</p>
       </section>
     );
   }
@@ -28,20 +28,25 @@ export default function ReceiveNotesPage() {
     <section className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Receive Notes</h1>
-          <p className="text-sm text-muted-foreground">Stock intake log from suppliers.</p>
+          <h1 className="text-2xl font-bold">GRN</h1>
+          <p className="text-sm text-muted-foreground">GRN log from suppliers.</p>
         </div>
         {canManageReceiveNotes ? (
-          <Button asChild>
-            <Link href="/receive-notes/new">New Receive Note</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline">
+              <Link href="/suppliers/new">Add Supplier</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/receive-notes/new">New GRN</Link>
+            </Button>
+          </div>
         ) : null}
       </div>
 
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>RN #</TableHead>
+            <TableHead>GRN #</TableHead>
             <TableHead>Supplier</TableHead>
             <TableHead>Received At</TableHead>
           </TableRow>

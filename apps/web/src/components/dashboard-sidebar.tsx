@@ -35,7 +35,7 @@ const baseNavItems: SidebarItem[] = [
   { href: "/orders", label: "Orders", icon: ClipboardList },
   { href: "/collections", label: "Collections", icon: HandCoins },
   { href: "/invoices", label: "Invoices", icon: FileText },
-  { href: "/receive-notes", label: "Receive Notes", icon: ReceiptText },
+  { href: "/receive-notes", label: "GRN", icon: ReceiptText },
   { href: "/products", label: "Products", icon: Package },
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/notifications", label: "Notifications", icon: Bell },

@@ -1,31 +1,60 @@
 "use client";
 
-import { useFieldArray, useForm } from "react-hook-form";
+import { useMemo } from "react";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
+import { useProducts } from "@/hooks/useProducts";
 
 type ReceiveNoteForm = {
+  invoice_number: string;
   supplier_name: string;
   notes: string;
   items: Array<{
     product_id: string;
     qty: number;
-    unit_cost: number;
+    product_cost: number;
+    item_discount_price: number;
+    rep_sales_discount: number;
+    rep_collection: number;
   }>;
 };
 
 export default function NewReceiveNotePage() {
   const { permissions, isLoading } = useCurrentUserPermissions();
-  const { control, register, handleSubmit } = useForm<ReceiveNoteForm>({
+  const { data: products, isLoading: isProductsLoading } = useProducts();
+  const { control, register, handleSubmit, setValue } = useForm<ReceiveNoteForm>({
     defaultValues: {
+      invoice_number: "",
       supplier_name: "",
       notes: "",
-      items: [{ product_id: "", qty: 1, unit_cost: 0 }]
+      items: [
+        {
+          product_id: "",
+          qty: 1,
+          product_cost: 0,
+          item_discount_price: 0,
+          rep_sales_discount: 0,
+          rep_collection: 0
+        }
+      ]
     }
   });
+
+  const watchedItems = useWatch({ control, name: "items" });
+
+  const productOptions = useMemo<SearchableSelectOption[]>(
+    () =>
+      (products ?? []).map((product) => ({
+        value: product.id,
+        label: `${product.name} · ${product.unit}`
+      })),
+    [products]
+  );
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -39,8 +68,8 @@ export default function NewReceiveNotePage() {
   if (!isLoading && !permissions?.canManageReceiveNotes) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">New Receive Note</h1>
-        <p className="text-sm text-muted-foreground">You do not have permission to create receive notes.</p>
+        <h1 className="text-2xl font-bold">New GRN</h1>
+        <p className="text-sm text-muted-foreground">You do not have permission to create GRN.</p>
       </section>
     );
   }
@@ -48,7 +77,7 @@ export default function NewReceiveNotePage() {
   return (
     <section className="space-y-6">
       <header>
-        <h1 className="text-2xl font-bold">New Receive Note</h1>
+        <h1 className="text-2xl font-bold">New GRN</h1>
         <p className="text-sm text-muted-foreground">Record supplier stock received into inventory.</p>
       </header>
 
@@ -57,7 +86,8 @@ export default function NewReceiveNotePage() {
           <CardHeader>
             <CardTitle>Header</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2">
+          <CardContent className="grid gap-3 md:grid-cols-3">
+            <Input placeholder="Invoice number" {...register("invoice_number")} />
             <Input placeholder="Supplier name" {...register("supplier_name")} />
             <Input placeholder="Notes" {...register("notes")} />
           </CardContent>
@@ -69,14 +99,38 @@ export default function NewReceiveNotePage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {fields.map((field, index) => (
-              <div key={field.id} className="grid gap-2 rounded-md border border-border p-3 md:grid-cols-4">
-                <Input placeholder="Product UUID" {...register(`items.${index}.product_id`)} />
+              <div key={field.id} className="grid gap-2 rounded-md border border-border p-3 md:grid-cols-7">
+                <SearchableSelect
+                  value={watchedItems?.[index]?.product_id ?? ""}
+                  options={productOptions}
+                  placeholder={isProductsLoading ? "Loading products..." : "Select product"}
+                  disabled={isProductsLoading}
+                  onChange={(value) => setValue(`items.${index}.product_id`, value)}
+                />
                 <Input type="number" step="0.01" placeholder="Qty" {...register(`items.${index}.qty`)} />
                 <Input
                   type="number"
                   step="0.01"
-                  placeholder="Unit Cost"
-                  {...register(`items.${index}.unit_cost`)}
+                  placeholder="Product cost"
+                  {...register(`items.${index}.product_cost`)}
+                />
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="Item discount price"
+                  {...register(`items.${index}.item_discount_price`)}
+                />
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="Sales discount for rep"
+                  {...register(`items.${index}.rep_sales_discount`)}
+                />
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="Collection for rep"
+                  {...register(`items.${index}.rep_collection`)}
                 />
                 <Button type="button" variant="ghost" onClick={() => remove(index)}>
                   Remove
@@ -86,14 +140,23 @@ export default function NewReceiveNotePage() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => append({ product_id: "", qty: 1, unit_cost: 0 })}
+              onClick={() =>
+                append({
+                  product_id: "",
+                  qty: 1,
+                  product_cost: 0,
+                  item_discount_price: 0,
+                  rep_sales_discount: 0,
+                  rep_collection: 0
+                })
+              }
             >
               Add Item
             </Button>
           </CardContent>
         </Card>
 
-        <Button type="submit">Save Receive Note</Button>
+        <Button type="submit">Add GRN</Button>
       </form>
     </section>
   );
