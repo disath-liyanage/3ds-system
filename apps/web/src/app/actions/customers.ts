@@ -33,6 +33,8 @@ export type CreateCustomerInput = {
   credit_limit?: number;
 };
 
+export type UpdateCustomerInput = CreateCustomerInput;
+
 async function getCurrentUserProfile() {
   const supabase = createClient();
 
@@ -152,7 +154,7 @@ export async function createCustomer(input: CreateCustomerInput): Promise<Action
   };
 }
 
-export async function approvePendingCustomer(customerId: string, notificationId: string): Promise<ActionResult> {
+export async function approvePendingCustomer(customerId: string, notificationId?: string): Promise<ActionResult> {
   const access = await getCurrentUserProfile();
   if ("error" in access) return { success: false, error: access.error };
 
@@ -160,13 +162,13 @@ export async function approvePendingCustomer(customerId: string, notificationId:
     return { success: false, error: "Only admins and managers can approve customers" };
   }
 
-  if (!customerId || !notificationId) {
-    return { success: false, error: "Missing customer or notification id" };
+  if (!customerId) {
+    return { success: false, error: "Missing customer id" };
   }
 
   const { data: customer, error: customerError } = await adminClient
     .from("customers")
-    .select("id, status")
+    .select("id, name, status, created_by")
     .eq("id", customerId)
     .maybeSingle();
 
@@ -191,17 +193,19 @@ export async function approvePendingCustomer(customerId: string, notificationId:
     return { success: false, error: updateCustomerError.message };
   }
 
-  const { error: markCurrentError } = await adminClient
-    .from("notifications")
-    .update({
-      is_read: true,
-      read_at: new Date().toISOString()
-    })
-    .eq("id", notificationId)
-    .eq("recipient_id", access.profile.id);
+  if (notificationId) {
+    const { error: markCurrentError } = await adminClient
+      .from("notifications")
+      .update({
+        is_read: true,
+        read_at: new Date().toISOString()
+      })
+      .eq("id", notificationId)
+      .eq("recipient_id", access.profile.id);
 
-  if (markCurrentError) {
-    return { success: false, error: markCurrentError.message };
+    if (markCurrentError) {
+      return { success: false, error: markCurrentError.message };
+    }
   }
 
   await adminClient
@@ -213,10 +217,177 @@ export async function approvePendingCustomer(customerId: string, notificationId:
     .eq("customer_id", customerId)
     .eq("type", "customer_approval_request");
 
+  if (customer.created_by) {
+    await adminClient.from("notifications").insert({
+      recipient_id: customer.created_by,
+      title: "Customer request approved",
+      message: `Your customer request "${customer.name}" has been approved.`,
+      type: "customer_approval_result",
+      customer_id: customer.id,
+      created_by: access.profile.id
+    });
+  }
+
   revalidatePath("/customers");
   revalidatePath("/notifications");
 
   return { success: true, message: "Customer approved successfully." };
+}
+
+export async function removePendingCustomer(customerId: string, notificationId?: string): Promise<ActionResult> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (access.profile.role !== "admin" && access.profile.role !== "manager") {
+    return { success: false, error: "Only admins and managers can remove pending customers" };
+  }
+
+  if (!customerId) {
+    return { success: false, error: "Missing customer id" };
+  }
+
+  const { data: customer, error: customerError } = await adminClient
+    .from("customers")
+    .select("id, name, status, created_by")
+    .eq("id", customerId)
+    .maybeSingle();
+
+  if (customerError || !customer) {
+    return { success: false, error: customerError?.message || "Customer not found" };
+  }
+
+  if (customer.status !== "pending_approval") {
+    return { success: false, error: "Only pending customers can be removed from review flow" };
+  }
+
+  await adminClient
+    .from("notifications")
+    .update({
+      is_read: true,
+      read_at: new Date().toISOString()
+    })
+    .eq("customer_id", customerId)
+    .eq("type", "customer_approval_request");
+
+  if (notificationId) {
+    await adminClient
+      .from("notifications")
+      .update({
+        is_read: true,
+        read_at: new Date().toISOString()
+      })
+      .eq("id", notificationId)
+      .eq("recipient_id", access.profile.id);
+  }
+
+  const { error: deleteError } = await adminClient.from("customers").delete().eq("id", customerId);
+  if (deleteError) {
+    return { success: false, error: deleteError.message };
+  }
+
+  if (customer.created_by) {
+    await adminClient.from("notifications").insert({
+      recipient_id: customer.created_by,
+      title: "Customer request removed",
+      message: `Your customer request "${customer.name}" was removed by ${access.profile.full_name || access.profile.email}.`,
+      type: "customer_approval_result",
+      created_by: access.profile.id
+    });
+  }
+
+  revalidatePath("/customers");
+  revalidatePath("/notifications");
+  return { success: true, message: "Pending customer removed." };
+}
+
+export async function updateCustomer(customerId: string, input: UpdateCustomerInput): Promise<ActionResult> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  const name = input.name.trim();
+  const phone = input.phone.trim();
+  const address = input.address.trim();
+  const area = input.area.trim();
+  const creditLimit = Number(input.credit_limit ?? 0);
+
+  if (!name || !phone || !address || !area) {
+    return { success: false, error: "Name, phone, address, and area are required" };
+  }
+
+  if (!Number.isFinite(creditLimit) || creditLimit < 0) {
+    return { success: false, error: "Credit limit must be a valid non-negative number" };
+  }
+
+  const { data: customer, error: customerError } = await adminClient
+    .from("customers")
+    .select("id, status, created_by")
+    .eq("id", customerId)
+    .maybeSingle();
+
+  if (customerError || !customer) {
+    return { success: false, error: customerError?.message || "Customer not found" };
+  }
+
+  const isAdminOrManager = access.profile.role === "admin" || access.profile.role === "manager";
+  const isOwnPendingRequest =
+    access.profile.role === "sales_rep" &&
+    customer.created_by === access.profile.id &&
+    customer.status === "pending_approval";
+
+  if (!isAdminOrManager && !isOwnPendingRequest) {
+    return { success: false, error: "You do not have permission to edit this customer" };
+  }
+
+  const { error: updateError } = await adminClient
+    .from("customers")
+    .update({
+      name,
+      phone,
+      address,
+      area,
+      credit_limit: creditLimit
+    })
+    .eq("id", customerId);
+
+  if (updateError) {
+    return { success: false, error: updateError.message };
+  }
+
+  revalidatePath("/customers");
+  return { success: true, message: "Customer updated successfully." };
+}
+
+export async function deleteCustomer(customerId: string): Promise<ActionResult> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  const { data: customer, error: customerError } = await adminClient
+    .from("customers")
+    .select("id, name, status, created_by")
+    .eq("id", customerId)
+    .maybeSingle();
+
+  if (customerError || !customer) {
+    return { success: false, error: customerError?.message || "Customer not found" };
+  }
+
+  const isAdminOrManager = access.profile.role === "admin" || access.profile.role === "manager";
+  const isOwnPendingRequest =
+    access.profile.role === "sales_rep" &&
+    customer.created_by === access.profile.id &&
+    customer.status === "pending_approval";
+
+  if (!isAdminOrManager && !isOwnPendingRequest) {
+    return { success: false, error: "You do not have permission to delete this customer" };
+  }
+
+  const { error: deleteError } = await adminClient.from("customers").delete().eq("id", customerId);
+  if (deleteError) {
+    return { success: false, error: deleteError.message };
+  }
+
+  revalidatePath("/customers");
+  return { success: true, message: "Customer deleted successfully." };
 }
 
 export async function markNotificationRead(notificationId: string): Promise<ActionResult> {
