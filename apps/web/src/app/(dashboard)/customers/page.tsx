@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useMemo, useState } from "react";
 
 import {
@@ -54,6 +54,7 @@ export default function CustomersPage() {
 
   const { permissions, isLoading, user } = useCurrentUserPermissions();
   const supabase = useMemo(() => createClient(), []);
+  const queryClient = useQueryClient();
 
   const customersQuery = useQuery({
     queryKey: ["customers"],
@@ -91,6 +92,7 @@ export default function CustomersPage() {
     selectedCustomer?.status === "pending_approval" && (isAdminOrManager || isOwnPendingSalesRepCustomer)
   );
   const canRemoveApprovedSelected = Boolean(selectedCustomer?.status === "active" && isAdminOrManager);
+  const isPendingSelected = selectedCustomer?.status === "pending_approval";
 
   if (!isLoading && !canViewCustomers) {
     return (
@@ -170,6 +172,8 @@ export default function CustomersPage() {
     }
     toast({ title: "Customer approved", description: result.message, variant: "success" });
     setIsEditing(false);
+    await queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+    await queryClient.invalidateQueries({ queryKey: ["notifications"] });
     await customersQuery.refetch();
   };
 
@@ -205,6 +209,8 @@ export default function CustomersPage() {
       variant: "success"
     });
     setIsEditing(false);
+    await queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+    await queryClient.invalidateQueries({ queryKey: ["notifications"] });
     await customersQuery.refetch();
   };
 
@@ -262,7 +268,7 @@ export default function CustomersPage() {
           {filtered.map((customer) => (
             <TableRow
               key={customer.id}
-              className="cursor-pointer"
+              className={`cursor-pointer ${customer.status === "pending_approval" ? "bg-orange-50 hover:bg-orange-100" : ""}`}
               onClick={() => openCustomerDialog(customer)}
             >
               <TableCell>{customer.name}</TableCell>
@@ -334,57 +340,72 @@ export default function CustomersPage() {
                   Edit
                 </Button>
               ) : null}
-              {canEditSelected && isEditing ? (
-                <Button
-                  size="sm"
-                  disabled={processingCustomerId === selectedCustomer.id}
-                  onClick={handleSaveCustomer}
-                >
-                  Save Changes
-                </Button>
-              ) : null}
 
-              {canApproveSelected ? (
-                <Button
-                  size="sm"
-                  disabled={processingCustomerId === selectedCustomer.id}
-                  onClick={() => handleApproveFromCustomers(selectedCustomer.id)}
-                >
-                  Approve
-                </Button>
-              ) : null}
+              {isEditing && isPendingSelected && canApproveSelected ? (
+                <>
+                  <Button
+                    size="sm"
+                    disabled={processingCustomerId === selectedCustomer.id}
+                    onClick={handleSaveAndApprove}
+                  >
+                    Edit & Approve
+                  </Button>
+                  {canDeletePendingSelected ? (
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      disabled={processingCustomerId === selectedCustomer.id}
+                      onClick={() => handleDeletePendingCustomer(selectedCustomer.id)}
+                    >
+                      Delete
+                    </Button>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  {canEditSelected && isEditing ? (
+                    <Button
+                      size="sm"
+                      disabled={processingCustomerId === selectedCustomer.id}
+                      onClick={handleSaveCustomer}
+                    >
+                      Save Changes
+                    </Button>
+                  ) : null}
 
-              {canApproveSelected && isEditing ? (
-                <Button
-                  size="sm"
-                  disabled={processingCustomerId === selectedCustomer.id}
-                  onClick={handleSaveAndApprove}
-                >
-                  Edit & Approve
-                </Button>
-              ) : null}
+                  {canApproveSelected ? (
+                    <Button
+                      size="sm"
+                      disabled={processingCustomerId === selectedCustomer.id}
+                      onClick={() => handleApproveFromCustomers(selectedCustomer.id)}
+                    >
+                      Approve
+                    </Button>
+                  ) : null}
 
-              {canDeletePendingSelected ? (
-                <Button
-                  size="sm"
-                  variant="danger"
-                  disabled={processingCustomerId === selectedCustomer.id}
-                  onClick={() => handleDeletePendingCustomer(selectedCustomer.id)}
-                >
-                  Delete
-                </Button>
-              ) : null}
+                  {canDeletePendingSelected ? (
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      disabled={processingCustomerId === selectedCustomer.id}
+                      onClick={() => handleDeletePendingCustomer(selectedCustomer.id)}
+                    >
+                      Delete
+                    </Button>
+                  ) : null}
 
-              {canRemoveApprovedSelected ? (
-                <Button
-                  size="sm"
-                  variant="danger"
-                  disabled={processingCustomerId === selectedCustomer.id}
-                  onClick={() => handleRemoveApprovedCustomer(selectedCustomer.id)}
-                >
-                  Remove Customer
-                </Button>
-              ) : null}
+                  {canRemoveApprovedSelected ? (
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      disabled={processingCustomerId === selectedCustomer.id}
+                      onClick={() => handleRemoveApprovedCustomer(selectedCustomer.id)}
+                    >
+                      Remove Customer
+                    </Button>
+                  ) : null}
+                </>
+              )}
             </div>
           </div>
         ) : (

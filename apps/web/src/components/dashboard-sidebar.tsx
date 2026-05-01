@@ -13,9 +13,9 @@ import {
   ShieldCheck,
   Users
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Sidebar, type SidebarItem } from "@/components/ui/sidebar";
 import { createClient } from "@/lib/supabase/client";
@@ -51,6 +51,8 @@ export function DashboardSidebar({ isAdmin, user }: DashboardSidebarProps) {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const queryClient = useQueryClient();
+  const previousUnreadCountRef = useRef<number | null>(null);
 
   const displayName = user.fullName?.trim() || user.email;
   const secondaryText = displayName === user.email ? user.role : `${user.email} · ${user.role}`;
@@ -82,6 +84,119 @@ export function DashboardSidebar({ isAdmin, user }: DashboardSidebarProps) {
       ),
     [unreadNotificationsQuery.data]
   );
+
+  const playNotificationSound = () => {
+    if (typeof window === "undefined") return;
+
+    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    const audioContext = new AudioContextClass();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+    gainNode.gain.setValueAtTime(0.0001, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.08, audioContext.currentTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.16);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.17);
+
+    oscillator.onended = () => {
+      void audioContext.close();
+    };
+  };
+
+  useEffect(() => {
+    const currentUnread = unreadNotificationsQuery.data ?? 0;
+    const previousUnread = previousUnreadCountRef.current;
+
+    if (previousUnread !== null && currentUnread > previousUnread) {
+      playNotificationSound();
+    }
+
+    previousUnreadCountRef.current = currentUnread;
+  }, [unreadNotificationsQuery.data]);
+
+  useEffect(() => {
+    let isMounted = true;
+    let authUserId: string | null = null;
+    let subscription:
+      | ReturnType<ReturnType<typeof createClient>["channel"]>
+      | null = null;
+
+    const attachRealtime = async () => {
+      const {
+        data: { user: authUser }
+      } = await supabase.auth.getUser();
+
+      if (!isMounted || !authUser) return;
+      authUserId = authUser.id;
+
+      subscription = supabase
+        .channel(`notifications-unread-${authUser.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "notifications",
+            filter: `recipient_id=eq.${authUser.id}`
+          },
+          async (payload) => {
+            const eventType = payload.eventType;
+            const newRow = (payload as { new?: { is_read?: boolean } }).new;
+            const oldRow = (payload as { old?: { is_read?: boolean } }).old;
+
+            if (eventType === "INSERT" && newRow?.is_read === false) {
+              queryClient.setQueryData<number>(["notifications-unread-count"], (current) => (current ?? 0) + 1);
+              return;
+            }
+
+            if (eventType === "UPDATE") {
+              if (oldRow?.is_read === false && newRow?.is_read === true) {
+                queryClient.setQueryData<number>(["notifications-unread-count"], (current) =>
+                  Math.max(0, (current ?? 0) - 1)
+                );
+                return;
+              }
+
+              if (oldRow?.is_read === true && newRow?.is_read === false) {
+                queryClient.setQueryData<number>(["notifications-unread-count"], (current) => (current ?? 0) + 1);
+                return;
+              }
+            }
+
+            if (eventType === "DELETE" && oldRow?.is_read === false) {
+              queryClient.setQueryData<number>(["notifications-unread-count"], (current) =>
+                Math.max(0, (current ?? 0) - 1)
+              );
+              return;
+            }
+
+            await queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+          }
+        )
+        .subscribe();
+    };
+
+    attachRealtime();
+
+    return () => {
+      isMounted = false;
+      if (subscription) {
+        void supabase.removeChannel(subscription);
+      }
+      if (authUserId) {
+        void queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+      }
+    };
+  }, [queryClient, supabase]);
 
   const handleSignOut = async () => {
     if (isSigningOut) return;

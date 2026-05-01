@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { approvePendingCustomer, markNotificationRead, removePendingCustomer } from "@/app/actions/customers";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/lib/toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 type NotificationRow = {
   id: string;
@@ -39,6 +39,7 @@ export default function NotificationsPage() {
   const [selectedNotificationId, setSelectedNotificationId] = useState<string | null>(null);
   const { user } = useCurrentUserPermissions();
   const supabase = useMemo(() => createClient(), []);
+  const queryClient = useQueryClient();
 
   const notificationsQuery = useQuery({
     queryKey: ["notifications"],
@@ -68,6 +69,47 @@ export default function NotificationsPage() {
   const canReviewCustomers = user?.role === "admin" || user?.role === "manager";
   const selectedNotification = notificationsQuery.data?.find((item) => item.id === selectedNotificationId) || null;
 
+  useEffect(() => {
+    let isMounted = true;
+    let subscription:
+      | ReturnType<ReturnType<typeof createClient>["channel"]>
+      | null = null;
+
+    const attachRealtime = async () => {
+      const {
+        data: { user: authUser }
+      } = await supabase.auth.getUser();
+
+      if (!isMounted || !authUser) return;
+
+      subscription = supabase
+        .channel(`notifications-list-${authUser.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "notifications",
+            filter: `recipient_id=eq.${authUser.id}`
+          },
+          async () => {
+            await notificationsQuery.refetch();
+            await queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+          }
+        )
+        .subscribe();
+    };
+
+    attachRealtime();
+
+    return () => {
+      isMounted = false;
+      if (subscription) {
+        void supabase.removeChannel(subscription);
+      }
+    };
+  }, [notificationsQuery, queryClient, supabase]);
+
   const handleMarkRead = async (notificationId: string) => {
     setProcessingId(notificationId);
     const result = await markNotificationRead(notificationId);
@@ -78,6 +120,7 @@ export default function NotificationsPage() {
       return;
     }
 
+    await queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
     await notificationsQuery.refetch();
   };
 
@@ -93,6 +136,7 @@ export default function NotificationsPage() {
 
     toast({ title: "Customer approved", description: result.message, variant: "success" });
     setSelectedNotificationId(null);
+    await queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
     await notificationsQuery.refetch();
   };
 
@@ -108,6 +152,7 @@ export default function NotificationsPage() {
 
     toast({ title: "Customer removed", description: result.message, variant: "success" });
     setSelectedNotificationId(null);
+    await queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
     await notificationsQuery.refetch();
   };
 
