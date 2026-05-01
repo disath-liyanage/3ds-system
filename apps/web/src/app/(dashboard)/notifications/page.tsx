@@ -37,7 +37,7 @@ type RawNotificationRow = Omit<NotificationRow, "customer"> & {
 export default function NotificationsPage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [selectedNotificationId, setSelectedNotificationId] = useState<string | null>(null);
-  const { permissions, user } = useCurrentUserPermissions();
+  const { user } = useCurrentUserPermissions();
   const supabase = useMemo(() => createClient(), []);
 
   const notificationsQuery = useQuery({
@@ -123,7 +123,7 @@ export default function NotificationsPage() {
           {notificationsQuery.data.map((notification) => {
             const pendingApproval = notification.type === "customer_approval_request" && !!notification.customer_id;
             const isProcessing = processingId === notification.id;
-            const showApprove = pendingApproval && !notification.is_read && canReviewCustomers;
+            const showViewCustomer = pendingApproval && !!notification.customer;
 
             return (
               <Card key={notification.id}>
@@ -147,27 +147,10 @@ export default function NotificationsPage() {
                         Mark as read
                       </Button>
                     ) : null}
-                    {showApprove ? (
-                      <>
-                        <Button size="sm" variant="outline" onClick={() => setSelectedNotificationId(notification.id)}>
-                          View Customer
-                        </Button>
-                        <Button
-                          size="sm"
-                          disabled={isProcessing}
-                          onClick={() => handleApproveCustomer(notification.customer_id as string, notification.id)}
-                        >
-                          Approve Customer
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="danger"
-                          disabled={isProcessing}
-                          onClick={() => handleRemoveCustomer(notification.customer_id as string, notification.id)}
-                        >
-                          Remove Customer
-                        </Button>
-                      </>
+                    {showViewCustomer ? (
+                      <Button size="sm" variant="outline" onClick={() => setSelectedNotificationId(notification.id)}>
+                        View Customer
+                      </Button>
                     ) : null}
                   </div>
                 </CardContent>

@@ -13,8 +13,9 @@ import {
   ShieldCheck,
   Users
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Sidebar, type SidebarItem } from "@/components/ui/sidebar";
 import { createClient } from "@/lib/supabase/client";
@@ -29,7 +30,7 @@ type DashboardSidebarProps = {
   };
 };
 
-const navItems: SidebarItem[] = [
+const baseNavItems: SidebarItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/orders", label: "Orders", icon: ClipboardList },
   { href: "/collections", label: "Collections", icon: HandCoins },
@@ -49,16 +50,43 @@ const adminNavItems: SidebarItem[] = [
 export function DashboardSidebar({ isAdmin, user }: DashboardSidebarProps) {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
 
   const displayName = user.fullName?.trim() || user.email;
   const secondaryText = displayName === user.email ? user.role : `${user.email} · ${user.role}`;
+
+  const unreadNotificationsQuery = useQuery({
+    queryKey: ["notifications-unread-count"],
+    queryFn: async () => {
+      const {
+        data: { user: authUser }
+      } = await supabase.auth.getUser();
+
+      if (!authUser) return 0;
+
+      const { count, error } = await supabase
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .eq("recipient_id", authUser.id)
+        .eq("is_read", false);
+
+      if (error) return 0;
+      return count ?? 0;
+    }
+  });
+
+  const navItems = useMemo(
+    () =>
+      baseNavItems.map((item) =>
+        item.href === "/notifications" ? { ...item, badgeCount: unreadNotificationsQuery.data ?? 0 } : item
+      ),
+    [unreadNotificationsQuery.data]
+  );
 
   const handleSignOut = async () => {
     if (isSigningOut) return;
 
     setIsSigningOut(true);
-    const supabase = createClient();
-
     await supabase.auth.signOut();
     router.replace("/login");
     router.refresh();

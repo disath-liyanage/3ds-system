@@ -11,6 +11,7 @@ export type SidebarItem = {
   href: string;
   label: string;
   icon?: LucideIcon;
+  badgeCount?: number;
 };
 
 type SidebarProps = {
@@ -39,6 +40,11 @@ export function Sidebar({ title, items, adminItems = [], adminTitle = "Admin", f
       >
         {Icon ? <Icon className="h-4 w-4" /> : null}
         <span>{item.label}</span>
+        {typeof item.badgeCount === "number" && item.badgeCount > 0 ? (
+          <span className="ml-auto rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
+            {item.badgeCount}
+          </span>
+        ) : null}
       </Link>
     );
   };

@@ -22,9 +22,12 @@ type CustomerRow = {
   id: string;
   name: string;
   phone: string;
+  address: string;
   area: string;
+  credit_limit: number;
   balance: number;
   status: "pending_approval" | "active" | "rejected";
+  created_by: string | null;
 };
 
 export default function CustomersPage() {
@@ -48,6 +51,7 @@ export default function CustomersPage() {
     area: "",
     credit_limit: "0"
   });
+
   const { permissions, isLoading, user } = useCurrentUserPermissions();
   const supabase = useMemo(() => createClient(), []);
 
@@ -56,7 +60,7 @@ export default function CustomersPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
-        .select("id, name, phone, area, balance, status")
+        .select("id, name, phone, address, area, credit_limit, balance, status, created_by")
         .order("created_at", { ascending: false });
 
       if (error) throw new Error(error.message);
@@ -74,8 +78,19 @@ export default function CustomersPage() {
 
   const canViewCustomers = permissions?.canViewCustomers || permissions?.canManageCustomers;
   const canAddCustomers = Boolean(permissions?.canAddCustomers);
-  const canApproveOrRemove = Boolean(user?.role === "admin" || user?.role === "manager");
+  const isAdminOrManager = user?.role === "admin" || user?.role === "manager";
   const selectedCustomer = (customersQuery.data || []).find((customer) => customer.id === selectedCustomerId) || null;
+  const isOwnPendingSalesRepCustomer = Boolean(
+    user?.role === "sales_rep" &&
+      selectedCustomer?.status === "pending_approval" &&
+      selectedCustomer?.created_by === user?.id
+  );
+  const canEditSelected = Boolean(selectedCustomer && (isAdminOrManager || isOwnPendingSalesRepCustomer));
+  const canApproveSelected = Boolean(isAdminOrManager && selectedCustomer?.status === "pending_approval");
+  const canDeletePendingSelected = Boolean(
+    selectedCustomer?.status === "pending_approval" && (isAdminOrManager || isOwnPendingSalesRepCustomer)
+  );
+  const canRemoveApprovedSelected = Boolean(selectedCustomer?.status === "active" && isAdminOrManager);
 
   if (!isLoading && !canViewCustomers) {
     return (
@@ -111,25 +126,14 @@ export default function CustomersPage() {
     await customersQuery.refetch();
   };
 
-  const openCustomerDialog = async (customer: CustomerRow) => {
-    const { data, error } = await supabase
-      .from("customers")
-      .select("id, name, phone, address, area, credit_limit, status, balance")
-      .eq("id", customer.id)
-      .maybeSingle();
-
-    if (error || !data) {
-      toast({ title: "Unable to load customer", description: error?.message, variant: "error" });
-      return;
-    }
-
-    setSelectedCustomerId(data.id);
+  const openCustomerDialog = (customer: CustomerRow) => {
+    setSelectedCustomerId(customer.id);
     setEditForm({
-      name: data.name,
-      phone: data.phone,
-      address: data.address,
-      area: data.area,
-      credit_limit: String(data.credit_limit ?? 0)
+      name: customer.name,
+      phone: customer.phone,
+      address: customer.address,
+      area: customer.area,
+      credit_limit: String(customer.credit_limit ?? 0)
     });
     setIsEditing(false);
   };
@@ -156,34 +160,70 @@ export default function CustomersPage() {
     await customersQuery.refetch();
   };
 
-  const handleDeleteCustomer = async (customerId: string) => {
-    setProcessingCustomerId(customerId);
-    const result = await deleteCustomer(customerId);
-    setProcessingCustomerId(null);
-    if (!result.success) {
-      toast({ title: "Delete failed", description: result.error, variant: "error" });
-      return;
-    }
-    toast({ title: "Customer deleted", description: result.message, variant: "success" });
-    if (selectedCustomerId === customerId) setSelectedCustomerId(null);
-    await customersQuery.refetch();
-  };
-
   const handleApproveFromCustomers = async (customerId: string) => {
     setProcessingCustomerId(customerId);
-    const result = await approvePendingCustomer(customerId, "");
+    const result = await approvePendingCustomer(customerId);
     setProcessingCustomerId(null);
     if (!result.success) {
       toast({ title: "Approve failed", description: result.error, variant: "error" });
       return;
     }
     toast({ title: "Customer approved", description: result.message, variant: "success" });
+    setIsEditing(false);
     await customersQuery.refetch();
   };
 
-  const handleRemoveFromCustomers = async (customerId: string) => {
+  const handleSaveAndApprove = async () => {
+    if (!selectedCustomer) return;
+    const customerId = selectedCustomer.id;
+
     setProcessingCustomerId(customerId);
-    const result = await removePendingCustomer(customerId);
+    const saveResult = await updateCustomer(customerId, {
+      name: editForm.name,
+      phone: editForm.phone,
+      address: editForm.address,
+      area: editForm.area,
+      credit_limit: Number(editForm.credit_limit || 0)
+    });
+
+    if (!saveResult.success) {
+      setProcessingCustomerId(null);
+      toast({ title: "Update failed", description: saveResult.error, variant: "error" });
+      return;
+    }
+
+    const approveResult = await approvePendingCustomer(customerId);
+    setProcessingCustomerId(null);
+    if (!approveResult.success) {
+      toast({ title: "Approve failed", description: approveResult.error, variant: "error" });
+      return;
+    }
+
+    toast({
+      title: "Customer updated and approved",
+      description: approveResult.message,
+      variant: "success"
+    });
+    setIsEditing(false);
+    await customersQuery.refetch();
+  };
+
+  const handleDeletePendingCustomer = async (customerId: string) => {
+    setProcessingCustomerId(customerId);
+    const result = await (isAdminOrManager ? removePendingCustomer(customerId) : deleteCustomer(customerId));
+    setProcessingCustomerId(null);
+    if (!result.success) {
+      toast({ title: "Delete failed", description: result.error, variant: "error" });
+      return;
+    }
+    toast({ title: "Customer removed", description: result.message, variant: "success" });
+    if (selectedCustomerId === customerId) setSelectedCustomerId(null);
+    await customersQuery.refetch();
+  };
+
+  const handleRemoveApprovedCustomer = async (customerId: string) => {
+    setProcessingCustomerId(customerId);
+    const result = await deleteCustomer(customerId);
     setProcessingCustomerId(null);
     if (!result.success) {
       toast({ title: "Remove failed", description: result.error, variant: "error" });
@@ -199,7 +239,7 @@ export default function CustomersPage() {
       <header className="flex items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Customers</h1>
-          <p className="text-sm text-muted-foreground">Review account balances and contacts.</p>
+          <p className="text-sm text-muted-foreground">Click a customer row to view details.</p>
         </div>
         {canAddCustomers ? <Button onClick={() => setIsAddOpen(true)}>Add Customer</Button> : null}
       </header>
@@ -216,12 +256,15 @@ export default function CustomersPage() {
             <TableHead>Area</TableHead>
             <TableHead>Balance</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {filtered.map((customer) => (
-            <TableRow key={customer.id}>
+            <TableRow
+              key={customer.id}
+              className="cursor-pointer"
+              onClick={() => openCustomerDialog(customer)}
+            >
               <TableCell>{customer.name}</TableCell>
               <TableCell>{customer.phone}</TableCell>
               <TableCell>{customer.area}</TableCell>
@@ -231,48 +274,7 @@ export default function CustomersPage() {
                   ? "Pending Approval"
                   : customer.status === "rejected"
                     ? "Rejected"
-                    : "Active"}
-              </TableCell>
-              <TableCell>
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={() => openCustomerDialog(customer)}>
-                    View
-                  </Button>
-                  {canAddCustomers ? (
-                    <Button size="sm" variant="outline" onClick={() => openCustomerDialog(customer)}>
-                      Edit
-                    </Button>
-                  ) : null}
-                  {canAddCustomers ? (
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      disabled={processingCustomerId === customer.id}
-                      onClick={() => handleDeleteCustomer(customer.id)}
-                    >
-                      Delete
-                    </Button>
-                  ) : null}
-                  {canApproveOrRemove && customer.status === "pending_approval" ? (
-                    <>
-                      <Button
-                        size="sm"
-                        disabled={processingCustomerId === customer.id}
-                        onClick={() => handleApproveFromCustomers(customer.id)}
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        disabled={processingCustomerId === customer.id}
-                        onClick={() => handleRemoveFromCustomers(customer.id)}
-                      >
-                        Remove
-                      </Button>
-                    </>
-                  ) : null}
-                </div>
+                    : "Approved"}
               </TableCell>
             </TableRow>
           ))}
@@ -288,7 +290,7 @@ export default function CustomersPage() {
           }
         }}
         title="Customer details"
-        description="View customer details, edit changes, delete, or review pending requests."
+        description="Edit details and manage approval state."
       >
         {selectedCustomer ? (
           <div className="space-y-3">
@@ -325,13 +327,14 @@ export default function CustomersPage() {
               disabled={!isEditing}
               onChange={(event) => setEditForm((prev) => ({ ...prev, credit_limit: event.target.value }))}
             />
+
             <div className="flex flex-wrap gap-2">
-              {canAddCustomers && !isEditing ? (
+              {canEditSelected && !isEditing ? (
                 <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
                   Edit
                 </Button>
               ) : null}
-              {canAddCustomers && isEditing ? (
+              {canEditSelected && isEditing ? (
                 <Button
                   size="sm"
                   disabled={processingCustomerId === selectedCustomer.id}
@@ -340,34 +343,47 @@ export default function CustomersPage() {
                   Save Changes
                 </Button>
               ) : null}
-              {canAddCustomers ? (
+
+              {canApproveSelected ? (
+                <Button
+                  size="sm"
+                  disabled={processingCustomerId === selectedCustomer.id}
+                  onClick={() => handleApproveFromCustomers(selectedCustomer.id)}
+                >
+                  Approve
+                </Button>
+              ) : null}
+
+              {canApproveSelected && isEditing ? (
+                <Button
+                  size="sm"
+                  disabled={processingCustomerId === selectedCustomer.id}
+                  onClick={handleSaveAndApprove}
+                >
+                  Edit & Approve
+                </Button>
+              ) : null}
+
+              {canDeletePendingSelected ? (
                 <Button
                   size="sm"
                   variant="danger"
                   disabled={processingCustomerId === selectedCustomer.id}
-                  onClick={() => handleDeleteCustomer(selectedCustomer.id)}
+                  onClick={() => handleDeletePendingCustomer(selectedCustomer.id)}
                 >
                   Delete
                 </Button>
               ) : null}
-              {canApproveOrRemove && selectedCustomer.status === "pending_approval" ? (
-                <>
-                  <Button
-                    size="sm"
-                    disabled={processingCustomerId === selectedCustomer.id}
-                    onClick={() => handleApproveFromCustomers(selectedCustomer.id)}
-                  >
-                    Approve
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="danger"
-                    disabled={processingCustomerId === selectedCustomer.id}
-                    onClick={() => handleRemoveFromCustomers(selectedCustomer.id)}
-                  >
-                    Remove
-                  </Button>
-                </>
+
+              {canRemoveApprovedSelected ? (
+                <Button
+                  size="sm"
+                  variant="danger"
+                  disabled={processingCustomerId === selectedCustomer.id}
+                  onClick={() => handleRemoveApprovedCustomer(selectedCustomer.id)}
+                >
+                  Remove Customer
+                </Button>
               ) : null}
             </div>
           </div>
