@@ -51,6 +51,15 @@ export const customerSchema = z.object({
   created_at: z.string()
 });
 
+export const supplierSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  phone: z.string().min(1),
+  address: z.string().min(1),
+  created_by: z.string().uuid().nullable().optional(),
+  created_at: z.string()
+});
+
 export const productSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
@@ -143,6 +152,7 @@ export const notificationSchema = z.object({
 export type UserSchemaType = z.infer<typeof userSchema>;
 export type CustomRoleSchemaType = z.infer<typeof customRoleSchema>;
 export type CustomerSchemaType = z.infer<typeof customerSchema>;
+export type SupplierSchemaType = z.infer<typeof supplierSchema>;
 export type ProductSchemaType = z.infer<typeof productSchema>;
 export type OrderSchemaType = z.infer<typeof orderSchema>;
 export type OrderItemSchemaType = z.infer<typeof orderItemSchema>;

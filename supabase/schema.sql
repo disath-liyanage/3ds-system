@@ -30,6 +30,15 @@ create table if not exists public.customers (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.suppliers (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  phone text not null,
+  address text not null,
+  created_by uuid references public.users_profile (id),
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.products (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -258,6 +267,7 @@ execute function public.audit_order_update();
 
 alter table public.users_profile enable row level security;
 alter table public.customers enable row level security;
+alter table public.suppliers enable row level security;
 alter table public.products enable row level security;
 alter table public.orders enable row level security;
 alter table public.order_items enable row level security;
@@ -274,6 +284,11 @@ using (public.is_admin_or_manager())
 with check (public.is_admin_or_manager());
 
 create policy customers_admin_manager_all on public.customers
+for all
+using (public.is_admin_or_manager())
+with check (public.is_admin_or_manager());
+
+create policy suppliers_admin_manager_all on public.suppliers
 for all
 using (public.is_admin_or_manager())
 with check (public.is_admin_or_manager());

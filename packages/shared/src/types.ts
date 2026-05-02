@@ -49,6 +49,15 @@ export interface Customer {
   created_at: string;
 }
 
+export interface Supplier {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  created_by?: string | null;
+  created_at: string;
+}
+
 export interface Product {
   id: string;
   name: string;
