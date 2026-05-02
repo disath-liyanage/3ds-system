@@ -17,7 +17,7 @@ export type ReceiveNoteInput = {
     free_qty: number;
     product_cost: number;
     selling_price: number;
-    item_discount_price: number;
+    item_discount_percent: number;
     rep_sales_discount: number;
     rep_collection: number;
   }>;
