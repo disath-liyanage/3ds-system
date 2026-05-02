@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/s
 import { createReceiveNote } from "@/app/actions/receive-notes";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useProducts } from "@/hooks/useProducts";
+import { cn } from "@/lib/utils";
 
 type ReceiveNoteForm = {
   invoice_number: string;
@@ -42,7 +43,20 @@ export default function NewReceiveNotePage() {
   const { data: products, isLoading: isProductsLoading } = useProducts();
   const costInputRef = useRef<HTMLInputElement | null>(null);
   const lastDiscountRef = useRef<number>(0);
-  const { control, register, handleSubmit, setValue, trigger, getValues, resetField } =
+  const productDefaultsRef = useRef(
+    new Map<
+      string,
+      {
+        sellingPrice?: number;
+        cost?: number;
+        discountPercent?: number;
+        repSalesDiscount?: number;
+        repCollection?: number;
+      }
+    >()
+  );
+  const [addAttempted, setAddAttempted] = useState(false);
+  const { control, register, handleSubmit, setValue, trigger, getValues, resetField, formState } =
     useForm<ReceiveNoteForm>({
     defaultValues: {
       invoice_number: "",
@@ -64,6 +78,7 @@ export default function NewReceiveNotePage() {
 
   const watchedItems = useWatch({ control, name: "items" });
   const watchedDraft = useWatch({ control, name: "draft" });
+  const draftErrors = formState.errors?.draft;
 
   const productOptions = useMemo<SearchableSelectOption[]>(
     () =>
@@ -74,12 +89,29 @@ export default function NewReceiveNotePage() {
     [products]
   );
 
-  const { fields, append, remove } = useFieldArray({
+  const { append, remove } = useFieldArray({
     control,
     name: "items"
   });
 
+  const hasDraftData = (draft: ReceiveNoteForm["draft"]) =>
+    Boolean(
+      draft.product_id ||
+        draft.qty ||
+        draft.free_qty ||
+        draft.product_cost ||
+        draft.selling_price ||
+        draft.item_discount_percent ||
+        draft.rep_sales_discount ||
+        draft.rep_collection
+    );
+
   const onSubmit = async (values: ReceiveNoteForm) => {
+    if (hasDraftData(values.draft)) {
+      setAddAttempted(true);
+      window.alert("Please add the item or reset the fields before submitting.");
+      return;
+    }
     const result = await createReceiveNote({
       invoice_number: values.invoice_number,
       supplier_name: values.supplier_name,
@@ -110,6 +142,30 @@ export default function NewReceiveNotePage() {
     lastDiscountRef.current = discountPercent;
   }, [setValue, watchedDraft?.item_discount_percent, watchedDraft?.selling_price]);
 
+  useEffect(() => {
+    const productId = watchedDraft?.product_id;
+    if (!productId) return;
+
+    const cached = productDefaultsRef.current.get(productId);
+    if (!cached) return;
+
+    if (cached.sellingPrice !== undefined) {
+      setValue("draft.selling_price", cached.sellingPrice, { shouldDirty: true });
+    }
+    if (cached.cost !== undefined) {
+      setValue("draft.product_cost", cached.cost, { shouldDirty: true });
+    }
+    if (cached.discountPercent !== undefined) {
+      setValue("draft.item_discount_percent", cached.discountPercent, { shouldDirty: true });
+    }
+    if (cached.repSalesDiscount !== undefined) {
+      setValue("draft.rep_sales_discount", cached.repSalesDiscount, { shouldDirty: true });
+    }
+    if (cached.repCollection !== undefined) {
+      setValue("draft.rep_collection", cached.repCollection, { shouldDirty: true });
+    }
+  }, [setValue, watchedDraft?.product_id]);
+
   const itemSummaries = useMemo(
     () =>
       (watchedItems ?? []).map((item) => {
@@ -133,6 +189,7 @@ export default function NewReceiveNotePage() {
   );
 
   const handleAddItem = async () => {
+    setAddAttempted(true);
     const isValid = await trigger([
       "draft.product_id",
       "draft.qty",
@@ -157,14 +214,33 @@ export default function NewReceiveNotePage() {
       rep_collection: normalizeNumber(draft.rep_collection) || 0
     });
 
-    resetField("draft.product_id");
-    resetField("draft.qty");
-    resetField("draft.free_qty");
-    resetField("draft.product_cost");
-    resetField("draft.selling_price");
-    resetField("draft.item_discount_percent");
-    resetField("draft.rep_sales_discount");
-    resetField("draft.rep_collection");
+    productDefaultsRef.current.set(draft.product_id, {
+      sellingPrice: normalizeNumber(draft.selling_price) || undefined,
+      cost: normalizeNumber(draft.product_cost) || undefined,
+      discountPercent: normalizeNumber(draft.item_discount_percent) || undefined,
+      repSalesDiscount: normalizeNumber(draft.rep_sales_discount) || undefined,
+      repCollection: normalizeNumber(draft.rep_collection) || undefined
+    });
+
+    resetField("draft", {
+      defaultValue: {
+        product_id: "",
+        qty: undefined,
+        free_qty: undefined,
+        product_cost: undefined,
+        selling_price: undefined,
+        item_discount_percent: undefined,
+        rep_sales_discount: undefined,
+        rep_collection: undefined
+      }
+    });
+    setAddAttempted(false);
+  };
+
+  const onSubmitInvalid = () => {
+    if (formState.errors.invoice_number || formState.errors.supplier_name) {
+      window.alert("Please enter invoice number and supplier name.");
+    }
   };
 
   if (!isLoading && !permissions?.canManageReceiveNotes) {
@@ -183,14 +259,30 @@ export default function NewReceiveNotePage() {
         <p className="text-sm text-muted-foreground">Record supplier stock received into inventory.</p>
       </header>
 
-      <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
+      <form className="space-y-4" onSubmit={handleSubmit(onSubmit, onSubmitInvalid)}>
         <Card>
           <CardHeader>
             <CardTitle>Header</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-3">
-            <Input placeholder="Invoice number" {...register("invoice_number")} />
-            <Input placeholder="Supplier name" {...register("supplier_name")} />
+            <Input
+              placeholder="Invoice number"
+              {...register("invoice_number", { required: "Invoice number is required" })}
+              className={cn(
+                formState.submitCount > 0 && formState.errors.invoice_number
+                  ? "border-red-400 focus:ring-red-400/40"
+                  : ""
+              )}
+            />
+            <Input
+              placeholder="Supplier name"
+              {...register("supplier_name", { required: "Supplier name is required" })}
+              className={cn(
+                formState.submitCount > 0 && formState.errors.supplier_name
+                  ? "border-red-400 focus:ring-red-400/40"
+                  : ""
+              )}
+            />
             <Input placeholder="Notes" {...register("notes")} />
           </CardContent>
         </Card>
@@ -209,8 +301,14 @@ export default function NewReceiveNotePage() {
                     options={productOptions}
                     placeholder={isProductsLoading ? "Loading products..." : "Select product"}
                     disabled={isProductsLoading}
+                    className={cn(
+                      addAttempted && draftErrors?.product_id
+                        ? "border-red-400 focus:ring-red-400/40"
+                        : ""
+                    )}
                     onChange={(value) => setValue("draft.product_id", value, { shouldDirty: true })}
                   />
+                  <input type="hidden" {...register("draft.product_id", { required: "Product is required" })} />
                 </div>
 
                 <div className="grid gap-2 md:grid-cols-2">
@@ -222,6 +320,9 @@ export default function NewReceiveNotePage() {
                       required: "Qty is required",
                       setValueAs: (value) => (value === "" ? undefined : Number(value))
                     })}
+                    className={cn(
+                      addAttempted && draftErrors?.qty ? "border-red-400 focus:ring-red-400/40" : ""
+                    )}
                   />
                   <Input
                     type="number"
@@ -242,6 +343,9 @@ export default function NewReceiveNotePage() {
                     required: "Cost is required",
                     setValueAs: (value) => (value === "" ? undefined : Number(value))
                   })}
+                  className={cn(
+                    addAttempted && draftErrors?.product_cost ? "border-red-400 focus:ring-red-400/40" : ""
+                  )}
                 />
 
                 <Input
@@ -252,6 +356,9 @@ export default function NewReceiveNotePage() {
                     required: "Selling price is required",
                     setValueAs: (value) => (value === "" ? undefined : Number(value))
                   })}
+                  className={cn(
+                    addAttempted && draftErrors?.selling_price ? "border-red-400 focus:ring-red-400/40" : ""
+                  )}
                 />
 
                 <div className="border-t border-dashed border-border" />

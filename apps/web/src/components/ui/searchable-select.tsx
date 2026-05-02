@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 export type SearchableSelectOption = {
   value: string;
@@ -16,6 +17,7 @@ type SearchableSelectProps = {
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
+  className?: string;
   onChange: (value: string) => void;
 };
 
@@ -26,6 +28,7 @@ export function SearchableSelect({
   placeholder,
   required = false,
   disabled = false,
+  className,
   onChange
 }: SearchableSelectProps) {
   const [query, setQuery] = useState("");
@@ -126,6 +129,7 @@ export function SearchableSelect({
         required={required}
         disabled={disabled}
         placeholder={placeholder}
+        className={cn(className)}
         onChange={(event) => handleInputChange(event.target.value)}
         onFocus={() => setIsOpen(true)}
         onKeyDown={handleKeyDown}
