@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,8 @@ import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/s
 import { createReceiveNote } from "@/app/actions/receive-notes";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useProducts } from "@/hooks/useProducts";
+import { useSuppliers } from "@/hooks/useSuppliers";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 type ReceiveNoteForm = {
@@ -39,8 +42,10 @@ type ReceiveNoteForm = {
 };
 
 export default function NewReceiveNotePage() {
+  const router = useRouter();
   const { permissions, isLoading } = useCurrentUserPermissions();
   const { data: products, isLoading: isProductsLoading } = useProducts();
+  const { data: suppliers, isLoading: isSuppliersLoading } = useSuppliers();
   const costInputRef = useRef<HTMLInputElement | null>(null);
   const lastDiscountRef = useRef<number>(0);
   const productDefaultsRef = useRef(
@@ -77,8 +82,15 @@ export default function NewReceiveNotePage() {
   });
 
   const watchedItems = useWatch({ control, name: "items" });
+  const watchedSupplierName = useWatch({ control, name: "supplier_name" });
   const watchedDraft = useWatch({ control, name: "draft" });
   const draftErrors = formState.errors?.draft;
+  const shouldValidateDraft = () => addAttempted || Boolean(getValues("draft.product_id"));
+  const costField = register("draft.product_cost", {
+    validate: (value) =>
+      shouldValidateDraft() && value === undefined ? "Cost is required" : true,
+    setValueAs: (value) => (value === "" ? undefined : Number(value))
+  });
 
   const productOptions = useMemo<SearchableSelectOption[]>(
     () =>
@@ -87,6 +99,15 @@ export default function NewReceiveNotePage() {
         label: `${product.name} · ${product.unit}`
       })),
     [products]
+  );
+
+  const supplierOptions = useMemo<SearchableSelectOption[]>(
+    () =>
+      (suppliers ?? []).map((supplier) => ({
+        value: supplier.name,
+        label: `${supplier.name} · ${supplier.phone}`
+      })),
+    [suppliers]
   );
 
   const { append, remove } = useFieldArray({
@@ -120,7 +141,16 @@ export default function NewReceiveNotePage() {
     });
     if (!result.success) {
       console.error("Failed to create GRN", result.error);
+      toast({
+        title: "Failed to add GRN",
+        description: result.error || "Please try again.",
+        variant: "error"
+      });
+      return;
     }
+
+    toast({ title: "GRN added successfully", variant: "success" });
+    router.push("/receive-notes");
   };
 
   const normalizeNumber = (value: unknown) => {
@@ -274,15 +304,28 @@ export default function NewReceiveNotePage() {
                   : ""
               )}
             />
-            <Input
-              placeholder="Supplier name"
-              {...register("supplier_name", { required: "Supplier name is required" })}
-              className={cn(
-                formState.submitCount > 0 && formState.errors.supplier_name
-                  ? "border-red-400 focus:ring-red-400/40"
-                  : ""
-              )}
-            />
+            <div>
+              <SearchableSelect
+                value={watchedSupplierName ?? ""}
+                options={supplierOptions}
+                placeholder={isSuppliersLoading ? "Loading suppliers..." : "Select supplier"}
+                disabled={isSuppliersLoading}
+                className={cn(
+                  formState.submitCount > 0 && formState.errors.supplier_name
+                    ? "border-red-400 focus:ring-red-400/40"
+                    : ""
+                )}
+                onChange={(value) => setValue("supplier_name", value, { shouldDirty: true })}
+              />
+              <input
+                type="hidden"
+                {...register("supplier_name", {
+                  required: "Supplier name is required",
+                  validate: (value) =>
+                    supplierOptions.some((option) => option.value === value) || "Please select a supplier"
+                })}
+              />
+            </div>
             <Input placeholder="Notes" {...register("notes")} />
           </CardContent>
         </Card>
@@ -308,7 +351,13 @@ export default function NewReceiveNotePage() {
                     )}
                     onChange={(value) => setValue("draft.product_id", value, { shouldDirty: true })}
                   />
-                  <input type="hidden" {...register("draft.product_id", { required: "Product is required" })} />
+                  <input
+                    type="hidden"
+                    {...register("draft.product_id", {
+                      validate: (value) =>
+                        shouldValidateDraft() && !value ? "Product is required" : true
+                    })}
+                  />
                 </div>
 
                 <div className="grid gap-2 md:grid-cols-2">
@@ -317,7 +366,8 @@ export default function NewReceiveNotePage() {
                     step="1"
                     placeholder="Qty"
                     {...register("draft.qty", {
-                      required: "Qty is required",
+                      validate: (value) =>
+                        shouldValidateDraft() && value === undefined ? "Qty is required" : true,
                       setValueAs: (value) => (value === "" ? undefined : Number(value))
                     })}
                     className={cn(
@@ -335,14 +385,14 @@ export default function NewReceiveNotePage() {
                 </div>
 
                 <Input
-                  ref={costInputRef}
                   type="number"
                   step="0.01"
                   placeholder="Cost"
-                  {...register("draft.product_cost", {
-                    required: "Cost is required",
-                    setValueAs: (value) => (value === "" ? undefined : Number(value))
-                  })}
+                  {...costField}
+                  ref={(node) => {
+                    costField.ref(node);
+                    costInputRef.current = node;
+                  }}
                   className={cn(
                     addAttempted && draftErrors?.product_cost ? "border-red-400 focus:ring-red-400/40" : ""
                   )}
@@ -353,7 +403,10 @@ export default function NewReceiveNotePage() {
                   step="0.01"
                   placeholder="Selling price"
                   {...register("draft.selling_price", {
-                    required: "Selling price is required",
+                    validate: (value) =>
+                      shouldValidateDraft() && value === undefined
+                        ? "Selling price is required"
+                        : true,
                     setValueAs: (value) => (value === "" ? undefined : Number(value))
                   })}
                   className={cn(
