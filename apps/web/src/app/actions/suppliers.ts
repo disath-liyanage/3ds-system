@@ -31,6 +31,8 @@ export type CreateSupplierInput = {
   address: string;
 };
 
+export type UpdateSupplierInput = CreateSupplierInput;
+
 async function getCurrentUserProfile() {
   const supabase = createClient();
 
@@ -93,4 +95,38 @@ export async function createSupplier(input: CreateSupplierInput): Promise<Action
   revalidatePath("/suppliers");
 
   return { success: true, message: "Supplier added successfully." };
+}
+
+export async function updateSupplier(supplierId: string, input: UpdateSupplierInput): Promise<ActionResult> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!canManageSuppliers(access.profile)) {
+    return { success: false, error: "You do not have permission to edit suppliers" };
+  }
+
+  if (!supplierId) {
+    return { success: false, error: "Missing supplier id" };
+  }
+
+  const name = input.name.trim();
+  const phone = input.phone.trim();
+  const address = input.address.trim();
+
+  if (!name || !phone || !address) {
+    return { success: false, error: "Supplier name, phone, and address are required" };
+  }
+
+  const { error: updateError } = await adminClient
+    .from("suppliers")
+    .update({ name, phone, address })
+    .eq("id", supplierId);
+
+  if (updateError) {
+    return { success: false, error: updateError.message };
+  }
+
+  revalidatePath("/suppliers");
+
+  return { success: true, message: "Supplier updated successfully." };
 }

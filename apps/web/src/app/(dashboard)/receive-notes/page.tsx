@@ -34,7 +34,7 @@ export default function ReceiveNotesPage() {
         {canManageReceiveNotes ? (
           <div className="flex items-center gap-2">
             <Button asChild variant="outline">
-              <Link href="/suppliers/new">Add Supplier</Link>
+              <Link href="/suppliers">View Suppliers</Link>
             </Button>
             <Button asChild>
               <Link href="/receive-notes/new">New GRN</Link>
