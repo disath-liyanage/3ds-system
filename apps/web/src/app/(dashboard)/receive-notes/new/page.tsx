@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select";
+import { createReceiveNote } from "@/app/actions/receive-notes";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useProducts } from "@/hooks/useProducts";
 
@@ -17,7 +18,9 @@ type ReceiveNoteForm = {
   items: Array<{
     product_id: string;
     qty: number;
+    free_qty: number;
     product_cost: number;
+    selling_price: number;
     item_discount_price: number;
     rep_sales_discount: number;
     rep_collection: number;
@@ -36,7 +39,9 @@ export default function NewReceiveNotePage() {
         {
           product_id: "",
           qty: 1,
+          free_qty: 0,
           product_cost: 0,
+          selling_price: 0,
           item_discount_price: 0,
           rep_sales_discount: 0,
           rep_collection: 0
@@ -62,8 +67,39 @@ export default function NewReceiveNotePage() {
   });
 
   const onSubmit = async (values: ReceiveNoteForm) => {
-    console.log("new receive note payload", values);
+    const result = await createReceiveNote(values);
+    if (!result.success) {
+      console.error("Failed to create GRN", result.error);
+    }
   };
+
+  const normalizeNumber = (value: unknown) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const itemSummaries = useMemo(
+    () =>
+      (watchedItems ?? []).map((item) => {
+        const qty = normalizeNumber(item?.qty);
+        const freeQty = normalizeNumber(item?.free_qty);
+        const sellingPrice = normalizeNumber(item?.selling_price);
+        const discount = normalizeNumber(item?.item_discount_price);
+        const unitCost = Math.max(sellingPrice - discount, 0);
+        const totalQty = qty + freeQty;
+
+        return {
+          productId: item?.product_id ?? "",
+          qty,
+          freeQty,
+          totalQty,
+          sellingPrice,
+          discount,
+          unitCost
+        };
+      }),
+    [watchedItems]
+  );
 
   if (!isLoading && !permissions?.canManageReceiveNotes) {
     return (
@@ -97,82 +133,135 @@ export default function NewReceiveNotePage() {
           <CardHeader>
             <CardTitle>Items</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="hidden gap-2 text-xs font-semibold text-muted-foreground md:grid md:grid-cols-12">
-              <div className="md:col-span-4">Product</div>
-              <div className="md:col-span-1">Qty</div>
-              <div className="md:col-span-2">Product cost</div>
-              <div className="md:col-span-2">Item discount price</div>
-              <div className="md:col-span-2">Sales discount for rep</div>
-              <div className="md:col-span-1">Collection for rep</div>
+          <CardContent className="grid gap-4 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+            <div className="space-y-3">
+              {fields.map((field, index) => {
+                const summary = itemSummaries[index];
+                const unitCost = summary?.unitCost ?? 0;
+
+                return (
+                  <div key={field.id} className="space-y-3 rounded-md border border-border p-4">
+                    <div>
+                      <label className="text-xs font-semibold text-muted-foreground">Product</label>
+                      <SearchableSelect
+                        value={watchedItems?.[index]?.product_id ?? ""}
+                        options={productOptions}
+                        placeholder={isProductsLoading ? "Loading products..." : "Select product"}
+                        disabled={isProductsLoading}
+                        onChange={(value) => setValue(`items.${index}.product_id`, value)}
+                      />
+                    </div>
+
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <Input
+                        type="number"
+                        step="1"
+                        placeholder="Qty"
+                        {...register(`items.${index}.qty`, { valueAsNumber: true })}
+                      />
+                      <Input
+                        type="number"
+                        step="1"
+                        placeholder="Free qty"
+                        {...register(`items.${index}.free_qty`, { valueAsNumber: true })}
+                      />
+                    </div>
+
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Cost"
+                      {...register(`items.${index}.product_cost`, { valueAsNumber: true })}
+                    />
+
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Selling price"
+                      {...register(`items.${index}.selling_price`, { valueAsNumber: true })}
+                    />
+
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Discount price if available"
+                      {...register(`items.${index}.item_discount_price`, { valueAsNumber: true })}
+                    />
+
+                    <Input
+                      readOnly
+                      value={unitCost}
+                      placeholder="Unit cost"
+                      className="bg-muted/40"
+                    />
+
+                    <div className="grid gap-2 md:grid-cols-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Sales rep discount"
+                        {...register(`items.${index}.rep_sales_discount`, { valueAsNumber: true })}
+                      />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Sales rep collection discount"
+                        {...register(`items.${index}.rep_collection`, { valueAsNumber: true })}
+                      />
+                    </div>
+
+                    <Button type="button" variant="ghost" onClick={() => remove(index)}>
+                      Remove
+                    </Button>
+                  </div>
+                );
+              })}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  append({
+                    product_id: "",
+                    qty: 1,
+                    free_qty: 0,
+                    product_cost: 0,
+                    selling_price: 0,
+                    item_discount_price: 0,
+                    rep_sales_discount: 0,
+                    rep_collection: 0
+                  })
+                }
+              >
+                Add Item
+              </Button>
             </div>
-            {fields.map((field, index) => (
-              <div key={field.id} className="grid gap-2 rounded-md border border-border p-3 md:grid-cols-12">
-                <div className="md:col-span-4">
-                  <SearchableSelect
-                    value={watchedItems?.[index]?.product_id ?? ""}
-                    options={productOptions}
-                    placeholder={isProductsLoading ? "Loading products..." : "Select product"}
-                    disabled={isProductsLoading}
-                    onChange={(value) => setValue(`items.${index}.product_id`, value)}
-                  />
+
+            <div className="space-y-3 rounded-md border border-border p-4">
+              <div className="text-sm font-semibold">Added products</div>
+              {itemSummaries.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No items added yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {itemSummaries.map((item, index) => {
+                    const productLabel =
+                      productOptions.find((option) => option.value === item.productId)?.label ||
+                      "Unknown product";
+
+                    return (
+                      <div key={`${item.productId}-${index}`} className="rounded-md border border-border p-3">
+                        <div className="text-sm font-semibold">{productLabel}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Qty: {item.qty} + Free: {item.freeQty} = {item.totalQty}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Selling: {item.sellingPrice} | Discount: {item.discount} | Unit cost: {item.unitCost}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <Input
-                  className="md:col-span-1"
-                  type="number"
-                  step="0.01"
-                  placeholder="Qty"
-                  {...register(`items.${index}.qty`)}
-                />
-                <Input
-                  className="md:col-span-2"
-                  type="number"
-                  step="0.01"
-                  placeholder="Product cost"
-                  {...register(`items.${index}.product_cost`)}
-                />
-                <Input
-                  className="md:col-span-2"
-                  type="number"
-                  step="0.01"
-                  placeholder="Item discount price"
-                  {...register(`items.${index}.item_discount_price`)}
-                />
-                <Input
-                  className="md:col-span-2"
-                  type="number"
-                  step="0.01"
-                  placeholder="Sales discount for rep"
-                  {...register(`items.${index}.rep_sales_discount`)}
-                />
-                <Input
-                  className="md:col-span-1"
-                  type="number"
-                  step="0.01"
-                  placeholder="Collection for rep"
-                  {...register(`items.${index}.rep_collection`)}
-                />
-                <Button type="button" variant="ghost" onClick={() => remove(index)}>
-                  Remove
-                </Button>
-              </div>
-            ))}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() =>
-                append({
-                  product_id: "",
-                  qty: 1,
-                  product_cost: 0,
-                  item_discount_price: 0,
-                  rep_sales_discount: 0,
-                  rep_collection: 0
-                })
-              }
-            >
-              Add Item
-            </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
 
