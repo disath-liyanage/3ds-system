@@ -122,6 +122,7 @@ export const invoiceSchema = z.object({
 export const receiveNoteSchema = z.object({
   id: z.string().uuid(),
   rn_number: z.number().int(),
+  invoice_number: z.string().min(1),
   supplier_name: z.string().min(1),
   received_by: z.string().uuid(),
   notes: z.string().nullable(),
@@ -133,7 +134,12 @@ export const receiveNoteItemSchema = z.object({
   receive_note_id: z.string().uuid(),
   product_id: z.string().uuid(),
   qty: z.number(),
-  unit_cost: z.number()
+  free_qty: z.number(),
+  unit_cost: z.number(),
+  selling_price: z.number(),
+  item_discount_percent: z.number(),
+  rep_sales_discount: z.number(),
+  rep_collection: z.number()
 });
 
 export const notificationSchema = z.object({

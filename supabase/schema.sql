@@ -105,6 +105,7 @@ create table if not exists public.invoice_items (
 create table if not exists public.receive_notes (
   id uuid primary key default gen_random_uuid(),
   rn_number bigint not null unique default nextval('public.rn_number_seq'),
+  invoice_number text not null,
   supplier_name text not null,
   received_by uuid not null references public.users_profile (id),
   notes text,
@@ -116,7 +117,12 @@ create table if not exists public.receive_note_items (
   receive_note_id uuid not null references public.receive_notes (id) on delete cascade,
   product_id uuid not null references public.products (id),
   qty numeric(12, 2) not null check (qty > 0),
+  free_qty numeric(12, 2) not null default 0 check (free_qty >= 0),
   unit_cost numeric(12, 2) not null check (unit_cost >= 0),
+  selling_price numeric(12, 2) not null default 0 check (selling_price >= 0),
+  item_discount_percent numeric(5, 2) not null default 0 check (item_discount_percent >= 0),
+  rep_sales_discount numeric(12, 2) not null default 0 check (rep_sales_discount >= 0),
+  rep_collection numeric(12, 2) not null default 0 check (rep_collection >= 0),
   created_at timestamptz not null default now()
 );
 

@@ -127,6 +127,7 @@ export interface Notification {
 export interface ReceiveNote {
   id: string;
   rn_number: number;
+  invoice_number: string;
   supplier_name: string;
   received_by: string;
   notes: string | null;
@@ -138,5 +139,10 @@ export interface ReceiveNoteItem {
   receive_note_id: string;
   product_id: string;
   qty: number;
+  free_qty: number;
   unit_cost: number;
+  selling_price: number;
+  item_discount_percent: number;
+  rep_sales_discount: number;
+  rep_collection: number;
 }
