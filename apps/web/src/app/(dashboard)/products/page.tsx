@@ -16,14 +16,21 @@ import { useProductStockByPrice } from "@/hooks/useProductStockByPrice";
 import { toast } from "@/lib/toast";
 import { updateProductGRNPrices, updateProductGRNStock } from "@/app/actions/update-grn-prices";
 
-function GrnStockManager({ productId }: { productId: string }) {
-  const { data: stockByPrice, isLoading, refetch } = useProductStockByPrice(productId);
+function UnifiedSizeEditor({ 
+  item, 
+  priceIndex, 
+  handleExistingSizeChange, 
+  handleToggleRemoveSize 
+}: { 
+  item: ExistingSizeFormState; 
+  priceIndex: number; 
+  handleExistingSizeChange: (id: string, field: "price" | "stock_qty" | "low_stock_threshold" | "unit", value: string) => void; 
+  handleToggleRemoveSize: (id: string) => void; 
+}) {
+  const { data: stockByPrice, isLoading, refetch } = useProductStockByPrice(item.id.startsWith("new-") ? undefined : item.id);
   const [editingPrice, setEditingPrice] = useState<Record<number, string>>({});
   const [editingStock, setEditingStock] = useState<Record<number, string>>({});
   const [isSaving, setIsSaving] = useState(false);
-
-  if (isLoading) return <div className="text-xs text-muted-foreground mt-4">Loading stock breakdown...</div>;
-  if (!stockByPrice || stockByPrice.length === 0) return null;
 
   const handleSave = async (oldPrice: number) => {
     setIsSaving(true);
@@ -33,7 +40,7 @@ function GrnStockManager({ productId }: { productId: string }) {
     if (newPriceStr !== undefined) {
       const newPrice = Number(newPriceStr);
       if (!isNaN(newPrice) && newPrice !== oldPrice) {
-        const result = await updateProductGRNPrices([{ productId, oldSellingPrice: oldPrice, newSellingPrice: newPrice }]);
+        const result = await updateProductGRNPrices([{ productId: item.id, oldSellingPrice: oldPrice, newSellingPrice: newPrice }]);
         if (!result.success) {
           toast.error(result.error || "Failed to update price");
           success = false;
@@ -44,10 +51,10 @@ function GrnStockManager({ productId }: { productId: string }) {
     const newStockStr = editingStock[oldPrice];
     if (newStockStr !== undefined) {
       const newStock = Number(newStockStr);
-      const oldStock = stockByPrice.find(r => r.selling_price === oldPrice)?.total_qty || 0;
+      const oldStock = stockByPrice?.find(r => r.selling_price === oldPrice)?.total_qty || 0;
       if (!isNaN(newStock) && newStock !== oldStock) {
         const targetPrice = newPriceStr && success ? Number(newPriceStr) : oldPrice;
-        const result = await updateProductGRNStock(productId, targetPrice, newStock);
+        const result = await updateProductGRNStock(item.id, targetPrice, newStock);
         if (!result.success) {
           toast.error(result.error || "Failed to update stock");
           success = false;
@@ -65,53 +72,62 @@ function GrnStockManager({ productId }: { productId: string }) {
     setIsSaving(false);
   };
 
-  return (
-    <div className="mt-4 rounded-md bg-white p-3 border border-border/50 shadow-sm">
-      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">Manage GRN Prices \u0026 Stock</p>
-      <div className="space-y-3">
-        {stockByPrice.map(row => {
-          const currentEditingPrice = editingPrice[row.selling_price] ?? row.selling_price.toString();
-          const currentEditingStock = editingStock[row.selling_price] ?? row.total_qty.toString();
-          const isChanged = currentEditingPrice !== row.selling_price.toString() || currentEditingStock !== row.total_qty.toString();
-
-          return (
-            <div key={row.selling_price} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end bg-muted/20 p-2 rounded border border-border/30">
-              <div className="space-y-1">
-                <label className="text-[10px] font-medium text-muted-foreground">Price in LKR</label>
-                <Input 
-                  className="h-7 text-xs bg-white" 
-                  type="number" 
-                  min={0}
-                  step="0.01"
-                  value={currentEditingPrice} 
-                  onChange={e => setEditingPrice(prev => ({...prev, [row.selling_price]: e.target.value}))} 
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-medium text-muted-foreground">Stock Qty</label>
-                <Input 
-                  className="h-7 text-xs bg-white" 
-                  type="number" 
-                  min={0}
-                  step="0.01"
-                  value={currentEditingStock} 
-                  onChange={e => setEditingStock(prev => ({...prev, [row.selling_price]: e.target.value}))} 
-                />
-              </div>
-              <Button 
-                type="button"
-                size="sm" 
-                className="h-7 text-xs px-3" 
-                variant={isChanged ? "default" : "secondary"}
-                disabled={!isChanged || isSaving}
-                onClick={() => handleSave(row.selling_price)}
-              >
-                Save
-              </Button>
-            </div>
-          );
-        })}
+  if (item.id.startsWith("new-") || (!isLoading && (!stockByPrice || stockByPrice.length === 0))) {
+    return (
+      <div className="rounded-md border border-border/50 bg-muted/30 p-3">
+        <div className="flex justify-between items-center mb-3">
+           <p className="text-sm font-medium">Price {priceIndex + 1}</p>
+           <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleToggleRemoveSize(item.id)}>
+            {item.isRemoved ? "Undo" : "Remove"}
+           </Button>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1">
+            <label htmlFor={`existing-product-price-${item.id}`} className="text-xs font-medium">Price in LKR</label>
+            <Input id={`existing-product-price-${item.id}`} required type="number" min={0} step="0.01" disabled={item.isRemoved} value={item.price} onChange={(event) => handleExistingSizeChange(item.id, "price", event.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <label htmlFor={`existing-product-stock-${item.id}`} className="text-xs font-medium">Stock Qty</label>
+            <Input id={`existing-product-stock-${item.id}`} required type="number" min={0} step="0.01" disabled={item.isRemoved} value={item.stock_qty} onChange={(event) => handleExistingSizeChange(item.id, "stock_qty", event.target.value)} />
+          </div>
+        </div>
       </div>
+    );
+  }
+
+  if (isLoading) return <div className="text-xs text-muted-foreground mt-2">Loading pricing...</div>;
+
+  return (
+    <div className="space-y-3">
+      {stockByPrice?.map((row, index) => {
+        const currentEditingPrice = editingPrice[row.selling_price] ?? row.selling_price.toString();
+        const currentEditingStock = editingStock[row.selling_price] ?? row.total_qty.toString();
+        const isChanged = currentEditingPrice !== row.selling_price.toString() || currentEditingStock !== row.total_qty.toString();
+
+        return (
+          <div key={row.selling_price} className="rounded-md border border-border/50 bg-muted/30 p-3">
+            <div className="flex justify-between items-center mb-3">
+               <p className="text-sm font-medium">Price {priceIndex + 1 + index}</p>
+               {index === 0 && (
+                 <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleToggleRemoveSize(item.id)}>
+                  {item.isRemoved ? "Undo" : "Remove"}
+                 </Button>
+               )}
+            </div>
+            <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Price in LKR</label>
+                <Input className="bg-white text-xs h-9" type="number" min={0} step="0.01" disabled={item.isRemoved} value={currentEditingPrice} onChange={e => setEditingPrice(prev => ({...prev, [row.selling_price]: e.target.value}))} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium">Stock Qty</label>
+                <Input className="bg-white text-xs h-9" type="number" min={0} step="0.01" disabled={item.isRemoved} value={currentEditingStock} onChange={e => setEditingStock(prev => ({...prev, [row.selling_price]: e.target.value}))} />
+              </div>
+              <Button type="button" size="sm" className="h-9" variant={isChanged ? "default" : "secondary"} disabled={!isChanged || isSaving || item.isRemoved} onClick={() => handleSave(row.selling_price)}>Save</Button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -945,69 +961,50 @@ function ProductFormDialog({
                         </Button>
                       </div>
                       
-                      <div className="space-y-1">
-                        <label htmlFor={`existing-group-unit-${originalUnitKey}`} className="text-sm font-medium">
-                          Unit
-                        </label>
-                        <Input
-                          id={`existing-group-unit-${originalUnitKey}`}
-                          required
-                          disabled={isAllRemoved}
-                          value={currentUnit}
-                          onChange={(event) => handleGroupUnitChange(originalUnitKey, event.target.value)}
-                        />
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1">
+                          <label htmlFor={`existing-group-unit-${originalUnitKey}`} className="text-sm font-medium">
+                            Unit
+                          </label>
+                          <Input
+                            id={`existing-group-unit-${originalUnitKey}`}
+                            required
+                            disabled={isAllRemoved}
+                            value={currentUnit}
+                            onChange={(event) => handleGroupUnitChange(originalUnitKey, event.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label htmlFor={`existing-group-lowstock-${originalUnitKey}`} className="text-sm font-medium">
+                            Low Stock
+                          </label>
+                          <Input
+                            id={`existing-group-lowstock-${originalUnitKey}`}
+                            required
+                            type="number"
+                            min={0}
+                            step="1"
+                            disabled={isAllRemoved}
+                            value={sizes[0]?.low_stock_threshold || ""}
+                            onChange={(event) => {
+                              // We can safely update it directly in the parent form state
+                              const val = event.target.value;
+                              handleExistingSizeChange(sizes[0].id, "low_stock_threshold", val);
+                            }}
+                          />
+                        </div>
                       </div>
 
                       <div className="space-y-3 pt-2">
                         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Prices \u0026 Stock for this size</p>
                         {sizes.map((item, priceIndex) => (
-                          <div key={item.id} className="rounded-md border border-border/50 bg-muted/30 p-3">
-                            <div className="flex justify-between items-center mb-3">
-                               <p className="text-sm font-medium">Price {priceIndex + 1}</p>
-                               <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 text-xs px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                onClick={() => handleToggleRemoveSize(item.id)}
-                               >
-                                {item.isRemoved ? "Undo" : "Remove"}
-                               </Button>
-                            </div>
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              <div className="space-y-1">
-                                <label htmlFor={`existing-product-price-${item.id}`} className="text-xs font-medium">
-                                  Price in LKR
-                                </label>
-                                <Input
-                                  id={`existing-product-price-${item.id}`}
-                                  required
-                                  type="number"
-                                  min={0}
-                                  step="0.01"
-                                  disabled={item.isRemoved}
-                                  value={item.price}
-                                  onChange={(event) => handleExistingSizeChange(item.id, "price", event.target.value)}
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <label htmlFor={`existing-product-stock-${item.id}`} className="text-xs font-medium">
-                                  Stock Qty
-                                </label>
-                                <Input
-                                  id={`existing-product-stock-${item.id}`}
-                                  required
-                                  type="number"
-                                  min={0}
-                                  step="0.01"
-                                  disabled={item.isRemoved}
-                                  value={item.stock_qty}
-                                  onChange={(event) => handleExistingSizeChange(item.id, "stock_qty", event.target.value)}
-                                />
-                              </div>
-                            </div>
-                            {!item.id.startsWith("new-") && <GrnStockManager productId={item.id} />}
-                          </div>
+                          <UnifiedSizeEditor 
+                            key={item.id} 
+                            item={item} 
+                            priceIndex={priceIndex} 
+                            handleExistingSizeChange={handleExistingSizeChange} 
+                            handleToggleRemoveSize={handleToggleRemoveSize} 
+                          />
                         ))}
                         
                         <div className="flex justify-end pt-2">
