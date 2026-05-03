@@ -1476,6 +1476,7 @@ export default function ProductsPage() {
   const [isDuplicateDialogOpen, setIsDuplicateDialogOpen] = useState(false);
   const [duplicateProduct, setDuplicateProduct] = useState<Product | null>(null);
   const [sortState, setSortState] = useState<SortState>(null);
+  const [query, setQuery] = useState("");
 
   const canManageProducts = permissions?.canManageProducts ?? false;
   const canAddProducts = canManageProducts;
@@ -1495,7 +1496,12 @@ export default function ProductsPage() {
   }, [isProductsLoading, products]);
 
   const sortedProducts = useMemo(() => {
-    const list = [...products];
+    let list = [...products];
+
+    if (query) {
+      const q = query.toLowerCase();
+      list = list.filter((p) => `${p.name} ${p.category} ${p.unit}`.toLowerCase().includes(q));
+    }
 
     if (!sortState) {
       return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -1522,7 +1528,7 @@ export default function ProductsPage() {
           return 0;
       }
     });
-  }, [products, sortState]);
+  }, [products, sortState, query]);
 
   const handleSort = (key: SortKey) => {
     setSortState((prev) => {
@@ -1760,6 +1766,9 @@ export default function ProductsPage() {
         <div className="rounded-md border border-border bg-white p-4 text-sm text-muted-foreground">Loading products...</div>
       ) : (
         <div className="space-y-3">
+          <div className="max-w-sm">
+            <Input placeholder="Search products..." value={query} onChange={(event) => setQuery(event.target.value)} />
+          </div>
           {sortState ? (
             <div className="flex justify-end">
               <Button variant="outline" size="sm" onClick={resetSort}>

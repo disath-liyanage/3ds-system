@@ -1,8 +1,10 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useReceiveNotes } from "@/hooks/useReceiveNotes";
@@ -12,9 +14,19 @@ import { useRouter } from "next/navigation";
 
 export default function ReceiveNotesPage() {
   const router = useRouter();
+  const [query, setQuery] = useState("");
   const { permissions, isLoading } = useCurrentUserPermissions();
   const canManageReceiveNotes = permissions?.canManageReceiveNotes ?? false;
   const { data: receiveNotes, isLoading: isReceiveNotesLoading } = useReceiveNotes();
+
+  const filtered = useMemo(() => {
+    const list = receiveNotes ?? [];
+    if (!query) return list;
+    const q = query.toLowerCase();
+    return list.filter((row) =>
+      `${row.rn_number} ${row.invoice_number} ${row.supplier_name}`.toLowerCase().includes(q)
+    );
+  }, [receiveNotes, query]);
 
   if (!isLoading && !canManageReceiveNotes) {
     return (
@@ -44,6 +56,10 @@ export default function ReceiveNotesPage() {
         ) : null}
       </div>
 
+      <div className="max-w-sm">
+        <Input placeholder="Search GRNs..." value={query} onChange={(event) => setQuery(event.target.value)} />
+      </div>
+
       <Table>
         <TableHeader>
           <TableRow>
@@ -60,14 +76,14 @@ export default function ReceiveNotesPage() {
                 Loading GRNs...
               </TableCell>
             </TableRow>
-          ) : (receiveNotes ?? []).length === 0 ? (
+          ) : filtered.length === 0 ? (
             <TableRow>
               <TableCell colSpan={4} className="text-sm text-muted-foreground">
-                No GRNs recorded yet.
+                No GRNs found.
               </TableCell>
             </TableRow>
           ) : (
-            (receiveNotes ?? []).map((row) => (
+            filtered.map((row) => (
               <TableRow 
                 key={row.id}
                 className="cursor-pointer transition hover:bg-muted/50"
