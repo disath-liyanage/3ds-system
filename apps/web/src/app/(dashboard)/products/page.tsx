@@ -42,7 +42,7 @@ function UnifiedSizeEditor({
       if (!isNaN(newPrice) && newPrice !== oldPrice) {
         const result = await updateProductGRNPrices([{ productId: item.id, oldSellingPrice: oldPrice, newSellingPrice: newPrice }]);
         if (!result.success) {
-          toast.error(result.error || "Failed to update price");
+          toast({ title: "Failed to update price", description: result.error, variant: "error" });
           success = false;
         }
       }
@@ -56,14 +56,14 @@ function UnifiedSizeEditor({
         const targetPrice = newPriceStr && success ? Number(newPriceStr) : oldPrice;
         const result = await updateProductGRNStock(item.id, targetPrice, newStock);
         if (!result.success) {
-          toast.error(result.error || "Failed to update stock");
+          toast({ title: "Failed to update stock", description: result.error, variant: "error" });
           success = false;
         }
       }
     }
 
     if (success && (newPriceStr !== undefined || newStockStr !== undefined)) {
-      toast.success("Updated successfully");
+      toast({ title: "Updated successfully", variant: "success" });
       setEditingPrice(prev => { const n = {...prev}; delete n[oldPrice]; return n; });
       setEditingStock(prev => { const n = {...prev}; delete n[oldPrice]; return n; });
       await refetch();
