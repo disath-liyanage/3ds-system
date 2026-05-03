@@ -8,23 +8,13 @@ import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useReceiveNotes } from "@/hooks/useReceiveNotes";
 import { toast } from "@/lib/toast";
 
+import { useRouter } from "next/navigation";
+
 export default function ReceiveNotesPage() {
+  const router = useRouter();
   const { permissions, isLoading } = useCurrentUserPermissions();
   const canManageReceiveNotes = permissions?.canManageReceiveNotes ?? false;
-  const { data: receiveNotes, isLoading: isReceiveNotesLoading, deleteReceiveNote } = useReceiveNotes();
-
-  const handleDelete = async (id: string) => {
-    const confirmed = window.confirm("Delete this GRN? This cannot be undone.");
-    if (!confirmed) return;
-
-    try {
-      await deleteReceiveNote.mutateAsync(id);
-      toast({ title: "GRN deleted", variant: "success" });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to delete GRN";
-      toast({ title: "Delete failed", description: message, variant: "error" });
-    }
-  };
+  const { data: receiveNotes, isLoading: isReceiveNotesLoading } = useReceiveNotes();
 
   if (!isLoading && !canManageReceiveNotes) {
     return (
@@ -61,44 +51,39 @@ export default function ReceiveNotesPage() {
             <TableHead>Invoice #</TableHead>
             <TableHead>Supplier</TableHead>
             <TableHead>Received At</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isReceiveNotesLoading ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-sm text-muted-foreground">
+              <TableCell colSpan={4} className="text-sm text-muted-foreground">
                 Loading GRNs...
               </TableCell>
             </TableRow>
           ) : (receiveNotes ?? []).length === 0 ? (
             <TableRow>
-              <TableCell colSpan={5} className="text-sm text-muted-foreground">
+              <TableCell colSpan={4} className="text-sm text-muted-foreground">
                 No GRNs recorded yet.
               </TableCell>
             </TableRow>
           ) : (
             (receiveNotes ?? []).map((row) => (
-              <TableRow key={row.id}>
+              <TableRow 
+                key={row.id}
+                className="cursor-pointer transition hover:bg-muted/50"
+                onClick={() => router.push(`/receive-notes/${row.id}`)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    router.push(`/receive-notes/${row.id}`);
+                  }
+                }}
+                tabIndex={0}
+              >
                 <TableCell>{row.rn_number}</TableCell>
                 <TableCell>{row.invoice_number}</TableCell>
                 <TableCell>{row.supplier_name}</TableCell>
                 <TableCell>{new Date(row.created_at).toLocaleDateString()}</TableCell>
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <Button asChild variant="ghost" size="sm">
-                      <Link href={`/receive-notes/${row.id}`}>Edit</Link>
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => handleDelete(row.id)}
-                      disabled={deleteReceiveNote.isPending}
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </TableCell>
               </TableRow>
             ))
           )}
