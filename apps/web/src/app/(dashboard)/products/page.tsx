@@ -3,6 +3,7 @@
 import type { FormEvent } from "react";
 import type { Product } from "@paintdist/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1315,6 +1316,7 @@ function DuplicateProductDialog({ open, onOpenChange, product, onChooseRename, o
 }
 
 export default function ProductsPage() {
+  const router = useRouter();
   const { permissions, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
   const {
     data: products = [],
@@ -1653,7 +1655,19 @@ export default function ProductsPage() {
                   const stockStatus = getStockStatus(product.stock_qty, product.low_stock_threshold);
 
                   return (
-                    <TableRow key={product.id}>
+                    <TableRow
+                      key={product.id}
+                      className="cursor-pointer transition hover:bg-muted/50"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => router.push(`/products/${product.id}`)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          router.push(`/products/${product.id}`);
+                        }
+                      }}
+                    >
                       <TableCell className="font-medium">{product.name}</TableCell>
                       <TableCell>{product.category}</TableCell>
                       <TableCell>{product.unit}</TableCell>
@@ -1668,7 +1682,8 @@ export default function ProductsPage() {
                             variant="outline"
                             size="sm"
                             disabled={updateProduct.isPending}
-                            onClick={() => {
+                            onClick={(event) => {
+                              event.stopPropagation();
                               setEditingProduct(product);
                               setIsEditDialogOpen(true);
                             }}

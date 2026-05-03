@@ -59,6 +59,53 @@ type NormalizedReceiveNoteInput = {
   items: NormalizedReceiveNoteItem[];
 };
 
+type ReceiveNoteStockRow = {
+  product_id: string;
+  qty: number;
+  free_qty: number;
+};
+
+function buildStockTotals(items: ReceiveNoteStockRow[]) {
+  const totals = new Map<string, number>();
+
+  for (const item of items) {
+    const qty = Number(item.qty) || 0;
+    const freeQty = Number(item.free_qty) || 0;
+    const total = qty + freeQty;
+    if (!item.product_id) continue;
+    totals.set(item.product_id, (totals.get(item.product_id) || 0) + total);
+  }
+
+  return totals;
+}
+
+async function recomputeProductStock(productIds: string[]) {
+  if (productIds.length === 0) return;
+
+  const { data: items, error } = await adminClient
+    .from("receive_note_items")
+    .select("product_id, qty, free_qty")
+    .in("product_id", productIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const totals = buildStockTotals((items ?? []) as ReceiveNoteStockRow[]);
+
+  for (const productId of productIds) {
+    const nextStock = totals.get(productId) || 0;
+    const { error: updateError } = await adminClient
+      .from("products")
+      .update({ stock_qty: nextStock })
+      .eq("id", productId);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+  }
+}
+
 async function getCurrentUserProfile() {
   const supabase = createClient();
 
@@ -211,7 +258,16 @@ export async function createReceiveNote(input: ReceiveNoteInput): Promise<Action
     return { success: false, error: itemsError.message };
   }
 
+  try {
+    const productIds = Array.from(new Set(normalized.data.items.map((item) => item.product_id)));
+    await recomputeProductStock(productIds);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to update product stock";
+    return { success: false, error: message };
+  }
+
   revalidatePath("/receive-notes");
+  revalidatePath("/products");
   return { success: true, message: "GRN created successfully" };
 }
 
@@ -251,6 +307,15 @@ export async function updateReceiveNote(id: string, input: ReceiveNoteInput): Pr
     return { success: false, error: "GRN not found" };
   }
 
+  const { data: existingItems, error: existingItemsError } = await adminClient
+    .from("receive_note_items")
+    .select("product_id, qty, free_qty")
+    .eq("receive_note_id", id);
+
+  if (existingItemsError) {
+    return { success: false, error: existingItemsError.message };
+  }
+
   const { error: deleteError } = await adminClient.from("receive_note_items").delete().eq("receive_note_id", id);
 
   if (deleteError) {
@@ -275,8 +340,23 @@ export async function updateReceiveNote(id: string, input: ReceiveNoteInput): Pr
     return { success: false, error: itemsError.message };
   }
 
+  try {
+    const productIds = new Set<string>();
+    for (const item of existingItems ?? []) {
+      if (item.product_id) productIds.add(item.product_id);
+    }
+    for (const item of normalized.data.items) {
+      if (item.product_id) productIds.add(item.product_id);
+    }
+    await recomputeProductStock(Array.from(productIds));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to update product stock";
+    return { success: false, error: message };
+  }
+
   revalidatePath("/receive-notes");
   revalidatePath(`/receive-notes/${id}`);
+  revalidatePath("/products");
   return { success: true, message: "GRN updated successfully" };
 }
 
@@ -292,12 +372,32 @@ export async function deleteReceiveNote(id: string): Promise<ActionResult> {
     return { success: false, error: "GRN id is required" };
   }
 
+  const { data: existingItems, error: existingItemsError } = await adminClient
+    .from("receive_note_items")
+    .select("product_id, qty, free_qty")
+    .eq("receive_note_id", id);
+
+  if (existingItemsError) {
+    return { success: false, error: existingItemsError.message };
+  }
+
   const { error } = await adminClient.from("receive_notes").delete().eq("id", id);
 
   if (error) {
     return { success: false, error: error.message };
   }
 
+  try {
+    const productIds = Array.from(
+      new Set((existingItems ?? []).map((item) => item.product_id).filter(Boolean))
+    ) as string[];
+    await recomputeProductStock(productIds);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to update product stock";
+    return { success: false, error: message };
+  }
+
   revalidatePath("/receive-notes");
+  revalidatePath("/products");
   return { success: true, message: "GRN deleted successfully" };
 }
