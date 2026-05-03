@@ -12,8 +12,109 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useProducts } from "@/hooks/useProducts";
+import { useProductStockByPrice } from "@/hooks/useProductStockByPrice";
 import { toast } from "@/lib/toast";
+import { updateProductGRNPrices, updateProductGRNStock } from "@/app/actions/update-grn-prices";
 
+function GrnStockManager({ productId }: { productId: string }) {
+  const { data: stockByPrice, isLoading, refetch } = useProductStockByPrice(productId);
+  const [editingPrice, setEditingPrice] = useState<Record<number, string>>({});
+  const [editingStock, setEditingStock] = useState<Record<number, string>>({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  if (isLoading) return <div className="text-xs text-muted-foreground mt-4">Loading stock breakdown...</div>;
+  if (!stockByPrice || stockByPrice.length === 0) return null;
+
+  const handleSave = async (oldPrice: number) => {
+    setIsSaving(true);
+    let success = true;
+
+    const newPriceStr = editingPrice[oldPrice];
+    if (newPriceStr !== undefined) {
+      const newPrice = Number(newPriceStr);
+      if (!isNaN(newPrice) && newPrice !== oldPrice) {
+        const result = await updateProductGRNPrices([{ productId, oldSellingPrice: oldPrice, newSellingPrice: newPrice }]);
+        if (!result.success) {
+          toast.error(result.error || "Failed to update price");
+          success = false;
+        }
+      }
+    }
+
+    const newStockStr = editingStock[oldPrice];
+    if (newStockStr !== undefined) {
+      const newStock = Number(newStockStr);
+      const oldStock = stockByPrice.find(r => r.selling_price === oldPrice)?.total_qty || 0;
+      if (!isNaN(newStock) && newStock !== oldStock) {
+        const targetPrice = newPriceStr && success ? Number(newPriceStr) : oldPrice;
+        const result = await updateProductGRNStock(productId, targetPrice, newStock);
+        if (!result.success) {
+          toast.error(result.error || "Failed to update stock");
+          success = false;
+        }
+      }
+    }
+
+    if (success && (newPriceStr !== undefined || newStockStr !== undefined)) {
+      toast.success("Updated successfully");
+      setEditingPrice(prev => { const n = {...prev}; delete n[oldPrice]; return n; });
+      setEditingStock(prev => { const n = {...prev}; delete n[oldPrice]; return n; });
+      await refetch();
+    }
+    
+    setIsSaving(false);
+  };
+
+  return (
+    <div className="mt-4 rounded-md bg-white p-3 border border-border/50 shadow-sm">
+      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3">Manage GRN Prices \u0026 Stock</p>
+      <div className="space-y-3">
+        {stockByPrice.map(row => {
+          const currentEditingPrice = editingPrice[row.selling_price] ?? row.selling_price.toString();
+          const currentEditingStock = editingStock[row.selling_price] ?? row.total_qty.toString();
+          const isChanged = currentEditingPrice !== row.selling_price.toString() || currentEditingStock !== row.total_qty.toString();
+
+          return (
+            <div key={row.selling_price} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end bg-muted/20 p-2 rounded border border-border/30">
+              <div className="space-y-1">
+                <label className="text-[10px] font-medium text-muted-foreground">Price in LKR</label>
+                <Input 
+                  className="h-7 text-xs bg-white" 
+                  type="number" 
+                  min={0}
+                  step="0.01"
+                  value={currentEditingPrice} 
+                  onChange={e => setEditingPrice(prev => ({...prev, [row.selling_price]: e.target.value}))} 
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-medium text-muted-foreground">Stock Qty</label>
+                <Input 
+                  className="h-7 text-xs bg-white" 
+                  type="number" 
+                  min={0}
+                  step="0.01"
+                  value={currentEditingStock} 
+                  onChange={e => setEditingStock(prev => ({...prev, [row.selling_price]: e.target.value}))} 
+                />
+              </div>
+              <Button 
+                type="button"
+                size="sm" 
+                className="h-7 text-xs px-3" 
+                variant={isChanged ? "default" : "secondary"}
+                disabled={!isChanged || isSaving}
+                onClick={() => handleSave(row.selling_price)}
+              >
+                Save
+              </Button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 type ProductFormState = {
   name: string;
   category: string;
@@ -34,6 +135,7 @@ type ProductSizeFormState = {
 type ExistingSizeFormState = ProductSizeFormState & {
   id: string;
   isRemoved?: boolean;
+  originalGroupKey?: string;
 };
 
 type ExistingSizeUpdate = {
@@ -400,7 +502,8 @@ function ProductFormDialog({
         price: toNumber(item.price).toString(),
         stock_qty: toNumber(item.stock_qty).toString(),
         low_stock_threshold: toNumber(item.low_stock_threshold).toString(),
-        isRemoved: false
+        isRemoved: false,
+        originalGroupKey: normalizeUnit(item.unit)
       }))
     );
     setSubmitError(null);
@@ -522,123 +625,92 @@ function ProductFormDialog({
     }
 
     let extraPayloads: ProductFormPayload[] | undefined;
-
-    if (isEditMode && extraSizes.length > 0) {
-      extraPayloads = [];
-      const seenExtraUnits = new Set<string>();
-
-      for (const [index, size] of extraSizes.entries()) {
-        const extraUnit = size.unit.trim();
-        const normalizedExtraUnit = normalizeUnit(extraUnit);
-
-        if (!extraUnit) {
-          setSubmitError(`Extra size ${index + 1}: Unit is required`);
-          return;
-        }
-
-        if (existingUnits.includes(normalizedExtraUnit)) {
-          setSubmitError(`Unit "${extraUnit}" already exists. Edit the existing unit instead.`);
-          return;
-        }
-
-        if (seenExtraUnits.has(normalizedExtraUnit)) {
-          setSubmitError(`Unit "${extraUnit}" is duplicated in the new sizes.`);
-          return;
-        }
-
-        seenExtraUnits.add(normalizedExtraUnit);
-
-        const extraPrice = parseNonNegativeNumber(size.price, `Extra size ${index + 1}: Price`);
-        if (!extraPrice.ok) {
-          setSubmitError(extraPrice.error);
-          return;
-        }
-
-        const extraStock = parseNonNegativeNumber(size.stock_qty, `Extra size ${index + 1}: Stock quantity`);
-        if (!extraStock.ok) {
-          setSubmitError(extraStock.error);
-          return;
-        }
-
-        const extraThreshold = parseNonNegativeNumber(
-          size.low_stock_threshold,
-          `Extra size ${index + 1}: Low stock threshold`
-        );
-        if (!extraThreshold.ok) {
-          setSubmitError(extraThreshold.error);
-          return;
-        }
-
-        extraPayloads.push({
-          name,
-          category: composedCategory,
-          unit: extraUnit,
-          price: extraPrice.value,
-          stock_qty: extraStock.value,
-          low_stock_threshold: extraThreshold.value
-        });
-      }
-    }
-
     let existingSizeEdits: ExistingSizeUpdate[] | undefined;
     let existingSizeDeletes: ExistingSizeDelete[] | undefined;
 
     if (isEditMode) {
+      extraPayloads = [];
       existingSizeEdits = [];
       existingSizeDeletes = [];
 
-      const seenUnits = new Set<string>();
+      const finalGroupUnits = new Set<string>();
 
-      for (const size of existingSizes) {
-        const trimmedUnit = size.unit.trim();
-        const normalizedUnit = normalizeUnit(trimmedUnit);
-
-        if (size.isRemoved) {
-          existingSizeDeletes.push({ id: size.id });
-          continue;
-        }
-
-        if (!trimmedUnit) {
+      for (const [groupKey, group] of Object.entries(groupedSizes)) {
+        if (group.sizes.every(s => s.isRemoved)) continue;
+        const currentUnit = group.sizes[0]?.unit.trim();
+        if (!currentUnit) {
           setSubmitError("Unit is required");
           return;
         }
-
-        if (seenUnits.has(normalizedUnit)) {
-          setSubmitError(`Unit "${trimmedUnit}" is duplicated in the sizes.`);
+        const finalUnit = normalizeUnit(currentUnit);
+        if (finalGroupUnits.has(finalUnit)) {
+          setSubmitError(`Unit "${currentUnit}" is duplicated. You cannot have multiple groups with the same unit.`);
           return;
         }
+        finalGroupUnits.add(finalUnit);
+      }
 
-        seenUnits.add(normalizedUnit);
+      for (const [index, size] of extraSizes.entries()) {
+        const extraUnit = size.unit.trim();
+        if (!extraUnit) {
+          setSubmitError(`Extra size ${index + 1}: Unit is required`);
+          return;
+        }
+        const finalUnit = normalizeUnit(extraUnit);
+        if (finalGroupUnits.has(finalUnit)) {
+          setSubmitError(`Unit "${extraUnit}" already exists. Edit the existing unit instead.`);
+          return;
+        }
+        finalGroupUnits.add(finalUnit);
+
+        const extraPrice = parseNonNegativeNumber(size.price, `Extra size ${index + 1}: Price`);
+        if (!extraPrice.ok) { setSubmitError(extraPrice.error); return; }
+
+        const extraStock = parseNonNegativeNumber(size.stock_qty, `Extra size ${index + 1}: Stock quantity`);
+        if (!extraStock.ok) { setSubmitError(extraStock.error); return; }
+
+        const extraThreshold = parseNonNegativeNumber(size.low_stock_threshold, `Extra size ${index + 1}: Low stock`);
+        if (!extraThreshold.ok) { setSubmitError(extraThreshold.error); return; }
+
+        extraPayloads.push({
+          name, category: composedCategory, unit: extraUnit,
+          price: extraPrice.value, stock_qty: extraStock.value, low_stock_threshold: extraThreshold.value
+        });
+      }
+
+      for (const size of existingSizes) {
+        const trimmedUnit = size.unit.trim();
+
+        if (size.isRemoved) {
+          if (!size.id.startsWith("new-")) {
+            existingSizeDeletes.push({ id: size.id });
+          }
+          continue;
+        }
 
         const priceResult = parseNonNegativeNumber(size.price, "Price");
-        if (!priceResult.ok) {
-          setSubmitError(priceResult.error);
-          return;
-        }
+        if (!priceResult.ok) { setSubmitError(priceResult.error); return; }
 
         const stockResult = parseNonNegativeNumber(size.stock_qty, "Stock quantity");
-        if (!stockResult.ok) {
-          setSubmitError(stockResult.error);
-          return;
-        }
+        if (!stockResult.ok) { setSubmitError(stockResult.error); return; }
 
         const thresholdResult = parseNonNegativeNumber(size.low_stock_threshold, "Low stock threshold");
-        if (!thresholdResult.ok) {
-          setSubmitError(thresholdResult.error);
-          return;
-        }
+        if (!thresholdResult.ok) { setSubmitError(thresholdResult.error); return; }
 
-        existingSizeEdits.push({
-          id: size.id,
-          payload: {
-            name,
-            category: composedCategory,
-            unit: trimmedUnit,
-            price: priceResult.value,
-            stock_qty: stockResult.value,
-            low_stock_threshold: thresholdResult.value
-          }
-        });
+        if (size.id.startsWith("new-")) {
+          extraPayloads.push({
+            name, category: composedCategory, unit: trimmedUnit,
+            price: priceResult.value, stock_qty: stockResult.value, low_stock_threshold: thresholdResult.value
+          });
+        } else {
+          existingSizeEdits.push({
+            id: size.id,
+            payload: {
+              name, category: composedCategory, unit: trimmedUnit,
+              price: priceResult.value, stock_qty: stockResult.value, low_stock_threshold: thresholdResult.value
+            }
+          });
+        }
       }
     }
 
@@ -681,6 +753,55 @@ function ProductFormDialog({
     setExistingSizes((prev) =>
       prev.map((item) => (item.id === id ? { ...item, isRemoved: !item.isRemoved } : item))
     );
+  };
+
+  const groupedSizes = useMemo(() => {
+    const groups: Record<string, { originalUnit: string; sizes: ExistingSizeFormState[] }> = {};
+    for (const size of existingSizes) {
+      const key = size.originalGroupKey || normalizeUnit(size.unit);
+      if (!groups[key]) {
+        groups[key] = { originalUnit: key, sizes: [] };
+      }
+      groups[key].sizes.push(size);
+    }
+    return groups;
+  }, [existingSizes]);
+
+  const handleGroupUnitChange = (originalUnitKey: string, newUnitValue: string) => {
+    setExistingSizes((prev) =>
+      prev.map((size) => {
+        if (size.originalGroupKey === originalUnitKey) {
+          return { ...size, unit: newUnitValue };
+        }
+        return size;
+      })
+    );
+  };
+
+  const handleGroupToggleRemove = (originalUnitKey: string, willRemove: boolean) => {
+    setExistingSizes((prev) =>
+      prev.map((size) => {
+        if (size.originalGroupKey === originalUnitKey) {
+          return { ...size, isRemoved: willRemove };
+        }
+        return size;
+      })
+    );
+  };
+
+  const handleAddPriceToGroup = (groupKey: string, currentUnit: string) => {
+    setExistingSizes((prev) => [
+      ...prev,
+      {
+        id: `new-${Date.now()}-${Math.random()}`,
+        unit: currentUnit,
+        price: "",
+        stock_qty: "",
+        low_stock_threshold: "10",
+        isRemoved: false,
+        originalGroupKey: groupKey
+      }
+    ]);
   };
 
   const isEditMode = mode === "edit";
@@ -804,81 +925,106 @@ function ProductFormDialog({
             {existingSizes.length === 0 ? (
               <p className="text-sm text-muted-foreground">No sizes found for this product.</p>
             ) : (
-              <div className="space-y-3">
-                {existingSizes.map((item, index) => (
-                  <div key={item.id} className="space-y-3 rounded-md border border-border p-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium">Size {index + 1}</p>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleToggleRemoveSize(item.id)}
-                      >
-                        {item.isRemoved ? "Undo remove" : "Remove"}
-                      </Button>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-4">
+                {Object.entries(groupedSizes).map(([originalUnitKey, group], groupIndex) => {
+                  const sizes = group.sizes;
+                  const currentUnit = sizes[0]?.unit || "";
+                  const isAllRemoved = sizes.every((s) => s.isRemoved);
+
+                  return (
+                    <div key={originalUnitKey} className="space-y-3 rounded-md border border-border p-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium">Size {groupIndex + 1}</p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleGroupToggleRemove(originalUnitKey, !isAllRemoved)}
+                        >
+                          {isAllRemoved ? "Undo remove size" : "Remove size"}
+                        </Button>
+                      </div>
+                      
                       <div className="space-y-1">
-                        <label htmlFor={`existing-product-unit-${item.id}`} className="text-sm font-medium">
+                        <label htmlFor={`existing-group-unit-${originalUnitKey}`} className="text-sm font-medium">
                           Unit
                         </label>
                         <Input
-                          id={`existing-product-unit-${item.id}`}
+                          id={`existing-group-unit-${originalUnitKey}`}
                           required
-                          disabled={item.isRemoved}
-                          value={item.unit}
-                          onChange={(event) => handleExistingSizeChange(item.id, "unit", event.target.value)}
+                          disabled={isAllRemoved}
+                          value={currentUnit}
+                          onChange={(event) => handleGroupUnitChange(originalUnitKey, event.target.value)}
                         />
                       </div>
-                      <div className="space-y-1">
-                        <label htmlFor={`existing-product-price-${item.id}`} className="text-sm font-medium">
-                          Price in LKR
-                        </label>
-                        <Input
-                          id={`existing-product-price-${item.id}`}
-                          required
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          disabled={item.isRemoved}
-                          value={item.price}
-                          onChange={(event) => handleExistingSizeChange(item.id, "price", event.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label htmlFor={`existing-product-stock-${item.id}`} className="text-sm font-medium">
-                          Stock Quantity
-                        </label>
-                        <Input
-                          id={`existing-product-stock-${item.id}`}
-                          required
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          disabled={item.isRemoved}
-                          value={item.stock_qty}
-                          onChange={(event) => handleExistingSizeChange(item.id, "stock_qty", event.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label htmlFor={`existing-product-threshold-${item.id}`} className="text-sm font-medium">
-                          Low Stock Threshold
-                        </label>
-                        <Input
-                          id={`existing-product-threshold-${item.id}`}
-                          required
-                          type="number"
-                          min={0}
-                          step="1"
-                          disabled={item.isRemoved}
-                          value={item.low_stock_threshold}
-                          onChange={(event) => handleExistingSizeChange(item.id, "low_stock_threshold", event.target.value)}
-                        />
+
+                      <div className="space-y-3 pt-2">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Prices \u0026 Stock for this size</p>
+                        {sizes.map((item, priceIndex) => (
+                          <div key={item.id} className="rounded-md border border-border/50 bg-muted/30 p-3">
+                            <div className="flex justify-between items-center mb-3">
+                               <p className="text-sm font-medium">Price {priceIndex + 1}</p>
+                               <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 text-xs px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => handleToggleRemoveSize(item.id)}
+                               >
+                                {item.isRemoved ? "Undo" : "Remove"}
+                               </Button>
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <div className="space-y-1">
+                                <label htmlFor={`existing-product-price-${item.id}`} className="text-xs font-medium">
+                                  Price in LKR
+                                </label>
+                                <Input
+                                  id={`existing-product-price-${item.id}`}
+                                  required
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  disabled={item.isRemoved}
+                                  value={item.price}
+                                  onChange={(event) => handleExistingSizeChange(item.id, "price", event.target.value)}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <label htmlFor={`existing-product-stock-${item.id}`} className="text-xs font-medium">
+                                  Stock Qty
+                                </label>
+                                <Input
+                                  id={`existing-product-stock-${item.id}`}
+                                  required
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  disabled={item.isRemoved}
+                                  value={item.stock_qty}
+                                  onChange={(event) => handleExistingSizeChange(item.id, "stock_qty", event.target.value)}
+                                />
+                              </div>
+                            </div>
+                            {!item.id.startsWith("new-") && <GrnStockManager productId={item.id} />}
+                          </div>
+                        ))}
+                        
+                        <div className="flex justify-end pt-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={isAllRemoved}
+                            onClick={() => handleAddPriceToGroup(originalUnitKey, currentUnit)}
+                          >
+                            Add Price
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
