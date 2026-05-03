@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ function getStockStatus(stockQty: number | string, lowStockThreshold: number | s
 }
 
 export default function ProductStockDetailPage() {
+  const router = useRouter();
   const params = useParams();
   const productId = Array.isArray(params.id) ? params.id[0] : params.id;
   const { data: products, isLoading: isProductsLoading } = useProducts();
@@ -79,9 +80,22 @@ export default function ProductStockDetailPage() {
           <h1 className="text-2xl font-bold">Product stock</h1>
           <p className="text-sm text-muted-foreground">Track price-level inventory for a single product.</p>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/products">Back to products</Link>
-        </Button>
+        <div className="flex gap-2">
+          {product && (
+            <Button
+              variant="default"
+              onClick={() => {
+                localStorage.setItem("open_edit_product_id", product.id);
+                router.push("/products");
+              }}
+            >
+              Edit product
+            </Button>
+          )}
+          <Button asChild variant="outline">
+            <Link href="/products">Back to products</Link>
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (

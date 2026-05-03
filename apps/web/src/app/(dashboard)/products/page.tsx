@@ -1480,6 +1480,20 @@ export default function ProductsPage() {
   const canManageProducts = permissions?.canManageProducts ?? false;
   const canAddProducts = canManageProducts;
 
+  useEffect(() => {
+    if (!isProductsLoading && products.length > 0) {
+      const editId = localStorage.getItem("open_edit_product_id");
+      if (editId) {
+        const prod = products.find(p => p.id === editId);
+        if (prod) {
+          setEditingProduct(prod);
+          setIsEditDialogOpen(true);
+        }
+        localStorage.removeItem("open_edit_product_id");
+      }
+    }
+  }, [isProductsLoading, products]);
+
   const sortedProducts = useMemo(() => {
     const list = [...products];
 
