@@ -344,6 +344,14 @@ for all
 using (public.is_admin_or_manager())
 with check (public.is_admin_or_manager());
 
+create policy receive_notes_sales_rep_select on public.receive_notes
+for select
+using (public.current_user_role() = 'sales_rep');
+
+create policy receive_note_items_sales_rep_select on public.receive_note_items
+for select
+using (public.current_user_role() = 'sales_rep');
+
 create policy users_profile_self_select on public.users_profile
 for select
 using (id = auth.uid());

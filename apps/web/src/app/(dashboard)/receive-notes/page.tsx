@@ -17,6 +17,7 @@ export default function ReceiveNotesPage() {
   const [query, setQuery] = useState("");
   const { permissions, isLoading } = useCurrentUserPermissions();
   const canManageReceiveNotes = permissions?.canManageReceiveNotes ?? false;
+  const canViewReceiveNotes = permissions?.canViewReceiveNotes ?? false;
   const { data: receiveNotes, isLoading: isReceiveNotesLoading } = useReceiveNotes();
 
   const filtered = useMemo(() => {
@@ -28,7 +29,7 @@ export default function ReceiveNotesPage() {
     );
   }, [receiveNotes, query]);
 
-  if (!isLoading && !canManageReceiveNotes) {
+  if (!isLoading && !canViewReceiveNotes) {
     return (
       <section className="space-y-4">
         <h1 className="text-2xl font-bold">GRN</h1>

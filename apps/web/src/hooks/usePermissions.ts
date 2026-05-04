@@ -34,6 +34,11 @@ export function usePermissions(user: User, customRole?: CustomRole) {
       user.role === "sales_rep" ||
       Boolean(customRole?.perm_create_invoices),
     canManageReceiveNotes: isAdmin || isManager || Boolean(customRole?.perm_manage_receive_notes),
+    canViewReceiveNotes:
+      isAdmin ||
+      isManager ||
+      user.role === "sales_rep" ||
+      Boolean(customRole?.perm_manage_receive_notes),
     canViewReports: isAdmin || isManager || Boolean(customRole?.perm_view_reports),
     canExportReports: isAdmin || isManager || Boolean(customRole?.perm_export_reports),
     canManageUsers: isAdmin || Boolean(customRole?.perm_manage_users),
