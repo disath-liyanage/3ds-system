@@ -68,7 +68,7 @@ export default function CustomersPage() {
 
   const salesRepsQuery = useQuery({
     queryKey: ["sales-reps"],
-    queryFn: getSalesReps
+    queryFn: async () => await getSalesReps()
   });
 
   useRealtimeInvalidate({
