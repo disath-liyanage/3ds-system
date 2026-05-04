@@ -23,6 +23,27 @@ export default function InvoicesPage() {
   const [minInvoiceNo, setMinInvoiceNo] = useState("");
   const [maxInvoiceNo, setMaxInvoiceNo] = useState("");
 
+  const hasFilters = 
+    customerSearch !== "" ||
+    startDate !== "" ||
+    endDate !== "" ||
+    statusFilter !== "all" ||
+    minTotal !== "" ||
+    maxTotal !== "" ||
+    minInvoiceNo !== "" ||
+    maxInvoiceNo !== "";
+
+  const handleResetFilters = () => {
+    setCustomerSearch("");
+    setStartDate("");
+    setEndDate("");
+    setStatusFilter("all");
+    setMinTotal("");
+    setMaxTotal("");
+    setMinInvoiceNo("");
+    setMaxInvoiceNo("");
+  };
+
   const filteredInvoices = useMemo(() => {
     if (!invoices) return [];
     let result = invoices;
@@ -167,6 +188,12 @@ export default function InvoicesPage() {
               onChange={(e) => setMaxInvoiceNo(e.target.value)} 
             />
           </div>
+        </div>
+
+        <div className="md:col-span-2 lg:col-span-4 flex justify-end mt-2">
+          <Button variant="outline" size="sm" onClick={handleResetFilters} disabled={!hasFilters}>
+            Reset Filters
+          </Button>
         </div>
       </div>
 

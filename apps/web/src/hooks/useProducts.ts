@@ -31,7 +31,9 @@ export function useProducts() {
 
   const productsQuery = useQuery({
     queryKey: PRODUCTS_QUERY_KEY,
-    queryFn: () => listProducts(supabase)
+    queryFn: () => listProducts(supabase),
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always"
   });
 
   const createProduct = useMutation({

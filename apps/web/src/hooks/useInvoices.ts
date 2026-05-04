@@ -41,19 +41,26 @@ export function useInvoices() {
 
       if (error) throw new Error(error.message);
 
-      return (data ?? []).map((row: any) => ({
-        id: row.id,
-        invoice_number: row.invoice_number,
-        order_id: row.order_id,
-        customer_id: row.customer_id,
-        customer_name: row.customer?.name ?? "Unknown Customer",
-        issued_by: row.issued_by,
-        issued_by_name: row.issuer?.full_name ?? "Unknown",
-        total_amount: Number(row.total_amount),
-        payment_method: row.payment_method,
-        status: row.status,
-        created_at: row.created_at
-      }));
-    }
+      return (data ?? []).map((row: any) => {
+        const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
+        const issuer = Array.isArray(row.issuer) ? row.issuer[0] : row.issuer;
+
+        return {
+          id: row.id,
+          invoice_number: row.invoice_number,
+          order_id: row.order_id,
+          customer_id: row.customer_id,
+          customer_name: customer?.name ?? "Unknown Customer",
+          issued_by: row.issued_by,
+          issued_by_name: issuer?.full_name ?? "Unknown",
+          total_amount: Number(row.total_amount),
+          payment_method: row.payment_method,
+          status: row.status,
+          created_at: row.created_at
+        };
+      });
+    },
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always"
   });
 }

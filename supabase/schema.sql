@@ -638,10 +638,16 @@ drop policy if exists invoices_sales_rep_select_own on public.invoices;
 drop policy if exists invoices_sales_rep_insert on public.invoices;
 drop policy if exists invoice_items_sales_rep_select_own on public.invoice_items;
 drop policy if exists invoice_items_sales_rep_insert_own on public.invoice_items;
+drop policy if exists invoices_cashier_select_own on public.invoices;
+drop policy if exists invoice_items_cashier_select_own on public.invoice_items;
 
 create policy invoices_sales_rep_select_own on public.invoices
 for select
 using (public.current_user_role() = 'sales_rep' and issued_by = auth.uid());
+
+create policy invoices_cashier_select_own on public.invoices
+for select
+using (public.current_user_role() = 'cashier' and issued_by = auth.uid());
 
 create policy invoices_sales_rep_insert on public.invoices
 for insert
@@ -651,6 +657,18 @@ create policy invoice_items_sales_rep_select_own on public.invoice_items
 for select
 using (
   public.current_user_role() = 'sales_rep'
+  and exists (
+    select 1
+    from public.invoices i
+    where i.id = invoice_items.invoice_id
+      and i.issued_by = auth.uid()
+  )
+);
+
+create policy invoice_items_cashier_select_own on public.invoice_items
+for select
+using (
+  public.current_user_role() = 'cashier'
   and exists (
     select 1
     from public.invoices i

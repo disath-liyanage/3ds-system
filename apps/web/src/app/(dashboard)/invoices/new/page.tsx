@@ -140,7 +140,8 @@ export default function NewInvoicePage() {
     }
 
     toast({ title: "Invoice created successfully", variant: "success" });
-    queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    await queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    await queryClient.invalidateQueries({ queryKey: ["products"] });
     router.push("/invoices");
   };
 
