@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useProducts } from "@/hooks/useProducts";
+import { useProductStockByPrice } from "@/hooks/useProductStockByPrice";
 import { useCustomers } from "@/hooks/useCustomers";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -67,6 +68,8 @@ export default function NewInvoicePage() {
   const watchedDraft = useWatch({ control, name: "draft" });
   const draftErrors = formState.errors?.draft;
 
+  const { data: stockByPrice, isLoading: isStockLoading } = useProductStockByPrice(watchedDraft?.product_id);
+
   const shouldValidateDraft = () => addAttempted || Boolean(getValues("draft.product_id"));
 
   const productOptions = useMemo<SearchableSelectOption[]>(
@@ -87,12 +90,13 @@ export default function NewInvoicePage() {
     [customers]
   );
 
-  const { append, remove } = useFieldArray({
+  const { append, remove, update } = useFieldArray({
     control,
     name: "items"
   });
 
   // When a product is selected in the draft, automatically fill in its default selling price
+  // only if there is NO price selected yet and it's not overriding existing manual input
   useEffect(() => {
     const productId = watchedDraft?.product_id;
     if (!productId) return;
@@ -146,11 +150,25 @@ export default function NewInvoicePage() {
     const draft = getValues("draft");
     if (!draft.product_id) return;
 
-    append({
-      product_id: draft.product_id,
-      qty: Number(draft.qty) || 0,
-      unit_price: Number(draft.unit_price) || 0
-    });
+    const draftQty = Number(draft.qty) || 0;
+    const draftPrice = Number(draft.unit_price) || 0;
+
+    const existingIndex = watchedItems.findIndex(
+      (item) => item.product_id === draft.product_id && item.unit_price === draftPrice
+    );
+
+    if (existingIndex >= 0) {
+      update(existingIndex, {
+        ...watchedItems[existingIndex],
+        qty: watchedItems[existingIndex].qty + draftQty
+      });
+    } else {
+      append({
+        product_id: draft.product_id,
+        qty: draftQty,
+        unit_price: draftPrice
+      });
+    }
 
     resetField("draft", { defaultValue: emptyDraft });
     setAddAttempted(false);
@@ -325,7 +343,33 @@ export default function NewInvoicePage() {
                   />
                 </div>
               </div>
-              <div className="mt-3">
+
+              {watchedDraft?.product_id && (
+                <div className="mt-4 p-3 bg-white border rounded-md">
+                  <h4 className="text-xs font-semibold text-muted-foreground mb-2">Available Received Stock (Reference)</h4>
+                  {isStockLoading ? (
+                    <p className="text-xs text-muted-foreground">Loading stock details...</p>
+                  ) : !stockByPrice || stockByPrice.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No receive history found for this product.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {stockByPrice.map((bucket) => (
+                        <button
+                          key={bucket.selling_price}
+                          type="button"
+                          onClick={() => setValue("draft.unit_price", bucket.selling_price, { shouldValidate: true, shouldDirty: true })}
+                          className="flex flex-col items-start px-3 py-1.5 border rounded bg-muted/30 hover:bg-muted/60 transition text-left text-xs"
+                        >
+                          <span className="font-semibold text-primary">LKR {bucket.selling_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          <span className="text-muted-foreground mt-0.5">Stock Received: {bucket.total_qty}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-4">
                 <Button type="button" variant="outline" size="sm" onClick={handleAddItem}>
                   Add Item
                 </Button>
