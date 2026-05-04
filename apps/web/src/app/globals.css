@@ -27,3 +27,18 @@ body {
   background: radial-gradient(circle at top right, #fff1d6 0%, #f5f2eb 42%, #f3efe6 100%);
   color: hsl(var(--foreground));
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area, .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+}
