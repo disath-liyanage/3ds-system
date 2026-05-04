@@ -25,6 +25,33 @@ type ProfilePermissionRow = {
   custom_role: CustomRolePermissionSummary | CustomRolePermissionSummary[] | null;
 };
 
+export type InvoiceListRow = {
+  id: string;
+  invoice_number: number;
+  order_id: string | null;
+  customer_id: string;
+  customer_name: string;
+  issued_by: string;
+  issued_by_name: string;
+  total_amount: number;
+  payment_method: string;
+  status: "draft" | "issued" | "paid";
+  created_at: string;
+};
+
+export type InvoiceDetailRow = InvoiceListRow & {
+  customer_phone: string;
+  customer_address: string;
+  items: Array<{
+    id: string;
+    product_id: string;
+    product_name: string;
+    product_unit: string;
+    qty: number;
+    unit_price: number;
+  }>;
+};
+
 export type InvoiceInput = {
   customer_id: string;
   payment_method: string;
@@ -72,6 +99,123 @@ function canCreateInvoices(profile: ProfilePermissionRow): boolean {
     profile.role === "sales_rep" ||
     Boolean(customRole?.perm_create_invoices)
   );
+}
+
+function canViewAllInvoices(profile: ProfilePermissionRow): boolean {
+  return profile.role === "admin" || profile.role === "manager";
+}
+
+export async function listInvoices(): Promise<{ success: boolean; data?: InvoiceListRow[]; error?: string }> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!canCreateInvoices(access.profile)) {
+    return { success: false, error: "You do not have permission to view invoices" };
+  }
+
+  let query = adminClient
+    .from("invoices")
+    .select(
+      "id, invoice_number, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at, customer:customers(name), issuer:users_profile(full_name)"
+    )
+    .order("created_at", { ascending: false });
+
+  if (!canViewAllInvoices(access.profile)) {
+    query = query.eq("issued_by", access.profile.id);
+  }
+
+  const { data, error } = await query;
+
+  if (error) return { success: false, error: error.message };
+
+  const rows = (data ?? []).map((row: any) => {
+    const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
+    const issuer = Array.isArray(row.issuer) ? row.issuer[0] : row.issuer;
+
+    return {
+      id: row.id,
+      invoice_number: row.invoice_number,
+      order_id: row.order_id,
+      customer_id: row.customer_id,
+      customer_name: customer?.name ?? "Unknown Customer",
+      issued_by: row.issued_by,
+      issued_by_name: issuer?.full_name ?? "Unknown",
+      total_amount: Number(row.total_amount),
+      payment_method: row.payment_method,
+      status: row.status,
+      created_at: row.created_at
+    } as InvoiceListRow;
+  });
+
+  return { success: true, data: rows };
+}
+
+export async function getInvoiceDetail(
+  invoiceId: string
+): Promise<{ success: boolean; data?: InvoiceDetailRow | null; error?: string }> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!invoiceId) {
+    return { success: false, error: "Invoice id is required" };
+  }
+
+  if (!canCreateInvoices(access.profile)) {
+    return { success: false, error: "You do not have permission to view invoices" };
+  }
+
+  let query = adminClient
+    .from("invoices")
+    .select(
+      `
+        id, invoice_number, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at,
+        customer:customers(name, phone, address),
+        issuer:users_profile(full_name),
+        invoice_items (
+          id, product_id, qty, unit_price,
+          product:products(name, unit)
+        )
+      `
+    )
+    .eq("id", invoiceId)
+    .single();
+
+  if (!canViewAllInvoices(access.profile)) {
+    query = query.eq("issued_by", access.profile.id);
+  }
+
+  const { data, error } = await query;
+
+  if (error) return { success: false, error: error.message };
+  if (!data) return { success: true, data: null };
+
+  const invoiceData = data as any;
+
+  const result: InvoiceDetailRow = {
+    id: invoiceData.id,
+    invoice_number: invoiceData.invoice_number,
+    order_id: invoiceData.order_id,
+    customer_id: invoiceData.customer_id,
+    customer_name: invoiceData.customer?.name ?? "Unknown Customer",
+    customer_phone: invoiceData.customer?.phone ?? "",
+    customer_address: invoiceData.customer?.address ?? "",
+    issued_by: invoiceData.issued_by,
+    issued_by_name: invoiceData.issuer?.full_name ?? "Unknown",
+    total_amount: Number(invoiceData.total_amount),
+    payment_method: invoiceData.payment_method,
+    status: invoiceData.status,
+    created_at: invoiceData.created_at,
+    items: (invoiceData.invoice_items ?? []).map((item: any) => ({
+      id: item.id,
+      product_id: item.product_id,
+      qty: Number(item.qty),
+      unit_price: Number(item.unit_price),
+      product_name: item.product?.name ?? "Unknown Product",
+      product_unit: item.product?.unit ?? ""
+    }))
+  };
+
+  return { success: true, data: result };
 }
 
 export async function createInvoice(input: InvoiceInput): Promise<ActionResult> {

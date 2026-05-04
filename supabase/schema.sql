@@ -640,6 +640,10 @@ drop policy if exists invoice_items_sales_rep_select_own on public.invoice_items
 drop policy if exists invoice_items_sales_rep_insert_own on public.invoice_items;
 drop policy if exists invoices_cashier_select_own on public.invoices;
 drop policy if exists invoice_items_cashier_select_own on public.invoice_items;
+drop policy if exists invoices_custom_role_select_own on public.invoices;
+drop policy if exists invoice_items_custom_role_select_own on public.invoice_items;
+drop policy if exists invoices_issued_by_select on public.invoices;
+drop policy if exists invoice_items_issued_by_select on public.invoice_items;
 
 create policy invoices_sales_rep_select_own on public.invoices
 for select
@@ -648,6 +652,24 @@ using (public.current_user_role() = 'sales_rep' and issued_by = auth.uid());
 create policy invoices_cashier_select_own on public.invoices
 for select
 using (public.current_user_role() = 'cashier' and issued_by = auth.uid());
+
+create policy invoices_custom_role_select_own on public.invoices
+for select
+using (
+  public.current_user_role() = 'custom'
+  and issued_by = auth.uid()
+  and exists (
+    select 1
+    from public.users_profile up
+    join public.custom_roles cr on cr.id = up.custom_role_id
+    where up.id = auth.uid()
+      and coalesce(cr.perm_create_invoices, false)
+  )
+);
+
+create policy invoices_issued_by_select on public.invoices
+for select
+using (issued_by = auth.uid());
 
 create policy invoices_sales_rep_insert on public.invoices
 for insert
@@ -670,6 +692,36 @@ for select
 using (
   public.current_user_role() = 'cashier'
   and exists (
+    select 1
+    from public.invoices i
+    where i.id = invoice_items.invoice_id
+      and i.issued_by = auth.uid()
+  )
+);
+
+create policy invoice_items_custom_role_select_own on public.invoice_items
+for select
+using (
+  public.current_user_role() = 'custom'
+  and exists (
+    select 1
+    from public.invoices i
+    where i.id = invoice_items.invoice_id
+      and i.issued_by = auth.uid()
+  )
+  and exists (
+    select 1
+    from public.users_profile up
+    join public.custom_roles cr on cr.id = up.custom_role_id
+    where up.id = auth.uid()
+      and coalesce(cr.perm_create_invoices, false)
+  )
+);
+
+create policy invoice_items_issued_by_select on public.invoice_items
+for select
+using (
+  exists (
     select 1
     from public.invoices i
     where i.id = invoice_items.invoice_id
