@@ -7,12 +7,14 @@ import {
   approvePendingCustomer,
   createCustomer,
   deleteCustomer,
+  getSalesReps,
   removePendingCustomer,
   updateCustomer
 } from "@/app/actions/customers";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useRealtimeInvalidate } from "@/hooks/useRealtimeInvalidate";
@@ -29,6 +31,7 @@ type CustomerRow = {
   balance: number;
   status: "pending_approval" | "active" | "rejected";
   created_by: string | null;
+  sales_rep_id: string | null;
 };
 
 const CUSTOMERS_QUERY_KEY = ["customers"] as const;
@@ -47,19 +50,26 @@ export default function CustomersPage() {
     phone: "",
     address: "",
     area: "",
-    credit_limit: "0"
+    credit_limit: "0",
+    sales_rep_id: ""
   });
   const [editForm, setEditForm] = useState({
     name: "",
     phone: "",
     address: "",
     area: "",
-    credit_limit: "0"
+    credit_limit: "0",
+    sales_rep_id: ""
   });
 
   const { permissions, isLoading, user } = useCurrentUserPermissions();
   const supabase = useMemo(() => createClient(), []);
   const queryClient = useQueryClient();
+
+  const salesRepsQuery = useQuery({
+    queryKey: ["sales-reps"],
+    queryFn: getSalesReps
+  });
 
   useRealtimeInvalidate({
     channel: "customers-realtime",
@@ -72,7 +82,7 @@ export default function CustomersPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("customers")
-        .select("id, name, phone, address, area, credit_limit, balance, status, created_by")
+        .select("id, name, phone, address, area, credit_limit, balance, status, created_by, sales_rep_id")
         .order("created_at", { ascending: false });
 
       if (error) throw new Error(error.message);
@@ -118,13 +128,19 @@ export default function CustomersPage() {
     event.preventDefault();
     if (isSubmitting) return;
 
+    if (isAdminOrManager && !form.sales_rep_id) {
+      toast({ title: "Validation error", description: "Please select a sales rep.", variant: "error" });
+      return;
+    }
+
     setIsSubmitting(true);
     const result = await createCustomer({
       name: form.name,
       phone: form.phone,
       address: form.address,
       area: form.area,
-      credit_limit: Number(form.credit_limit || 0)
+      credit_limit: Number(form.credit_limit || 0),
+      sales_rep_id: form.sales_rep_id || undefined
     });
     setIsSubmitting(false);
 
@@ -134,7 +150,7 @@ export default function CustomersPage() {
     }
 
     toast({ title: "Customer submitted", description: result.message, variant: "success" });
-    setForm({ name: "", phone: "", address: "", area: "", credit_limit: "0" });
+    setForm({ name: "", phone: "", address: "", area: "", credit_limit: "0", sales_rep_id: "" });
     setIsAddOpen(false);
     await customersQuery.refetch();
   };
@@ -146,20 +162,28 @@ export default function CustomersPage() {
       phone: customer.phone,
       address: customer.address,
       area: customer.area,
-      credit_limit: String(customer.credit_limit ?? 0)
+      credit_limit: String(customer.credit_limit ?? 0),
+      sales_rep_id: customer.sales_rep_id || ""
     });
     setIsEditing(false);
   };
 
   const handleSaveCustomer = async () => {
     if (!selectedCustomer) return;
+    
+    if (isAdminOrManager && !editForm.sales_rep_id) {
+      toast({ title: "Validation error", description: "Please select a sales rep.", variant: "error" });
+      return;
+    }
+
     setProcessingCustomerId(selectedCustomer.id);
     const result = await updateCustomer(selectedCustomer.id, {
       name: editForm.name,
       phone: editForm.phone,
       address: editForm.address,
       area: editForm.area,
-      credit_limit: Number(editForm.credit_limit || 0)
+      credit_limit: Number(editForm.credit_limit || 0),
+      sales_rep_id: editForm.sales_rep_id || undefined
     });
     setProcessingCustomerId(null);
 
@@ -192,13 +216,19 @@ export default function CustomersPage() {
     if (!selectedCustomer) return;
     const customerId = selectedCustomer.id;
 
+    if (isAdminOrManager && !editForm.sales_rep_id) {
+      toast({ title: "Validation error", description: "Please select a sales rep.", variant: "error" });
+      return;
+    }
+
     setProcessingCustomerId(customerId);
     const saveResult = await updateCustomer(customerId, {
       name: editForm.name,
       phone: editForm.phone,
       address: editForm.address,
       area: editForm.area,
-      credit_limit: Number(editForm.credit_limit || 0)
+      credit_limit: Number(editForm.credit_limit || 0),
+      sales_rep_id: editForm.sales_rep_id || undefined
     });
 
     if (!saveResult.success) {
@@ -345,6 +375,16 @@ export default function CustomersPage() {
               onChange={(event) => setEditForm((prev) => ({ ...prev, credit_limit: event.target.value }))}
             />
 
+            {isAdminOrManager ? (
+              <SearchableSelect
+                placeholder="Select Sales Rep"
+                options={(salesRepsQuery.data || []).map((rep) => ({ value: rep.id, label: rep.full_name }))}
+                value={editForm.sales_rep_id}
+                onChange={(value) => setEditForm((prev) => ({ ...prev, sales_rep_id: value }))}
+                disabled={!isEditing}
+              />
+            ) : null}
+
             <div className="flex flex-wrap gap-2">
               {canEditSelected && !isEditing ? (
                 <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
@@ -463,6 +503,14 @@ export default function CustomersPage() {
             value={form.credit_limit}
             onChange={(event) => setForm((prev) => ({ ...prev, credit_limit: event.target.value }))}
           />
+          {isAdminOrManager ? (
+            <SearchableSelect
+              placeholder="Select Sales Rep"
+              options={(salesRepsQuery.data || []).map((rep) => ({ value: rep.id, label: rep.full_name }))}
+              value={form.sales_rep_id}
+              onChange={(value) => setForm((prev) => ({ ...prev, sales_rep_id: value }))}
+            />
+          ) : null}
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Saving..." : "Submit"}
           </Button>

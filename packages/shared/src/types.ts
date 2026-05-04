@@ -44,6 +44,7 @@ export interface Customer {
   balance: number;
   status?: "pending_approval" | "active" | "rejected";
   created_by?: string;
+  sales_rep_id?: string | null;
   approved_by?: string | null;
   approved_at?: string | null;
   created_at: string;

@@ -46,6 +46,7 @@ export const customerSchema = z.object({
   balance: z.number(),
   status: z.enum(["pending_approval", "active", "rejected"]).optional(),
   created_by: z.string().uuid().optional(),
+  sales_rep_id: z.string().uuid().nullable().optional(),
   approved_by: z.string().uuid().nullable().optional(),
   approved_at: z.string().nullable().optional(),
   created_at: z.string()

@@ -31,6 +31,7 @@ export type CreateCustomerInput = {
   address: string;
   area: string;
   credit_limit?: number;
+  sales_rep_id?: string;
 };
 
 export type UpdateCustomerInput = CreateCustomerInput;
@@ -72,6 +73,20 @@ function canAddCustomers(profile: ProfilePermissionRow): boolean {
   );
 }
 
+export async function getSalesReps(): Promise<{ id: string; full_name: string }[]> {
+  const { data, error } = await adminClient
+    .from("users_profile")
+    .select("id, full_name")
+    .eq("role", "sales_rep")
+    .order("full_name");
+
+  if (error) {
+    console.error("Failed to fetch sales reps:", error);
+    return [];
+  }
+  return data || [];
+}
+
 export async function createCustomer(input: CreateCustomerInput): Promise<ActionResult> {
   const access = await getCurrentUserProfile();
   if ("error" in access) return { success: false, error: access.error };
@@ -94,7 +109,13 @@ export async function createCustomer(input: CreateCustomerInput): Promise<Action
     return { success: false, error: "Credit limit must be a valid non-negative number" };
   }
 
-  const status = access.profile.role === "sales_rep" ? "pending_approval" : "active";
+  const isSalesRep = access.profile.role === "sales_rep";
+  const status = isSalesRep ? "pending_approval" : "active";
+  
+  const sales_rep_id = isSalesRep ? access.profile.id : input.sales_rep_id;
+  if (!isSalesRep && !sales_rep_id) {
+    return { success: false, error: "Sales rep selection is required" };
+  }
 
   const { data: insertedCustomer, error: customerError } = await adminClient
     .from("customers")
@@ -106,7 +127,8 @@ export async function createCustomer(input: CreateCustomerInput): Promise<Action
       credit_limit: creditLimit,
       balance: 0,
       status,
-      created_by: access.profile.id
+      created_by: access.profile.id,
+      sales_rep_id
     })
     .select("id, name")
     .single();
@@ -338,15 +360,21 @@ export async function updateCustomer(customerId: string, input: UpdateCustomerIn
     return { success: false, error: "You do not have permission to edit this customer" };
   }
 
+  const updateData: any = {
+    name,
+    phone,
+    address,
+    area,
+    credit_limit: creditLimit
+  };
+
+  if (isAdminOrManager && input.sales_rep_id) {
+    updateData.sales_rep_id = input.sales_rep_id;
+  }
+
   const { error: updateError } = await adminClient
     .from("customers")
-    .update({
-      name,
-      phone,
-      address,
-      area,
-      credit_limit: creditLimit
-    })
+    .update(updateData)
     .eq("id", customerId);
 
   if (updateError) {

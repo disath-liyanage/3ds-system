@@ -517,10 +517,12 @@ alter table public.customers
   add column if not exists status public.customer_status not null default 'active',
   add column if not exists created_by uuid references public.users_profile (id),
   add column if not exists approved_by uuid references public.users_profile (id),
-  add column if not exists approved_at timestamptz;
+  add column if not exists approved_at timestamptz,
+  add column if not exists sales_rep_id uuid references public.users_profile (id);
 
 create index if not exists idx_customers_status on public.customers (status);
 create index if not exists idx_customers_created_by on public.customers (created_by);
+create index if not exists idx_customers_sales_rep_id on public.customers (sales_rep_id);
 
 create table if not exists public.notifications (
   id uuid primary key default gen_random_uuid(),
