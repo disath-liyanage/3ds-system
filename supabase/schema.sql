@@ -85,10 +85,11 @@ create table if not exists public.collections (
 create table if not exists public.invoices (
   id uuid primary key default gen_random_uuid(),
   invoice_number bigint not null unique default nextval('public.invoice_number_seq'),
-  order_id uuid not null unique references public.orders (id),
+  order_id uuid references public.orders (id),
   customer_id uuid not null references public.customers (id),
   issued_by uuid not null references public.users_profile (id),
   total_amount numeric(12, 2) not null check (total_amount >= 0),
+  payment_method text not null default 'credit',
   status public.invoice_status not null default 'draft',
   created_at timestamptz not null default now()
 );

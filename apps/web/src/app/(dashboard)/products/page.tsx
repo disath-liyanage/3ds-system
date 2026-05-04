@@ -123,7 +123,7 @@ function UnifiedSizeEditor({
                 <label className="text-xs font-medium">Stock Qty</label>
                 <Input className="bg-white text-xs h-9" type="number" min={0} step="0.01" disabled={item.isRemoved} value={currentEditingStock} onChange={e => setEditingStock(prev => ({...prev, [row.selling_price]: e.target.value}))} />
               </div>
-              <Button type="button" size="sm" className="h-9" variant={isChanged ? "default" : "secondary"} disabled={!isChanged || isSaving || item.isRemoved} onClick={() => handleSave(row.selling_price)}>Save</Button>
+              <Button type="button" size="sm" className="h-9" variant={isChanged ? "default" : "outline"} disabled={!isChanged || isSaving || item.isRemoved} onClick={() => handleSave(row.selling_price)}>Save</Button>
             </div>
           </div>
         );
