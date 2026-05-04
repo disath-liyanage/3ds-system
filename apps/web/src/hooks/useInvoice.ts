@@ -42,21 +42,23 @@ export function useInvoice(id: string) {
       if (error) throw new Error(error.message);
       if (!data) return null;
 
+      const invoiceData = data as any;
+
       return {
-        id: data.id,
-        invoice_number: data.invoice_number,
-        order_id: data.order_id,
-        customer_id: data.customer_id,
-        customer_name: data.customer?.name ?? "Unknown Customer",
-        customer_phone: data.customer?.phone ?? "",
-        customer_address: data.customer?.address ?? "",
-        issued_by: data.issued_by,
-        issued_by_name: data.issuer?.full_name ?? "Unknown",
-        total_amount: Number(data.total_amount),
-        payment_method: data.payment_method,
-        status: data.status,
-        created_at: data.created_at,
-        items: (data.invoice_items ?? []).map((item: any) => ({
+        id: invoiceData.id,
+        invoice_number: invoiceData.invoice_number,
+        order_id: invoiceData.order_id,
+        customer_id: invoiceData.customer_id,
+        customer_name: invoiceData.customer?.name ?? "Unknown Customer",
+        customer_phone: invoiceData.customer?.phone ?? "",
+        customer_address: invoiceData.customer?.address ?? "",
+        issued_by: invoiceData.issued_by,
+        issued_by_name: invoiceData.issuer?.full_name ?? "Unknown",
+        total_amount: Number(invoiceData.total_amount),
+        payment_method: invoiceData.payment_method,
+        status: invoiceData.status,
+        created_at: invoiceData.created_at,
+        items: (invoiceData.invoice_items ?? []).map((item: any) => ({
           id: item.id,
           product_id: item.product_id,
           qty: Number(item.qty),

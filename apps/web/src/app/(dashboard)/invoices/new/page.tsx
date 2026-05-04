@@ -3,10 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { createInvoice } from "@/app/actions/invoices";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
@@ -23,18 +25,21 @@ type InvoiceForm = {
     product_id: string;
     qty?: number;
     unit_price?: number;
+    unit_cost?: number;
   };
   items: Array<{
     product_id: string;
     qty: number;
     unit_price: number;
+    unit_cost: number;
   }>;
 };
 
 const emptyDraft = {
   product_id: "",
   qty: undefined,
-  unit_price: undefined
+  unit_price: undefined,
+  unit_cost: undefined
 };
 
 export default function NewInvoicePage() {
@@ -43,7 +48,9 @@ export default function NewInvoicePage() {
   const { data: products, isLoading: isProductsLoading } = useProducts();
   const { data: customers, isLoading: isCustomersLoading } = useCustomers();
   
+  const queryClient = useQueryClient();
   const [addAttempted, setAddAttempted] = useState(false);
+  const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
 
   const {
     control,
@@ -95,17 +102,12 @@ export default function NewInvoicePage() {
     name: "items"
   });
 
-  // When a product is selected in the draft, automatically fill in its default selling price
-  // only if there is NO price selected yet and it's not overriding existing manual input
+  // When a product is selected in the draft and no price is set, open the price selection modal
   useEffect(() => {
-    const productId = watchedDraft?.product_id;
-    if (!productId) return;
-
-    const product = products?.find((p) => p.id === productId);
-    if (product && watchedDraft.unit_price === undefined) {
-      setValue("draft.unit_price", Number(product.price), { shouldDirty: true });
+    if (watchedDraft?.product_id && watchedDraft?.unit_price === undefined) {
+      setIsPriceModalOpen(true);
     }
-  }, [watchedDraft?.product_id, products, setValue, watchedDraft?.unit_price]);
+  }, [watchedDraft?.product_id, watchedDraft?.unit_price]);
 
   const hasDraftData = (draft: InvoiceForm["draft"]) =>
     Boolean(draft.product_id || draft.qty || draft.unit_price);
@@ -138,6 +140,7 @@ export default function NewInvoicePage() {
     }
 
     toast({ title: "Invoice created successfully", variant: "success" });
+    queryClient.invalidateQueries({ queryKey: ["invoices"] });
     router.push("/invoices");
   };
 
@@ -152,6 +155,12 @@ export default function NewInvoicePage() {
 
     const draftQty = Number(draft.qty) || 0;
     const draftPrice = Number(draft.unit_price) || 0;
+    const draftCost = Number(draft.unit_cost) || 0;
+
+    if (draftPrice < draftCost) {
+      window.alert("Cannot bill undercost. The entered unit price is below the registered cost for this product bucket.");
+      return;
+    }
 
     const existingIndex = watchedItems.findIndex(
       (item) => item.product_id === draft.product_id && item.unit_price === draftPrice
@@ -166,7 +175,8 @@ export default function NewInvoicePage() {
       append({
         product_id: draft.product_id,
         qty: draftQty,
-        unit_price: draftPrice
+        unit_price: draftPrice,
+        unit_cost: draftCost
       });
     }
 
@@ -328,46 +338,66 @@ export default function NewInvoicePage() {
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 relative">
                   <label className="text-xs font-semibold text-muted-foreground">Unit Price</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="Price"
-                    {...register("draft.unit_price", {
-                      validate: (value) =>
-                        shouldValidateDraft() && (value === undefined || value < 0) ? "Price is required" : true,
-                      setValueAs: (value) => (value === "" ? undefined : Number(value))
-                    })}
-                    className={cn(addAttempted && draftErrors?.unit_price ? "border-red-400 focus:ring-red-400/40" : "")}
-                  />
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Price"
+                      {...register("draft.unit_price", {
+                        validate: (value) =>
+                          shouldValidateDraft() && (value === undefined || value < 0) ? "Price is required" : true,
+                        setValueAs: (value) => (value === "" ? undefined : Number(value))
+                      })}
+                      className={cn(addAttempted && draftErrors?.unit_price ? "border-red-400 focus:ring-red-400/40" : "", "pr-20")}
+                    />
+                    {watchedDraft?.product_id && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-1 top-1 h-8 px-2 text-xs text-primary"
+                        onClick={() => setIsPriceModalOpen(true)}
+                      >
+                        Buckets
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {watchedDraft?.product_id && (
-                <div className="mt-4 p-3 bg-white border rounded-md">
-                  <h4 className="text-xs font-semibold text-muted-foreground mb-2">Available Received Stock (Reference)</h4>
+              <Dialog 
+                open={isPriceModalOpen} 
+                onOpenChange={setIsPriceModalOpen}
+                title="Select Price Bucket"
+              >
+                <div className="py-2">
                   {isStockLoading ? (
-                    <p className="text-xs text-muted-foreground">Loading stock details...</p>
+                    <p className="text-sm text-muted-foreground">Loading stock details...</p>
                   ) : !stockByPrice || stockByPrice.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No receive history found for this product.</p>
+                    <p className="text-sm text-muted-foreground">No receive history found for this product.</p>
                   ) : (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {stockByPrice.map((bucket) => (
                         <button
                           key={bucket.selling_price}
                           type="button"
-                          onClick={() => setValue("draft.unit_price", bucket.selling_price, { shouldValidate: true, shouldDirty: true })}
-                          className="flex flex-col items-start px-3 py-1.5 border rounded bg-muted/30 hover:bg-muted/60 transition text-left text-xs"
+                          onClick={() => {
+                            setValue("draft.unit_price", bucket.selling_price, { shouldValidate: true, shouldDirty: true });
+                            setValue("draft.unit_cost", bucket.unit_cost);
+                            setIsPriceModalOpen(false);
+                          }}
+                          className="flex flex-col items-start px-4 py-3 border rounded-lg bg-muted/20 hover:bg-muted/60 transition text-left"
                         >
-                          <span className="font-semibold text-primary">LKR {bucket.selling_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                          <span className="text-muted-foreground mt-0.5">Stock Received: {bucket.total_qty}</span>
+                          <span className="font-semibold text-primary text-base">LKR {bucket.selling_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                          <span className="text-xs text-muted-foreground mt-1">Stock Received: {bucket.total_qty}</span>
                         </button>
                       ))}
                     </div>
                   )}
                 </div>
-              )}
+              </Dialog>
 
               <div className="mt-4">
                 <Button type="button" variant="outline" size="sm" onClick={handleAddItem}>

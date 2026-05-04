@@ -2,6 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/lib/supabase/client";
+import { useRealtimeInvalidate } from "@/hooks/useRealtimeInvalidate";
 
 export type InvoiceRow = {
   id: string;
@@ -13,15 +14,23 @@ export type InvoiceRow = {
   issued_by_name: string;
   total_amount: number;
   payment_method: string;
-  status: string;
+  status: "draft" | "issued" | "paid";
   created_at: string;
 };
+
+export const INVOICES_QUERY_KEY = ["invoices"];
 
 export function useInvoices() {
   const supabase = createClient();
 
+  useRealtimeInvalidate({
+    channel: "invoices-realtime",
+    table: "invoices",
+    queryKeys: [INVOICES_QUERY_KEY]
+  });
+
   return useQuery<InvoiceRow[]>({
-    queryKey: ["invoices"],
+    queryKey: INVOICES_QUERY_KEY,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("invoices")

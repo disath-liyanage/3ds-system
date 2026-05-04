@@ -32,6 +32,7 @@ export type InvoiceInput = {
     product_id: string;
     qty: number;
     unit_price: number;
+    unit_cost: number;
   }>;
 };
 
@@ -102,12 +103,16 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
     }
     const qty = Number(item.qty);
     const unitPrice = Number(item.unit_price);
+    const unitCost = Number(item.unit_cost) || 0;
     
     if (!Number.isFinite(qty) || qty <= 0) {
       return { success: false, error: `Item ${index + 1} quantity must be greater than 0` };
     }
     if (!Number.isFinite(unitPrice) || unitPrice < 0) {
       return { success: false, error: `Item ${index + 1} unit price cannot be negative` };
+    }
+    if (unitPrice < unitCost) {
+      return { success: false, error: `Cannot bill undercost. Item ${index + 1} price is below the required cost.` };
     }
 
     total_amount += qty * unitPrice;
