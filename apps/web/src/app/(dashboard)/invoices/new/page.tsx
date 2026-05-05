@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { createInvoice } from "@/app/actions/invoices";
+import { createInvoice, getInvoiceDetail, updateDraftInvoice } from "@/app/actions/invoices";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
@@ -55,6 +55,8 @@ const emptyDraft = {
 
 export default function NewInvoicePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const draftId = searchParams.get("draftId");
   const { permissions, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
   const { data: products, isLoading: isProductsLoading } = useProducts();
   const { data: customers, isLoading: isCustomersLoading } = useCustomers();
@@ -143,10 +145,62 @@ export default function NewInvoicePage() {
     [customers]
   );
 
-  const { append, remove, update } = useFieldArray({
+  const { append, remove, replace, update } = useFieldArray({
     control,
     name: "items"
   });
+
+  useEffect(() => {
+    if (!draftId) return;
+    let isMounted = true;
+
+    const loadDraft = async () => {
+      const result = await getInvoiceDetail(draftId);
+      if (!isMounted) return;
+
+      if (!result.success || !result.data) {
+        toast({
+          title: "Unable to load draft",
+          description: result.error || "Please try again.",
+          variant: "error"
+        });
+        return;
+      }
+
+      if (result.data.status !== "draft") {
+        toast({
+          title: "Invoice is not a draft",
+          description: "Please open this invoice from the list.",
+          variant: "error"
+        });
+        return;
+      }
+
+      setValue("customer_id", result.data.customer_id, { shouldDirty: true });
+      setValue("payment_method", result.data.payment_method as InvoiceForm["payment_method"], { shouldDirty: true });
+      setValue("notes", result.data.notes ?? "", { shouldDirty: true });
+      replace(
+        result.data.items.map((item) => ({
+          product_id: item.product_id,
+          qty: item.qty,
+          free_qty: item.free_qty || 0,
+          unit_price: item.unit_price,
+          unit_cost: 0,
+          discount_type: item.discount_type || "percent",
+          discount_value: item.discount_value || 0
+        }))
+      );
+      resetField("draft", { defaultValue: emptyDraft });
+      setEditingIndex(null);
+      setAddAttempted(false);
+    };
+
+    loadDraft();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [draftId, replace, resetField, setValue]);
 
   // When a product is selected in the draft and no price is set, determine price modal behavior
   useEffect(() => {
@@ -191,12 +245,20 @@ export default function NewInvoicePage() {
       return;
     }
 
-    const result = await createInvoice({
-      customer_id: values.customer_id,
-      payment_method: values.payment_method,
-      notes: values.notes?.trim() || undefined,
-      items: values.items
-    });
+    const result = draftId
+      ? await updateDraftInvoice({
+          invoice_id: draftId,
+          payment_method: values.payment_method,
+          notes: values.notes?.trim() || undefined,
+          items: values.items,
+          finalize: true
+        })
+      : await createInvoice({
+          customer_id: values.customer_id,
+          payment_method: values.payment_method,
+          notes: values.notes?.trim() || undefined,
+          items: values.items
+        });
 
     if (!result.success) {
       toast({
@@ -226,13 +288,21 @@ export default function NewInvoicePage() {
       return;
     }
 
-    const result = await createInvoice({
-      customer_id: values.customer_id,
-      payment_method: values.payment_method,
-      notes: values.notes?.trim() || undefined,
-      items: values.items,
-      saveAsDraft: true
-    });
+    const result = draftId
+      ? await updateDraftInvoice({
+          invoice_id: draftId,
+          payment_method: values.payment_method,
+          notes: values.notes?.trim() || undefined,
+          items: values.items,
+          finalize: false
+        })
+      : await createInvoice({
+          customer_id: values.customer_id,
+          payment_method: values.payment_method,
+          notes: values.notes?.trim() || undefined,
+          items: values.items,
+          saveAsDraft: true
+        });
 
     if (!result.success) {
       toast({

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { ChevronRight } from "lucide-react";
 import { DayPicker, type DateRange } from "react-day-picker";
@@ -18,6 +19,7 @@ import { useInvoices } from "@/hooks/useInvoices";
 export default function InvoicesPage() {
   const { permissions, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
   const { data: invoices, isLoading: isInvoicesLoading } = useInvoices();
+  const router = useRouter();
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -105,6 +107,15 @@ export default function InvoicesPage() {
       .map(({ invoice }) => invoice),
   [filteredInvoices]
   );
+
+  const handleRowClick = (row: (typeof sortedInvoices)[number]) => {
+    if (row.status === "draft") {
+      router.push(`/invoices/new?draftId=${row.id}`);
+      return;
+    }
+
+    router.push(`/invoices/${row.id}`);
+  };
 
   useEffect(() => {
     if (!isDatePickerOpen) return;
@@ -305,18 +316,37 @@ export default function InvoicesPage() {
             </TableRow>
           ) : (
             sortedInvoices.map((row) => (
-              <TableRow key={row.id} className={row.status === "draft" ? "bg-muted/30" : ""}>
+              <TableRow
+                key={row.id}
+                onClick={() => handleRowClick(row)}
+                className={
+                  row.status === "draft"
+                    ? "bg-muted/30 cursor-pointer"
+                    : "cursor-pointer"
+                }
+              >
                 <TableCell className="font-medium">{row.invoice_number}</TableCell>
                 <TableCell>{new Date(row.created_at).toLocaleDateString()}</TableCell>
                 <TableCell>{row.customer_name}</TableCell>
                 <TableCell className="capitalize">{row.payment_method}</TableCell>
                 <TableCell>LKR {row.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                 <TableCell>
-                  <Badge variant={row.status === "paid" ? "success" : "default"}>{row.status}</Badge>
+                  <Badge
+                    variant={
+                      row.status === "paid" ? "success" : row.status === "draft" ? "warning" : "default"
+                    }
+                  >
+                    {row.status}
+                  </Badge>
                 </TableCell>
                 <TableCell>
                   <Button asChild size="sm" variant="outline">
-                    <Link href={`/invoices/${row.id}`}>View</Link>
+                    <Link
+                      href={row.status === "draft" ? `/invoices/new?draftId=${row.id}` : `/invoices/${row.id}`}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      View
+                    </Link>
                   </Button>
                 </TableCell>
               </TableRow>

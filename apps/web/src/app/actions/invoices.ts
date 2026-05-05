@@ -72,6 +72,22 @@ export type InvoiceInput = {
   }>;
 };
 
+export type UpdateDraftInvoiceInput = {
+  invoice_id: string;
+  payment_method: string;
+  finalize: boolean;
+  notes?: string;
+  items: Array<{
+    product_id: string;
+    qty: number;
+    free_qty?: number;
+    unit_price: number;
+    unit_cost: number;
+    discount_type?: "percent" | "amount";
+    discount_value?: number;
+  }>;
+};
+
 async function getCurrentUserProfile() {
   const supabase = createClient();
 
@@ -137,7 +153,7 @@ export async function listInvoices(): Promise<{ success: boolean; data?: Invoice
 
   if (error) return { success: false, error: error.message };
 
-  const rows = (data ?? []).map((row: any) => {
+  let rows = (data ?? []).map((row: any) => {
     const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
     const issuer = Array.isArray(row.issuer) ? row.issuer[0] : row.issuer;
 
@@ -155,6 +171,10 @@ export async function listInvoices(): Promise<{ success: boolean; data?: Invoice
       created_at: row.created_at
     } as InvoiceListRow;
   });
+
+  if (canViewAllInvoices(access.profile)) {
+    rows = rows.filter((row) => row.status !== "draft" || row.issued_by === access.profile.id);
+  }
 
   return { success: true, data: rows };
 }
@@ -374,6 +394,171 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
   revalidatePath("/customers");
 
   return { success: true, message: saveAsDraft ? "Invoice draft saved" : "Invoice created successfully" };
+}
+
+export async function updateDraftInvoice(input: UpdateDraftInvoiceInput): Promise<ActionResult> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!canCreateInvoices(access.profile)) {
+    return { success: false, error: "You do not have permission to update invoices" };
+  }
+
+  const { invoice_id, payment_method, items, notes, finalize } = input;
+
+  if (!invoice_id) {
+    return { success: false, error: "Invoice id is required" };
+  }
+
+  if (payment_method !== "cash" && payment_method !== "credit") {
+    return { success: false, error: "Valid payment method is required (cash or credit)" };
+  }
+
+  if (!items || items.length === 0) {
+    return { success: false, error: "At least one item is required" };
+  }
+
+  const { data: invoice, error: invoiceError } = await adminClient
+    .from("invoices")
+    .select("id, issued_by, status, customer_id")
+    .eq("id", invoice_id)
+    .single();
+
+  if (invoiceError || !invoice) {
+    return { success: false, error: invoiceError?.message || "Invoice not found" };
+  }
+
+  if (!canViewAllInvoices(access.profile) && invoice.issued_by !== access.profile.id) {
+    return { success: false, error: "You do not have permission to update this invoice" };
+  }
+
+  if (invoice.status !== "draft") {
+    return { success: false, error: "Only draft invoices can be updated" };
+  }
+
+  let total_amount = 0;
+  for (const [index, item] of items.entries()) {
+    if (!item.product_id) {
+      return { success: false, error: `Item ${index + 1} is missing a product` };
+    }
+    const qty = Number(item.qty);
+    const unitPrice = Number(item.unit_price);
+    const unitCost = Number(item.unit_cost) || 0;
+    const freeQty = Number(item.free_qty) || 0;
+    const discountType = item.discount_type === "percent" ? "percent" : "amount";
+    const discountValue = Number(item.discount_value) || 0;
+    const discountPerUnit = discountType === "percent" ? (unitPrice * discountValue) / 100 : discountValue;
+    const effectiveUnitPrice = unitPrice - discountPerUnit;
+
+    if (!Number.isFinite(qty) || qty <= 0) {
+      return { success: false, error: `Item ${index + 1} quantity must be greater than 0` };
+    }
+    if (!Number.isFinite(freeQty) || freeQty < 0) {
+      return { success: false, error: `Item ${index + 1} free quantity must be 0 or more` };
+    }
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      return { success: false, error: `Item ${index + 1} unit price cannot be negative` };
+    }
+    if (!Number.isFinite(discountValue) || discountValue < 0) {
+      return { success: false, error: `Item ${index + 1} discount cannot be negative` };
+    }
+    if (discountType === "percent" && discountValue > 100) {
+      return { success: false, error: `Item ${index + 1} discount percent cannot exceed 100` };
+    }
+    if (discountPerUnit > unitPrice) {
+      return { success: false, error: `Item ${index + 1} discount cannot exceed unit price` };
+    }
+    if (effectiveUnitPrice < unitCost) {
+      return { success: false, error: `Cannot bill undercost. Item ${index + 1} price is below the required cost.` };
+    }
+
+    total_amount += qty * Math.max(0, effectiveUnitPrice);
+  }
+
+  const status = finalize ? (payment_method === "cash" ? "paid" : "issued") : "draft";
+
+  const { error: updateError } = await adminClient
+    .from("invoices")
+    .update({
+      total_amount,
+      payment_method,
+      status,
+      notes: notes || null
+    })
+    .eq("id", invoice_id);
+
+  if (updateError) {
+    return { success: false, error: updateError.message };
+  }
+
+  const { error: deleteItemsError } = await adminClient
+    .from("invoice_items")
+    .delete()
+    .eq("invoice_id", invoice_id);
+
+  if (deleteItemsError) {
+    return { success: false, error: deleteItemsError.message };
+  }
+
+  const itemsPayload = items.map((item) => ({
+    invoice_id,
+    product_id: item.product_id,
+    qty: item.qty,
+    free_qty: item.free_qty || 0,
+    unit_price: item.unit_price,
+    discount_type: item.discount_type === "percent" ? "percent" : "amount",
+    discount_value: item.discount_value || 0
+  }));
+
+  const { error: itemsError } = await adminClient.from("invoice_items").insert(itemsPayload);
+
+  if (itemsError) {
+    return { success: false, error: itemsError.message };
+  }
+
+  if (finalize) {
+    // Reduce product stock
+    try {
+      for (const item of items) {
+        const qty = Number(item.qty);
+        const { data: product, error: productError } = await adminClient
+          .from("products")
+          .select("stock_qty")
+          .eq("id", item.product_id)
+          .single();
+
+        if (product && !productError) {
+          const newStock = Math.max(0, Number(product.stock_qty) - qty);
+          await adminClient.from("products").update({ stock_qty: newStock }).eq("id", item.product_id);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to update stock after draft finalize", err);
+    }
+
+    if (payment_method === "credit") {
+      try {
+        const { data: customer, error: customerError } = await adminClient
+          .from("customers")
+          .select("balance")
+          .eq("id", invoice.customer_id)
+          .single();
+
+        if (customer && !customerError) {
+          const newBalance = Number(customer.balance) + total_amount;
+          await adminClient.from("customers").update({ balance: newBalance }).eq("id", invoice.customer_id);
+        }
+      } catch (err) {
+        console.error("Failed to update customer balance after draft finalize", err);
+      }
+    }
+  }
+
+  revalidatePath("/invoices");
+  revalidatePath("/products");
+  revalidatePath("/customers");
+
+  return { success: true, message: finalize ? "Invoice updated" : "Draft updated" };
 }
 
 export async function deleteInvoice(invoiceId: string): Promise<ActionResult> {

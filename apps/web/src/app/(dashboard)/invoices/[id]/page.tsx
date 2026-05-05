@@ -172,7 +172,11 @@ export default function InvoiceDetailsPage() {
             </div>
             <div className="flex justify-between items-center text-sm pt-2 border-t">
               <span>Status:</span>
-              <Badge variant={invoice.status === "paid" ? "success" : "default"}>
+              <Badge
+                variant={
+                  invoice.status === "paid" ? "success" : invoice.status === "draft" ? "warning" : "default"
+                }
+              >
                 {invoice.status.toUpperCase()}
               </Badge>
             </div>
