@@ -216,14 +216,14 @@ const initialProductFormState: ProductFormState = {
   subCategory: "",
   unit: "",
   price: "",
-  stock_qty: "",
+  stock_qty: "0",
   low_stock_threshold: "10"
 };
 
 const initialProductSizeState: ProductSizeFormState = {
   unit: "",
   price: "",
-  stock_qty: "",
+  stock_qty: "0",
   low_stock_threshold: "10"
 };
 
@@ -812,7 +812,7 @@ function ProductFormDialog({
         id: `new-${Date.now()}-${Math.random()}`,
         unit: currentUnit,
         price: "",
-        stock_qty: "",
+        stock_qty: "0",
         low_stock_threshold: "10",
         isRemoved: false,
         originalGroupKey: groupKey
@@ -900,21 +900,6 @@ function ProductFormDialog({
                 step="0.01"
                 value={form.price}
                 onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor={`${mode}-product-stock`} className="text-sm font-medium">
-                Stock Quantity
-              </label>
-              <Input
-                id={`${mode}-product-stock`}
-                required
-                type="number"
-                min={0}
-                step="0.01"
-                value={form.stock_qty}
-                onChange={(event) => setForm((prev) => ({ ...prev, stock_qty: event.target.value }))}
               />
             </div>
 
@@ -1078,20 +1063,6 @@ function ProductFormDialog({
                           step="0.01"
                           value={size.price}
                           onChange={(event) => handleExtraSizeChange(index, "price", event.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label htmlFor={`extra-product-stock-${index}`} className="text-sm font-medium">
-                          Stock Quantity
-                        </label>
-                        <Input
-                          id={`extra-product-stock-${index}`}
-                          required
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          value={size.stock_qty}
-                          onChange={(event) => handleExtraSizeChange(index, "stock_qty", event.target.value)}
                         />
                       </div>
                       <div className="space-y-1">
@@ -1382,20 +1353,6 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
                       step="0.01"
                       value={size.price}
                       onChange={(event) => handleSizeChange(index, "price", event.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label htmlFor={`multi-product-stock-${index}`} className="text-sm font-medium">
-                      Stock Quantity
-                    </label>
-                    <Input
-                      id={`multi-product-stock-${index}`}
-                      required
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={size.stock_qty}
-                      onChange={(event) => handleSizeChange(index, "stock_qty", event.target.value)}
                     />
                   </div>
                   <div className="space-y-1">
