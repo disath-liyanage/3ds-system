@@ -221,14 +221,13 @@ export async function getInvoiceDetail(
         )
       `
     )
-    .eq("id", invoiceId)
-    .single();
+    .eq("id", invoiceId);
 
   if (!canViewAllInvoices(access.profile)) {
     query = query.eq("issued_by", access.profile.id);
   }
 
-  const { data, error } = await query;
+  const { data, error } = await query.single();
 
   if (error) return { success: false, error: error.message };
   if (!data) return { success: true, data: null };
