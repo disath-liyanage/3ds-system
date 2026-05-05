@@ -136,7 +136,9 @@ export default function NewInvoicePage() {
     () =>
       (customers ?? []).map((customer) => ({
         value: customer.id,
-        label: `${customer.name} · ${customer.phone}`
+        label: customer.name,
+        meta: customer.area,
+        subLabel: customer.address
       })),
     [customers]
   );

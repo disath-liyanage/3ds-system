@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 export type SearchableSelectOption = {
   value: string;
   label: string;
+  subLabel?: string;
+  meta?: string;
 };
 
 type SearchableSelectProps = {
@@ -41,7 +43,10 @@ export function SearchableSelect({
   const filteredOptions = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return options;
-    return options.filter((option) => option.label.toLowerCase().includes(normalizedQuery));
+    return options.filter((option) => {
+      const searchable = `${option.label} ${option.meta ?? ""} ${option.subLabel ?? ""}`.toLowerCase();
+      return searchable.includes(normalizedQuery);
+    });
   }, [options, query]);
 
   useEffect(() => {
@@ -148,7 +153,15 @@ export function SearchableSelect({
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => handleSelect(option)}
                 >
-                  {option.label}
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium text-foreground">{option.label}</span>
+                    {option.meta ? (
+                      <span className="text-xs text-muted-foreground text-right">{option.meta}</span>
+                    ) : null}
+                  </div>
+                  {option.subLabel ? (
+                    <div className="text-xs text-muted-foreground mt-1">{option.subLabel}</div>
+                  ) : null}
                 </div>
               ))}
             </div>
