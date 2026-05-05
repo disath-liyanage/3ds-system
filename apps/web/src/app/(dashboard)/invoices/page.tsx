@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
+import { ChevronRight } from "lucide-react";
 import { DayPicker, type DateRange } from "react-day-picker";
 
 import "react-day-picker/dist/style.css";
@@ -151,15 +152,29 @@ export default function InvoicesPage() {
             />
             {hasFilters ? <span className="text-xs text-muted-foreground">Filters active</span> : null}
           </div>
-          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
             <Button
               type="button"
-              variant="outline"
+                variant="ghost"
               onClick={() => setFiltersOpen((prev) => !prev)}
             >
-              {filtersOpen ? "Hide Filters" : "Show Filters"}
+                <span className="flex items-center gap-2">
+                  <ChevronRight
+                    className={
+                      filtersOpen
+                        ? "h-4 w-4 rotate-90 transition-transform"
+                        : "h-4 w-4 rotate-0 transition-transform"
+                    }
+                  />
+                  {filtersOpen ? "Hide filters" : "Show filters"}
+                </span>
             </Button>
-            <Button variant="outline" size="sm" onClick={handleResetFilters} disabled={!hasFilters}>
+              <Button
+                variant={hasFilters ? "default" : "outline"}
+                size="sm"
+                onClick={handleResetFilters}
+                disabled={!hasFilters}
+              >
               Reset
             </Button>
           </div>
