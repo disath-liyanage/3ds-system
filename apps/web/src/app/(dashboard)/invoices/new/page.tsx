@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 type InvoiceForm = {
   customer_id: string;
   payment_method: "cash" | "credit";
+  notes?: string;
   draft: {
     product_id: string;
     qty?: number;
@@ -48,7 +49,7 @@ const emptyDraft = {
   free_qty: undefined,
   unit_price: undefined,
   unit_cost: undefined,
-  discount_type: "amount" as const,
+  discount_type: "percent" as const,
   discount_value: undefined
 };
 
@@ -75,6 +76,7 @@ export default function NewInvoicePage() {
     defaultValues: {
       customer_id: "",
       payment_method: "credit",
+      notes: "",
       draft: emptyDraft,
       items: []
     }
@@ -82,6 +84,7 @@ export default function NewInvoicePage() {
 
   const watchedItems = useWatch({ control, name: "items" });
   const watchedCustomerId = useWatch({ control, name: "customer_id" });
+  const watchedPaymentMethod = useWatch({ control, name: "payment_method" });
   const watchedDraft = useWatch({ control, name: "draft" });
   const draftErrors = formState.errors?.draft;
 
@@ -188,6 +191,7 @@ export default function NewInvoicePage() {
     const result = await createInvoice({
       customer_id: values.customer_id,
       payment_method: values.payment_method,
+      notes: values.notes?.trim() || undefined,
       items: values.items
     });
 
@@ -226,7 +230,7 @@ export default function NewInvoicePage() {
     const draftFreeQty = Number(draft.free_qty) || 0;
     const draftPrice = Number(draft.unit_price) || 0;
     const draftCost = Number(draft.unit_cost) || 0;
-    const draftDiscountType = draft.discount_type || "amount";
+    const draftDiscountType = draft.discount_type || "percent";
     const draftDiscountValue = Number(draft.discount_value) || 0;
     const discountPerUnit = getDiscountPerUnit(draftPrice, draftDiscountType, draftDiscountValue);
     const effectiveUnitPrice = draftPrice - discountPerUnit;
@@ -260,7 +264,7 @@ export default function NewInvoicePage() {
       (item) =>
         item.product_id === draft.product_id &&
         item.unit_price === draftPrice &&
-        (item.discount_type || "amount") === draftDiscountType &&
+        (item.discount_type || "percent") === draftDiscountType &&
         Number(item.discount_value) === draftDiscountValue
     );
 
@@ -298,7 +302,7 @@ export default function NewInvoicePage() {
         const qty = Number(item?.qty) || 0;
         const freeQty = Number(item?.free_qty) || 0;
         const unitPrice = Number(item?.unit_price) || 0;
-        const discountType = item?.discount_type || "amount";
+        const discountType = item?.discount_type || "percent";
         const discountValue = Number(item?.discount_value) || 0;
         const discountPerUnit = getDiscountPerUnit(unitPrice, discountType, discountValue);
         const effectiveUnitPrice = unitPrice - discountPerUnit;
@@ -378,28 +382,33 @@ export default function NewInvoicePage() {
               />
             </div>
 
-            <div className="space-y-1 md:col-span-2">
+            <div className="space-y-1 md:col-span-1">
               <label className="text-xs font-semibold text-muted-foreground">Payment Method</label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="credit"
-                    {...register("payment_method")}
-                    className="accent-primary"
-                  />
-                  <span className="text-sm">Credit</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    value="cash"
-                    {...register("payment_method")}
-                    className="accent-primary"
-                  />
-                  <span className="text-sm">Cash</span>
-                </label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={watchedPaymentMethod === "credit" ? "default" : "outline"}
+                  onClick={() => setValue("payment_method", "credit", { shouldDirty: true })}
+                >
+                  Credit
+                </Button>
+                <Button
+                  type="button"
+                  variant={watchedPaymentMethod === "cash" ? "default" : "outline"}
+                  onClick={() => setValue("payment_method", "cash", { shouldDirty: true })}
+                >
+                  Cash
+                </Button>
               </div>
+              <input type="hidden" {...register("payment_method")} />
+            </div>
+
+            <div className="space-y-1 md:col-span-1">
+              <label className="text-xs font-semibold text-muted-foreground">Notes</label>
+              <Input
+                placeholder="Add invoice notes (optional)"
+                {...register("notes")}
+              />
             </div>
           </CardContent>
         </Card>

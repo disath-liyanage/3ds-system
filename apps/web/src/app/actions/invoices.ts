@@ -42,6 +42,7 @@ export type InvoiceListRow = {
 export type InvoiceDetailRow = InvoiceListRow & {
   customer_phone: string;
   customer_address: string;
+  notes: string | null;
   items: Array<{
     id: string;
     product_id: string;
@@ -58,6 +59,7 @@ export type InvoiceDetailRow = InvoiceListRow & {
 export type InvoiceInput = {
   customer_id: string;
   payment_method: string;
+  notes?: string;
   items: Array<{
     product_id: string;
     qty: number;
@@ -174,7 +176,7 @@ export async function getInvoiceDetail(
     .from("invoices")
     .select(
       `
-        id, invoice_number, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at,
+        id, invoice_number, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at, notes,
         customer:customers(name, phone, address),
         issuer:users_profile(full_name),
         invoice_items (
@@ -210,6 +212,7 @@ export async function getInvoiceDetail(
     total_amount: Number(invoiceData.total_amount),
     payment_method: invoiceData.payment_method,
     status: invoiceData.status,
+    notes: invoiceData.notes ?? null,
     created_at: invoiceData.created_at,
     items: (invoiceData.invoice_items ?? []).map((item: any) => ({
       id: item.id,
@@ -235,7 +238,7 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
     return { success: false, error: "You do not have permission to create invoices" };
   }
 
-  const { customer_id, payment_method, items } = input;
+  const { customer_id, payment_method, items, notes } = input;
 
   if (!customer_id) {
     return { success: false, error: "Customer is required" };
@@ -299,7 +302,8 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
       issued_by: access.profile.id,
       total_amount,
       payment_method,
-      status
+      status,
+      notes: notes || null
     })
     .select("id")
     .single();

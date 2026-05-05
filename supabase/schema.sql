@@ -91,6 +91,7 @@ create table if not exists public.invoices (
   total_amount numeric(12, 2) not null check (total_amount >= 0),
   payment_method text not null default 'credit',
   status public.invoice_status not null default 'draft',
+  notes text,
   created_at timestamptz not null default now()
 );
 
