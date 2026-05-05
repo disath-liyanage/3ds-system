@@ -99,7 +99,10 @@ create table if not exists public.invoice_items (
   invoice_id uuid not null references public.invoices (id) on delete cascade,
   product_id uuid not null references public.products (id),
   qty numeric(12, 2) not null check (qty > 0),
+  free_qty numeric(12, 2) not null default 0 check (free_qty >= 0),
   unit_price numeric(12, 2) not null check (unit_price >= 0),
+  discount_type text not null default 'amount',
+  discount_value numeric(12, 2) not null default 0 check (discount_value >= 0),
   created_at timestamptz not null default now()
 );
 

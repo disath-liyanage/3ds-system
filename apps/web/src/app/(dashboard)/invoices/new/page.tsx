@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select";
+import { Select } from "@/components/ui/select";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useProducts } from "@/hooks/useProducts";
 import { useProductStockByPrice } from "@/hooks/useProductStockByPrice";
@@ -24,22 +25,31 @@ type InvoiceForm = {
   draft: {
     product_id: string;
     qty?: number;
+    free_qty?: number;
     unit_price?: number;
     unit_cost?: number;
+    discount_type?: "percent" | "amount";
+    discount_value?: number;
   };
   items: Array<{
     product_id: string;
     qty: number;
+    free_qty?: number;
     unit_price: number;
     unit_cost: number;
+    discount_type?: "percent" | "amount";
+    discount_value?: number;
   }>;
 };
 
 const emptyDraft = {
   product_id: "",
   qty: undefined,
+  free_qty: undefined,
   unit_price: undefined,
-  unit_cost: undefined
+  unit_cost: undefined,
+  discount_type: "amount" as const,
+  discount_value: undefined
 };
 
 export default function NewInvoicePage() {
@@ -76,6 +86,36 @@ export default function NewInvoicePage() {
   const draftErrors = formState.errors?.draft;
 
   const { data: stockByPrice, isLoading: isStockLoading } = useProductStockByPrice(watchedDraft?.product_id);
+
+  const availableQty = useMemo(() => {
+    if (!watchedDraft?.product_id) return null;
+    if (isStockLoading || !stockByPrice || stockByPrice.length === 0) return 0;
+    
+    if (watchedDraft.unit_price !== undefined) {
+      const bucket = stockByPrice.find((b) => b.selling_price === watchedDraft.unit_price);
+      return bucket ? bucket.total_qty : 0;
+    }
+    
+    return stockByPrice.reduce((sum, b) => sum + b.total_qty, 0);
+  }, [stockByPrice, watchedDraft?.product_id, watchedDraft?.unit_price, isStockLoading]);
+
+  const discountTypeOptions = useMemo(
+    () => [
+      { value: "percent", label: "%" },
+      { value: "amount", label: "LKR" }
+    ],
+    []
+  );
+
+  const getDiscountPerUnit = useCallback((
+    unitPrice: number,
+    discountType: "percent" | "amount",
+    discountValue: number
+  ) => {
+    if (!discountValue) return 0;
+    if (discountType === "percent") return (unitPrice * discountValue) / 100;
+    return discountValue;
+  }, []);
 
   const shouldValidateDraft = () => addAttempted || Boolean(getValues("draft.product_id"));
 
@@ -125,7 +165,13 @@ export default function NewInvoicePage() {
   }, [watchedDraft?.product_id, watchedDraft?.unit_price, isStockLoading, stockByPrice, setValue]);
 
   const hasDraftData = (draft: InvoiceForm["draft"]) =>
-    Boolean(draft.product_id || draft.qty || draft.unit_price);
+    Boolean(
+      draft.product_id ||
+      draft.qty ||
+      draft.free_qty ||
+      draft.unit_price ||
+      draft.discount_value
+    );
 
   const onSubmit = async (values: InvoiceForm) => {
     if (hasDraftData(values.draft)) {
@@ -162,7 +208,14 @@ export default function NewInvoicePage() {
 
   const handleAddItem = async () => {
     setAddAttempted(true);
-    const isValid = await trigger(["draft.product_id", "draft.qty", "draft.unit_price"]);
+    const isValid = await trigger([
+      "draft.product_id",
+      "draft.qty",
+      "draft.unit_price",
+      "draft.free_qty",
+      "draft.discount_value",
+      "draft.discount_type"
+    ]);
 
     if (!isValid) return;
 
@@ -170,29 +223,62 @@ export default function NewInvoicePage() {
     if (!draft.product_id) return;
 
     const draftQty = Number(draft.qty) || 0;
+    const draftFreeQty = Number(draft.free_qty) || 0;
     const draftPrice = Number(draft.unit_price) || 0;
     const draftCost = Number(draft.unit_cost) || 0;
+    const draftDiscountType = draft.discount_type || "amount";
+    const draftDiscountValue = Number(draft.discount_value) || 0;
+    const discountPerUnit = getDiscountPerUnit(draftPrice, draftDiscountType, draftDiscountValue);
+    const effectiveUnitPrice = draftPrice - discountPerUnit;
 
-    if (draftPrice < draftCost) {
+    if (draftFreeQty < 0) {
+      window.alert("Free qty cannot be negative.");
+      return;
+    }
+
+    if (draftDiscountValue < 0) {
+      window.alert("Discount cannot be negative.");
+      return;
+    }
+
+    if (draftDiscountType === "percent" && draftDiscountValue > 100) {
+      window.alert("Discount percent cannot exceed 100%.");
+      return;
+    }
+
+    if (discountPerUnit > draftPrice) {
+      window.alert("Discount cannot exceed the unit price.");
+      return;
+    }
+
+    if (effectiveUnitPrice < draftCost) {
       window.alert("Cannot bill undercost. The entered unit price is below the registered cost for this product bucket.");
       return;
     }
 
     const existingIndex = watchedItems.findIndex(
-      (item) => item.product_id === draft.product_id && item.unit_price === draftPrice
+      (item) =>
+        item.product_id === draft.product_id &&
+        item.unit_price === draftPrice &&
+        (item.discount_type || "amount") === draftDiscountType &&
+        Number(item.discount_value) === draftDiscountValue
     );
 
     if (existingIndex >= 0) {
       update(existingIndex, {
         ...watchedItems[existingIndex],
-        qty: watchedItems[existingIndex].qty + draftQty
+        qty: watchedItems[existingIndex].qty + draftQty,
+        free_qty: (Number(watchedItems[existingIndex].free_qty) || 0) + draftFreeQty
       });
     } else {
       append({
         product_id: draft.product_id,
         qty: draftQty,
+        free_qty: draftFreeQty,
         unit_price: draftPrice,
-        unit_cost: draftCost
+        unit_cost: draftCost,
+        discount_type: draftDiscountType,
+        discount_value: draftDiscountValue
       });
     }
 
@@ -210,16 +296,24 @@ export default function NewInvoicePage() {
     () =>
       (watchedItems ?? []).map((item) => {
         const qty = Number(item?.qty) || 0;
+        const freeQty = Number(item?.free_qty) || 0;
         const unitPrice = Number(item?.unit_price) || 0;
-        const total = qty * unitPrice;
+        const discountType = item?.discount_type || "amount";
+        const discountValue = Number(item?.discount_value) || 0;
+        const discountPerUnit = getDiscountPerUnit(unitPrice, discountType, discountValue);
+        const effectiveUnitPrice = unitPrice - discountPerUnit;
+        const total = qty * Math.max(0, effectiveUnitPrice);
         return {
           productId: item?.product_id ?? "",
           qty,
+          freeQty,
           unitPrice,
+          discountType,
+          discountValue,
           total
         };
       }),
-    [watchedItems]
+    [getDiscountPerUnit, watchedItems]
   );
 
   const grandTotal = itemSummaries.reduce((sum, item) => sum + item.total, 0);
@@ -243,7 +337,7 @@ export default function NewInvoicePage() {
   }
 
   return (
-    <section className="space-y-6 max-w-4xl">
+    <section className="space-y-6 w-full max-w-6xl mx-auto">
       <header>
         <h1 className="text-2xl font-bold">New Invoice</h1>
         <p className="text-sm text-muted-foreground">Create a direct invoice for a customer.</p>
@@ -312,12 +406,12 @@ export default function NewInvoicePage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Products</CardTitle>
+            <CardTitle>Items</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-md border border-border p-4 bg-muted/20">
-              <div className="grid gap-3 md:grid-cols-4 items-end">
-                <div className="space-y-1 md:col-span-2">
+          <CardContent className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+            <div className="space-y-3">
+              <div className="space-y-3 rounded-md border border-border p-4">
+                <div>
                   <label className="text-xs font-semibold text-muted-foreground">Product</label>
                   <SearchableSelect
                     value={watchedDraft?.product_id ?? ""}
@@ -339,125 +433,184 @@ export default function NewInvoicePage() {
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-muted-foreground">Qty</label>
-                  <Input
-                    type="number"
-                    step="1"
-                    placeholder="Qty"
-                    {...register("draft.qty", {
-                      validate: (value) =>
-                        shouldValidateDraft() && (value === undefined || value <= 0) ? "Qty is required" : true,
-                      setValueAs: (value) => (value === "" ? undefined : Number(value))
-                    })}
-                    className={cn(addAttempted && draftErrors?.qty ? "border-red-400 focus:ring-red-400/40" : "")}
-                  />
-                </div>
-
-                <div className="space-y-1 relative">
-                  <label className="text-xs font-semibold text-muted-foreground">Unit Price</label>
-                  <div className="relative">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-semibold text-muted-foreground">Qty</label>
+                      {availableQty !== null && (
+                        <span className="text-[10px] text-muted-foreground font-medium">Available: {availableQty}</span>
+                      )}
+                    </div>
                     <Input
                       type="number"
                       step="1"
-                      placeholder="Price"
-                      {...register("draft.unit_price", {
+                      placeholder="Qty"
+                      {...register("draft.qty", {
                         validate: (value) =>
-                          shouldValidateDraft() && (value === undefined || value < 0) ? "Price is required" : true,
+                          shouldValidateDraft() && (value === undefined || value <= 0) ? "Qty is required" : true,
                         setValueAs: (value) => (value === "" ? undefined : Number(value))
                       })}
-                      className={cn(addAttempted && draftErrors?.unit_price ? "border-red-400 focus:ring-red-400/40" : "", "pr-20")}
+                      className={cn(addAttempted && draftErrors?.qty ? "border-red-400 focus:ring-red-400/40" : "")}
                     />
-                    {watchedDraft?.product_id && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-1 top-1 h-8 px-2 text-xs text-primary"
-                        onClick={() => setIsPriceModalOpen(true)}
-                      >
-                        Buckets
-                      </Button>
-                    )}
+                  </div>
+
+                    <div className="space-y-1 relative">
+                    <div className="flex justify-between items-center">
+                      <label className="text-xs font-semibold text-muted-foreground">Free Qty</label>
+                      <span className="text-[10px] text-transparent select-none">Available: 0</span>
+                    </div>
+                    <Input
+                      type="number"
+                      step="1"
+                      placeholder="Free"
+                      {...register("draft.free_qty", {
+                        validate: (value) => (value === undefined || value >= 0 ? true : "Free qty must be 0 or more"),
+                        setValueAs: (value) => (value === "" ? undefined : Number(value))
+                      })}
+                      className={cn(addAttempted && draftErrors?.free_qty ? "border-red-400 focus:ring-red-400/40" : "")}
+                    />
                   </div>
                 </div>
-              </div>
 
-              <Dialog
-                open={isPriceModalOpen}
-                onOpenChange={setIsPriceModalOpen}
-                title="Select Price Bucket"
-              >
-                <div className="py-2">
-                  {isStockLoading ? (
-                    <p className="text-sm text-muted-foreground">Loading stock details...</p>
-                  ) : !stockByPrice || stockByPrice.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No receive history found for this product.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {stockByPrice.map((bucket) => (
-                        <button
-                          key={bucket.selling_price}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1 relative">
+                    <label className="text-xs font-semibold text-muted-foreground">Unit Price</label>
+                    <div className="relative">
+                      <Input
+                        type="number"
+                        step="1"
+                        placeholder="Price"
+                        {...register("draft.unit_price", {
+                          validate: (value) =>
+                            shouldValidateDraft() && (value === undefined || value < 0) ? "Price is required" : true,
+                          setValueAs: (value) => (value === "" ? undefined : Number(value))
+                        })}
+                        className={cn(addAttempted && draftErrors?.unit_price ? "border-red-400 focus:ring-red-400/40" : "", "pr-20")}
+                      />
+                      {watchedDraft?.product_id && (
+                        <Button
                           type="button"
-                          onClick={() => {
-                            setValue("draft.unit_price", bucket.selling_price, { shouldValidate: true, shouldDirty: true });
-                            setValue("draft.unit_cost", bucket.unit_cost);
-                            setIsPriceModalOpen(false);
-
-                            // Focus Qty field
-                            setTimeout(() => {
-                              const qtyInput = document.querySelector('input[name="draft.qty"]') as HTMLInputElement;
-                              if (qtyInput) {
-                                qtyInput.focus();
-                              }
-                            }, 0);
-                          }}
-                          className="flex flex-col items-start px-4 py-3 border rounded-lg bg-muted/20 hover:bg-muted/60 transition text-left"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-1 top-1 h-8 px-2 text-xs text-primary"
+                          onClick={() => setIsPriceModalOpen(true)}
                         >
-                          <span className="font-semibold text-primary text-base">LKR {bucket.selling_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                          <span className="text-xs text-muted-foreground mt-1">Stock Received: {bucket.total_qty}</span>
-                        </button>
-                      ))}
+                          Buckets
+                        </Button>
+                      )}
                     </div>
-                  )}
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground">Discount</label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0"
+                        {...register("draft.discount_value", {
+                          validate: (value) => (value === undefined || value >= 0 ? true : "Discount must be 0 or more"),
+                          setValueAs: (value) => (value === "" ? undefined : Number(value))
+                        })}
+                        className={cn(addAttempted && draftErrors?.discount_value ? "border-red-400 focus:ring-red-400/40" : "")}
+                      />
+                      <Select
+                        {...register("draft.discount_type")}
+                        options={discountTypeOptions}
+                        className="w-24"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </Dialog>
 
-              <div className="mt-4">
-                <Button type="button" variant="outline" size="sm" onClick={handleAddItem}>
+                <Dialog
+                  open={isPriceModalOpen}
+                  onOpenChange={setIsPriceModalOpen}
+                  title="Select Price Bucket"
+                >
+                  <div className="py-2">
+                    {isStockLoading ? (
+                      <p className="text-sm text-muted-foreground">Loading stock details...</p>
+                    ) : !stockByPrice || stockByPrice.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No receive history found for this product.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {stockByPrice.map((bucket) => (
+                          <button
+                            key={bucket.selling_price}
+                            type="button"
+                            onClick={() => {
+                              setValue("draft.unit_price", bucket.selling_price, { shouldValidate: true, shouldDirty: true });
+                              setValue("draft.unit_cost", bucket.unit_cost);
+                              setIsPriceModalOpen(false);
+
+                              // Focus Qty field
+                              setTimeout(() => {
+                                const qtyInput = document.querySelector('input[name="draft.qty"]') as HTMLInputElement;
+                                if (qtyInput) {
+                                  qtyInput.focus();
+                                }
+                              }, 0);
+                            }}
+                            className="flex flex-col items-start px-4 py-3 border rounded-lg bg-muted/20 hover:bg-muted/60 transition text-left"
+                          >
+                            <span className="font-semibold text-primary text-base">LKR {bucket.selling_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                            <span className="text-xs text-muted-foreground mt-1">Stock Received: {bucket.total_qty}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Dialog>
+
+                <Button type="button" variant="outline" onClick={handleAddItem}>
                   Add Item
                 </Button>
               </div>
             </div>
 
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold">Added Items</h3>
+            <div className="space-y-3 rounded-md border border-border p-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold">Added products</div>
+                <div className="text-sm font-bold text-primary">
+                  Total: LKR {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </div>
+              </div>
               {itemSummaries.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No items added yet.</p>
               ) : (
-                <div className="border rounded-md divide-y">
+                <div className="space-y-3">
                   {itemSummaries.map((item, index) => {
                     const productLabel =
                       productOptions.find((option) => option.value === item.productId)?.label ||
                       "Unknown product";
 
                     return (
-                      <div key={`${item.productId}-${index}`} className="p-3 flex items-center justify-between">
-                        <div>
-                          <div className="text-sm font-medium">{productLabel}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {item.qty} x LKR {item.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      <div key={`${item.productId}-${index}`} className="rounded-md border border-border p-3 flex flex-col gap-2">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="text-sm font-semibold">{productLabel}</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {item.qty} x LKR {item.unitPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                              {item.freeQty > 0 ? ` · Free ${item.freeQty}` : ""}
+                              {item.discountValue > 0
+                                ? ` · Discount ${
+                                    item.discountType === "percent"
+                                      ? `${item.discountValue}%`
+                                      : `LKR ${item.discountValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                                  }`
+                                : ""}
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-center gap-4">
                           <div className="text-sm font-semibold">
                             LKR {item.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </div>
+                        </div>
+                        <div className="flex justify-end">
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            className="text-red-500 hover:text-red-600"
+                            className="h-auto p-0 text-red-500 hover:text-red-600 hover:bg-transparent"
                             onClick={() => remove(index)}
                           >
                             Remove
@@ -466,10 +619,6 @@ export default function NewInvoicePage() {
                       </div>
                     );
                   })}
-                  <div className="p-4 bg-muted/10 flex justify-between items-center font-bold">
-                    <span>Grand Total:</span>
-                    <span className="text-lg">LKR {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                  </div>
                 </div>
               )}
             </div>

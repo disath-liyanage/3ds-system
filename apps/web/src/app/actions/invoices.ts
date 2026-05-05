@@ -48,7 +48,10 @@ export type InvoiceDetailRow = InvoiceListRow & {
     product_name: string;
     product_unit: string;
     qty: number;
+    free_qty: number;
     unit_price: number;
+    discount_type: "percent" | "amount";
+    discount_value: number;
   }>;
 };
 
@@ -58,8 +61,11 @@ export type InvoiceInput = {
   items: Array<{
     product_id: string;
     qty: number;
+    free_qty?: number;
     unit_price: number;
     unit_cost: number;
+    discount_type?: "percent" | "amount";
+    discount_value?: number;
   }>;
 };
 
@@ -172,7 +178,7 @@ export async function getInvoiceDetail(
         customer:customers(name, phone, address),
         issuer:users_profile(full_name),
         invoice_items (
-          id, product_id, qty, unit_price,
+          id, product_id, qty, free_qty, unit_price, discount_type, discount_value,
           product:products(name, unit)
         )
       `
@@ -209,7 +215,10 @@ export async function getInvoiceDetail(
       id: item.id,
       product_id: item.product_id,
       qty: Number(item.qty),
+      free_qty: Number(item.free_qty) || 0,
       unit_price: Number(item.unit_price),
+      discount_type: item.discount_type === "percent" ? "percent" : "amount",
+      discount_value: Number(item.discount_value) || 0,
       product_name: item.product?.name ?? "Unknown Product",
       product_unit: item.product?.unit ?? ""
     }))
@@ -248,18 +257,35 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
     const qty = Number(item.qty);
     const unitPrice = Number(item.unit_price);
     const unitCost = Number(item.unit_cost) || 0;
+    const freeQty = Number(item.free_qty) || 0;
+    const discountType = item.discount_type === "percent" ? "percent" : "amount";
+    const discountValue = Number(item.discount_value) || 0;
+    const discountPerUnit = discountType === "percent" ? (unitPrice * discountValue) / 100 : discountValue;
+    const effectiveUnitPrice = unitPrice - discountPerUnit;
     
     if (!Number.isFinite(qty) || qty <= 0) {
       return { success: false, error: `Item ${index + 1} quantity must be greater than 0` };
     }
+    if (!Number.isFinite(freeQty) || freeQty < 0) {
+      return { success: false, error: `Item ${index + 1} free quantity must be 0 or more` };
+    }
     if (!Number.isFinite(unitPrice) || unitPrice < 0) {
       return { success: false, error: `Item ${index + 1} unit price cannot be negative` };
     }
-    if (unitPrice < unitCost) {
+    if (!Number.isFinite(discountValue) || discountValue < 0) {
+      return { success: false, error: `Item ${index + 1} discount cannot be negative` };
+    }
+    if (discountType === "percent" && discountValue > 100) {
+      return { success: false, error: `Item ${index + 1} discount percent cannot exceed 100` };
+    }
+    if (discountPerUnit > unitPrice) {
+      return { success: false, error: `Item ${index + 1} discount cannot exceed unit price` };
+    }
+    if (effectiveUnitPrice < unitCost) {
       return { success: false, error: `Cannot bill undercost. Item ${index + 1} price is below the required cost.` };
     }
 
-    total_amount += qty * unitPrice;
+    total_amount += qty * Math.max(0, effectiveUnitPrice);
   }
 
   // Create invoice
@@ -286,7 +312,10 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
     invoice_id: invoice.id,
     product_id: item.product_id,
     qty: item.qty,
-    unit_price: item.unit_price
+    free_qty: item.free_qty || 0,
+    unit_price: item.unit_price,
+    discount_type: item.discount_type === "percent" ? "percent" : "amount",
+    discount_value: item.discount_value || 0
   }));
 
   const { error: itemsError } = await adminClient.from("invoice_items").insert(itemsPayload);

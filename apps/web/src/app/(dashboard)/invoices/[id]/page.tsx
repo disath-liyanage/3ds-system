@@ -46,6 +46,12 @@ export default function InvoiceDetailsPage() {
     window.print();
   };
 
+  const getDiscountPerUnit = (unitPrice: number, discountType: "percent" | "amount", discountValue: number) => {
+    if (!discountValue) return 0;
+    if (discountType === "percent") return (unitPrice * discountValue) / 100;
+    return discountValue;
+  };
+
   if (isPermissionsLoading || isInvoiceLoading) {
     return (
       <section className="space-y-4">
@@ -127,20 +133,34 @@ export default function InvoiceDetailsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {invoice.items.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell className="font-medium">
-                  {item.product_name} <span className="text-muted-foreground text-xs">({item.product_unit})</span>
-                </TableCell>
-                <TableCell className="text-right">{item.qty}</TableCell>
-                <TableCell className="text-right">
-                  LKR {item.unit_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </TableCell>
-                <TableCell className="text-right font-medium">
-                  LKR {(item.qty * item.unit_price).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </TableCell>
-              </TableRow>
-            ))}
+            {invoice.items.map((item) => {
+              const discountPerUnit = getDiscountPerUnit(item.unit_price, item.discount_type, item.discount_value);
+              const effectiveUnitPrice = Math.max(0, item.unit_price - discountPerUnit);
+
+              return (
+                <TableRow key={item.id}>
+                  <TableCell className="font-medium">
+                    {item.product_name} <span className="text-muted-foreground text-xs">({item.product_unit})</span>
+                    {(item.free_qty > 0 || item.discount_value > 0) && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {item.free_qty > 0 ? `Free: ${item.free_qty}` : ""}
+                        {item.free_qty > 0 && item.discount_value > 0 ? " · " : ""}
+                        {item.discount_value > 0
+                          ? `Discount: ${item.discount_type === "percent" ? `${item.discount_value}%` : `LKR ${item.discount_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}`
+                          : ""}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">{item.qty}</TableCell>
+                  <TableCell className="text-right">
+                    LKR {item.unit_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </TableCell>
+                  <TableCell className="text-right font-medium">
+                    LKR {(item.qty * effectiveUnitPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
 
