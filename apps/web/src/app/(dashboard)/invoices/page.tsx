@@ -1,7 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { format } from "date-fns";
+import { DayPicker, type DateRange } from "react-day-picker";
+
+import "react-day-picker/dist/style.css";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,9 +18,11 @@ export default function InvoicesPage() {
   const { permissions, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
   const { data: invoices, isLoading: isInvoicesLoading } = useInvoices();
 
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const datePickerRef = useRef<HTMLDivElement>(null);
   const [customerSearch, setCustomerSearch] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [minTotal, setMinTotal] = useState("");
   const [maxTotal, setMaxTotal] = useState("");
@@ -25,8 +31,8 @@ export default function InvoicesPage() {
 
   const hasFilters = 
     customerSearch !== "" ||
-    startDate !== "" ||
-    endDate !== "" ||
+    Boolean(dateRange?.from) ||
+    Boolean(dateRange?.to) ||
     statusFilter !== "all" ||
     minTotal !== "" ||
     maxTotal !== "" ||
@@ -35,8 +41,7 @@ export default function InvoicesPage() {
 
   const handleResetFilters = () => {
     setCustomerSearch("");
-    setStartDate("");
-    setEndDate("");
+    setDateRange(undefined);
     setStatusFilter("all");
     setMinTotal("");
     setMaxTotal("");
@@ -50,16 +55,20 @@ export default function InvoicesPage() {
 
     if (customerSearch) {
       const lowerSearch = customerSearch.toLowerCase();
-      result = result.filter((inv) => inv.customer_name.toLowerCase().includes(lowerSearch));
+      result = result.filter((inv) =>
+        inv.customer_name.toLowerCase().includes(lowerSearch) ||
+        String(inv.invoice_number).includes(lowerSearch)
+      );
     }
 
-    if (startDate) {
-      const start = new Date(startDate).getTime();
+    if (dateRange?.from) {
+      const start = new Date(dateRange.from).getTime();
       result = result.filter((inv) => new Date(inv.created_at).getTime() >= start);
     }
-    if (endDate) {
-      const end = new Date(endDate).getTime();
-      result = result.filter((inv) => new Date(inv.created_at).getTime() <= end + 86400000); // end of day
+    if (dateRange?.to) {
+      const end = new Date(dateRange.to);
+      end.setHours(23, 59, 59, 999);
+      result = result.filter((inv) => new Date(inv.created_at).getTime() <= end.getTime());
     }
 
     if (statusFilter !== "all") {
@@ -81,7 +90,28 @@ export default function InvoicesPage() {
     }
 
     return result;
-  }, [invoices, customerSearch, startDate, endDate, statusFilter, minTotal, maxTotal, minInvoiceNo, maxInvoiceNo]);
+  }, [invoices, customerSearch, dateRange, statusFilter, minTotal, maxTotal, minInvoiceNo, maxInvoiceNo]);
+
+  useEffect(() => {
+    if (!isDatePickerOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!datePickerRef.current || datePickerRef.current.contains(event.target as Node)) return;
+      setIsDatePickerOpen(false);
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isDatePickerOpen]);
+
+  const dateRangeLabel = useMemo(() => {
+    if (dateRange?.from && dateRange?.to) {
+      return `${format(dateRange.from, "MMM dd, yyyy")} - ${format(dateRange.to, "MMM dd, yyyy")}`;
+    }
+    if (dateRange?.from) {
+      return `${format(dateRange.from, "MMM dd, yyyy")} - ...`;
+    }
+    return "Select date range";
+  }, [dateRange]);
 
   if (isPermissionsLoading) {
     return <p className="text-sm text-muted-foreground">Loading permissions...</p>;
@@ -110,91 +140,114 @@ export default function InvoicesPage() {
         </Button>
       </header>
 
-      {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-4 rounded-md">
-        <div className="space-y-1">
-          <label className="text-xs font-semibold text-muted-foreground">Customer</label>
-          <Input 
-            placeholder="Search customer..." 
-            value={customerSearch} 
-            onChange={(e) => setCustomerSearch(e.target.value)} 
-          />
-        </div>
-        
-        <div className="space-y-1">
-          <label className="text-xs font-semibold text-muted-foreground">Status</label>
-          <select 
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="all">All</option>
-            <option value="draft">Draft</option>
-            <option value="issued">Issued</option>
-            <option value="paid">Paid</option>
-          </select>
-        </div>
-
-        <div className="space-y-1">
-          <label className="text-xs font-semibold text-muted-foreground">Date Range</label>
+      <div className="flex flex-col gap-3 rounded-md border border-border bg-white p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-1 items-center gap-3">
+            <Input
+              placeholder="Search customer or invoice #..."
+              value={customerSearch}
+              onChange={(e) => setCustomerSearch(e.target.value)}
+              className="lg:max-w-md"
+            />
+            {hasFilters ? <span className="text-xs text-muted-foreground">Filters active</span> : null}
+          </div>
           <div className="flex items-center gap-2">
-            <Input 
-              type="date" 
-              value={startDate} 
-              onChange={(e) => setStartDate(e.target.value)} 
-            />
-            <span>-</span>
-            <Input 
-              type="date" 
-              value={endDate} 
-              onChange={(e) => setEndDate(e.target.value)} 
-            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setFiltersOpen((prev) => !prev)}
+            >
+              {filtersOpen ? "Hide Filters" : "Show Filters"}
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleResetFilters} disabled={!hasFilters}>
+              Reset
+            </Button>
           </div>
         </div>
 
-        <div className="space-y-1">
-          <label className="text-xs font-semibold text-muted-foreground">Total Range</label>
-          <div className="flex items-center gap-2">
-            <Input 
-              type="number" 
-              placeholder="Min" 
-              value={minTotal} 
-              onChange={(e) => setMinTotal(e.target.value)} 
-            />
-            <span>-</span>
-            <Input 
-              type="number" 
-              placeholder="Max" 
-              value={maxTotal} 
-              onChange={(e) => setMaxTotal(e.target.value)} 
-            />
-          </div>
-        </div>
+        {filtersOpen ? (
+          <div className="grid grid-cols-1 gap-4 rounded-md border border-border bg-muted/30 p-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Status</label>
+              <select
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="all">All</option>
+                <option value="draft">Draft</option>
+                <option value="issued">Issued</option>
+                <option value="paid">Paid</option>
+              </select>
+            </div>
 
-        <div className="space-y-1">
-          <label className="text-xs font-semibold text-muted-foreground">Inv Number Range</label>
-          <div className="flex items-center gap-2">
-            <Input 
-              type="number" 
-              placeholder="Min No" 
-              value={minInvoiceNo} 
-              onChange={(e) => setMinInvoiceNo(e.target.value)} 
-            />
-            <span>-</span>
-            <Input 
-              type="number" 
-              placeholder="Max No" 
-              value={maxInvoiceNo} 
-              onChange={(e) => setMaxInvoiceNo(e.target.value)} 
-            />
-          </div>
-        </div>
+            <div className="space-y-1" ref={datePickerRef}>
+              <label className="text-xs font-semibold text-muted-foreground">Date Range</label>
+              <button
+                type="button"
+                onClick={() => setIsDatePickerOpen((prev) => !prev)}
+                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 text-sm text-foreground transition focus:outline-none focus:ring-2 focus:ring-primary/40"
+              >
+                <span className={dateRange?.from ? "text-foreground" : "text-muted-foreground"}>
+                  {dateRangeLabel}
+                </span>
+                <span className="text-xs text-muted-foreground">Pick</span>
+              </button>
+              {isDatePickerOpen ? (
+                <div className="relative">
+                  <div className="absolute z-20 mt-2 rounded-md border border-border bg-white p-3 shadow-lg">
+                    <DayPicker
+                      mode="range"
+                      selected={dateRange}
+                      onSelect={setDateRange}
+                      numberOfMonths={2}
+                      defaultMonth={dateRange?.from}
+                      className="rounded-md"
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </div>
 
-        <div className="md:col-span-2 lg:col-span-4 flex justify-end mt-2">
-          <Button variant="outline" size="sm" onClick={handleResetFilters} disabled={!hasFilters}>
-            Reset Filters
-          </Button>
-        </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Total (LKR)</label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  placeholder="Min"
+                  value={minTotal}
+                  onChange={(e) => setMinTotal(e.target.value)}
+                />
+                <span className="text-xs text-muted-foreground">to</span>
+                <Input
+                  type="number"
+                  placeholder="Max"
+                  value={maxTotal}
+                  onChange={(e) => setMaxTotal(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Invoice # Range</label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  placeholder="Min"
+                  value={minInvoiceNo}
+                  onChange={(e) => setMinInvoiceNo(e.target.value)}
+                />
+                <span className="text-xs text-muted-foreground">to</span>
+                <Input
+                  type="number"
+                  placeholder="Max"
+                  value={maxInvoiceNo}
+                  onChange={(e) => setMaxInvoiceNo(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <Table>
