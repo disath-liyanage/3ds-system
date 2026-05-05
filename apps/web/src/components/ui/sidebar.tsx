@@ -50,7 +50,7 @@ export function Sidebar({ title, items, adminItems = [], adminTitle = "Admin", f
   };
 
   return (
-    <aside className="flex w-full flex-col border-b border-border bg-white p-4 lg:min-h-screen lg:w-72 lg:border-b-0 lg:border-r">
+    <aside className="flex w-full flex-col border-b border-border bg-white p-4 lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:border-b-0 lg:border-r lg:overflow-y-auto">
       <div className="mb-6 flex items-center gap-2">
         <div className="h-8 w-8 rounded-md bg-primary" />
         <h2 className="text-lg font-semibold">{title}</h2>
