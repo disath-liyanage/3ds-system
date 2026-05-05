@@ -62,6 +62,7 @@ export default function NewInvoicePage() {
   const queryClient = useQueryClient();
   const [addAttempted, setAddAttempted] = useState(false);
   const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
   const {
     control,
@@ -268,7 +269,36 @@ export default function NewInvoicePage() {
         Number(item.discount_value) === draftDiscountValue
     );
 
-    if (existingIndex >= 0) {
+    if (editingIndex !== null) {
+      const mergeIndex = watchedItems.findIndex(
+        (item, index) =>
+          index !== editingIndex &&
+          item.product_id === draft.product_id &&
+          item.unit_price === draftPrice &&
+          (item.discount_type || "percent") === draftDiscountType &&
+          Number(item.discount_value) === draftDiscountValue
+      );
+
+      if (mergeIndex >= 0) {
+        update(mergeIndex, {
+          ...watchedItems[mergeIndex],
+          qty: watchedItems[mergeIndex].qty + draftQty,
+          free_qty: (Number(watchedItems[mergeIndex].free_qty) || 0) + draftFreeQty
+        });
+        remove(editingIndex);
+      } else {
+        update(editingIndex, {
+          product_id: draft.product_id,
+          qty: draftQty,
+          free_qty: draftFreeQty,
+          unit_price: draftPrice,
+          unit_cost: draftCost,
+          discount_type: draftDiscountType,
+          discount_value: draftDiscountValue
+        });
+      }
+      setEditingIndex(null);
+    } else if (existingIndex >= 0) {
       update(existingIndex, {
         ...watchedItems[existingIndex],
         qty: watchedItems[existingIndex].qty + draftQty,
@@ -288,6 +318,40 @@ export default function NewInvoicePage() {
 
     resetField("draft", { defaultValue: emptyDraft });
     setAddAttempted(false);
+  };
+
+  const handleEditItem = (index: number) => {
+    if (hasDraftData(getValues("draft"))) {
+      window.alert("Please add the pending item or reset the fields before editing an added item.");
+      return;
+    }
+
+    const item = watchedItems[index];
+    if (!item) return;
+
+    setValue("draft.product_id", item.product_id, { shouldDirty: true });
+    setValue("draft.qty", item.qty, { shouldDirty: true });
+    setValue("draft.free_qty", item.free_qty || 0, { shouldDirty: true });
+    setValue("draft.unit_price", item.unit_price, { shouldDirty: true });
+    setValue("draft.unit_cost", item.unit_cost, { shouldDirty: true });
+    setValue("draft.discount_type", item.discount_type || "percent", { shouldDirty: true });
+    setValue("draft.discount_value", item.discount_value || 0, { shouldDirty: true });
+    setEditingIndex(index);
+  };
+
+  const handleCancelEdit = () => {
+    resetField("draft", { defaultValue: emptyDraft });
+    setEditingIndex(null);
+    setAddAttempted(false);
+  };
+
+  const handleRemoveItem = (index: number) => {
+    remove(index);
+    if (editingIndex === index) {
+      handleCancelEdit();
+    } else if (editingIndex !== null && index < editingIndex) {
+      setEditingIndex(editingIndex - 1);
+    }
   };
 
   const onSubmitInvalid = () => {
@@ -420,6 +484,14 @@ export default function NewInvoicePage() {
           <CardContent className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
             <div className="space-y-3">
               <div className="space-y-3 rounded-md border border-border p-4">
+                {editingIndex !== null && (
+                  <div className="flex items-center justify-between rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+                    <div className="text-xs font-semibold text-primary">Editing item #{editingIndex + 1}</div>
+                    <Button type="button" size="sm" variant="ghost" onClick={handleCancelEdit}>
+                      Cancel
+                    </Button>
+                  </div>
+                )}
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground">Product</label>
                   <SearchableSelect
@@ -594,7 +666,22 @@ export default function NewInvoicePage() {
                       "Unknown product";
 
                     return (
-                      <div key={`${item.productId}-${index}`} className="rounded-md border border-border p-3 flex flex-col gap-2">
+                        <div
+                          key={`${item.productId}-${index}`}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => handleEditItem(index)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              handleEditItem(index);
+                            }
+                          }}
+                          className={cn(
+                            "rounded-md border border-border p-3 flex flex-col gap-2 transition hover:bg-muted/40",
+                            editingIndex === index ? "border-primary/60 bg-primary/5" : "cursor-pointer"
+                          )}
+                        >
                         <div className="flex justify-between items-start">
                           <div>
                             <div className="text-sm font-semibold">{productLabel}</div>
@@ -614,13 +701,16 @@ export default function NewInvoicePage() {
                             LKR {item.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </div>
                         </div>
-                        <div className="flex justify-end">
+                          <div className="flex justify-end">
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             className="h-auto p-0 text-red-500 hover:text-red-600 hover:bg-transparent"
-                            onClick={() => remove(index)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleRemoveItem(index);
+                              }}
                           >
                             Remove
                           </Button>
