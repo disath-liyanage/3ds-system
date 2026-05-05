@@ -403,6 +403,14 @@ export default function NewInvoicePage() {
                             setValue("draft.unit_price", bucket.selling_price, { shouldValidate: true, shouldDirty: true });
                             setValue("draft.unit_cost", bucket.unit_cost);
                             setIsPriceModalOpen(false);
+
+                            // Focus Qty field
+                            setTimeout(() => {
+                              const qtyInput = document.querySelector('input[name="draft.qty"]') as HTMLInputElement;
+                              if (qtyInput) {
+                                qtyInput.focus();
+                              }
+                            }, 0);
                           }}
                           className="flex flex-col items-start px-4 py-3 border rounded-lg bg-muted/20 hover:bg-muted/60 transition text-left"
                         >
