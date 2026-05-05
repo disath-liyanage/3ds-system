@@ -102,12 +102,27 @@ export default function NewInvoicePage() {
     name: "items"
   });
 
-  // When a product is selected in the draft and no price is set, open the price selection modal
+  // When a product is selected in the draft and no price is set, determine price modal behavior
   useEffect(() => {
-    if (watchedDraft?.product_id && watchedDraft?.unit_price === undefined) {
-      setIsPriceModalOpen(true);
+    if (watchedDraft?.product_id && watchedDraft?.unit_price === undefined && !isStockLoading) {
+      if (stockByPrice && stockByPrice.length === 1) {
+        const bucket = stockByPrice[0];
+        setValue("draft.unit_price", bucket.selling_price, { shouldValidate: true, shouldDirty: true });
+        setValue("draft.unit_cost", bucket.unit_cost);
+        setIsPriceModalOpen(false);
+
+        // Focus Qty field
+        setTimeout(() => {
+          const qtyInput = document.querySelector('input[name="draft.qty"]') as HTMLInputElement;
+          if (qtyInput) {
+            qtyInput.focus();
+          }
+        }, 0);
+      } else if (stockByPrice) {
+        setIsPriceModalOpen(true);
+      }
     }
-  }, [watchedDraft?.product_id, watchedDraft?.unit_price]);
+  }, [watchedDraft?.product_id, watchedDraft?.unit_price, isStockLoading, stockByPrice, setValue]);
 
   const hasDraftData = (draft: InvoiceForm["draft"]) =>
     Boolean(draft.product_id || draft.qty || draft.unit_price);
