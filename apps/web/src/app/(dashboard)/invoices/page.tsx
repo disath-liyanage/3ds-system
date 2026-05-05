@@ -93,6 +93,19 @@ export default function InvoicesPage() {
     return result;
   }, [invoices, customerSearch, dateRange, statusFilter, minTotal, maxTotal, minInvoiceNo, maxInvoiceNo]);
 
+  const sortedInvoices = useMemo(() =>
+    filteredInvoices
+      .map((invoice, index) => ({ invoice, index }))
+      .sort((a, b) => {
+        if (a.invoice.status === b.invoice.status) return a.index - b.index;
+        if (a.invoice.status === "draft") return -1;
+        if (b.invoice.status === "draft") return 1;
+        return a.index - b.index;
+      })
+      .map(({ invoice }) => invoice),
+  [filteredInvoices]
+  );
+
   useEffect(() => {
     if (!isDatePickerOpen) return;
     const handleClickOutside = (event: MouseEvent) => {
@@ -284,15 +297,15 @@ export default function InvoicesPage() {
                 Loading invoices...
               </TableCell>
             </TableRow>
-          ) : filteredInvoices.length === 0 ? (
+          ) : sortedInvoices.length === 0 ? (
             <TableRow>
               <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
                 No invoices found matching criteria.
               </TableCell>
             </TableRow>
           ) : (
-            filteredInvoices.map((row) => (
-              <TableRow key={row.id}>
+            sortedInvoices.map((row) => (
+              <TableRow key={row.id} className={row.status === "draft" ? "bg-muted/30" : ""}>
                 <TableCell className="font-medium">{row.invoice_number}</TableCell>
                 <TableCell>{new Date(row.created_at).toLocaleDateString()}</TableCell>
                 <TableCell>{row.customer_name}</TableCell>

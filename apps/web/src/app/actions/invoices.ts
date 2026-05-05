@@ -59,6 +59,7 @@ export type InvoiceDetailRow = InvoiceListRow & {
 export type InvoiceInput = {
   customer_id: string;
   payment_method: string;
+  saveAsDraft?: boolean;
   notes?: string;
   items: Array<{
     product_id: string;
@@ -238,7 +239,7 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
     return { success: false, error: "You do not have permission to create invoices" };
   }
 
-  const { customer_id, payment_method, items, notes } = input;
+  const { customer_id, payment_method, items, notes, saveAsDraft } = input;
 
   if (!customer_id) {
     return { success: false, error: "Customer is required" };
@@ -293,7 +294,7 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
 
   // Create invoice
   // status: if cash, we can consider it 'paid' maybe? Let's leave it 'issued' so user can track it.
-  const status = payment_method === "cash" ? "paid" : "issued";
+  const status = saveAsDraft ? "draft" : payment_method === "cash" ? "paid" : "issued";
 
   const { data: invoice, error: invoiceError } = await adminClient
     .from("invoices")
@@ -329,40 +330,42 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
     return { success: false, error: itemsError.message };
   }
 
-  // Reduce product stock
-  try {
-    for (const item of items) {
-      const qty = Number(item.qty);
-      const { data: product, error: productError } = await adminClient
-        .from("products")
-        .select("stock_qty")
-        .eq("id", item.product_id)
-        .single();
-        
-      if (product && !productError) {
-        const newStock = Math.max(0, Number(product.stock_qty) - qty);
-        await adminClient.from("products").update({ stock_qty: newStock }).eq("id", item.product_id);
-      }
-    }
-  } catch (err) {
-    console.error("Failed to update stock after invoice creation", err);
-  }
-
-  // If credit, we might want to update customer balance
-  if (payment_method === "credit") {
+  if (!saveAsDraft) {
+    // Reduce product stock
     try {
-      const { data: customer, error: customerError } = await adminClient
-        .from("customers")
-        .select("balance")
-        .eq("id", customer_id)
-        .single();
-
-      if (customer && !customerError) {
-        const newBalance = Number(customer.balance) + total_amount;
-        await adminClient.from("customers").update({ balance: newBalance }).eq("id", customer_id);
+      for (const item of items) {
+        const qty = Number(item.qty);
+        const { data: product, error: productError } = await adminClient
+          .from("products")
+          .select("stock_qty")
+          .eq("id", item.product_id)
+          .single();
+          
+        if (product && !productError) {
+          const newStock = Math.max(0, Number(product.stock_qty) - qty);
+          await adminClient.from("products").update({ stock_qty: newStock }).eq("id", item.product_id);
+        }
       }
     } catch (err) {
-      console.error("Failed to update customer balance", err);
+      console.error("Failed to update stock after invoice creation", err);
+    }
+
+    // If credit, we might want to update customer balance
+    if (payment_method === "credit") {
+      try {
+        const { data: customer, error: customerError } = await adminClient
+          .from("customers")
+          .select("balance")
+          .eq("id", customer_id)
+          .single();
+
+        if (customer && !customerError) {
+          const newBalance = Number(customer.balance) + total_amount;
+          await adminClient.from("customers").update({ balance: newBalance }).eq("id", customer_id);
+        }
+      } catch (err) {
+        console.error("Failed to update customer balance", err);
+      }
     }
   }
 
@@ -370,7 +373,7 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
   revalidatePath("/products");
   revalidatePath("/customers");
 
-  return { success: true, message: "Invoice created successfully" };
+  return { success: true, message: saveAsDraft ? "Invoice draft saved" : "Invoice created successfully" };
 }
 
 export async function deleteInvoice(invoiceId: string): Promise<ActionResult> {

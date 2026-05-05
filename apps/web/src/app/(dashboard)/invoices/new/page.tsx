@@ -213,6 +213,41 @@ export default function NewInvoicePage() {
     router.push("/invoices");
   };
 
+  const handleSaveDraft = async () => {
+    if (hasDraftData(getValues("draft"))) {
+      setAddAttempted(true);
+      window.alert("Please add the pending item or reset the fields before saving the draft.");
+      return;
+    }
+
+    const values = getValues();
+    if (values.items.length === 0) {
+      window.alert("Please add at least one item before saving the draft.");
+      return;
+    }
+
+    const result = await createInvoice({
+      customer_id: values.customer_id,
+      payment_method: values.payment_method,
+      notes: values.notes?.trim() || undefined,
+      items: values.items,
+      saveAsDraft: true
+    });
+
+    if (!result.success) {
+      toast({
+        title: "Failed to save draft",
+        description: result.error || "Please try again.",
+        variant: "error"
+      });
+      return;
+    }
+
+    toast({ title: "Draft saved", variant: "success" });
+    await queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    router.push("/invoices");
+  };
+
   const handleAddItem = async () => {
     setAddAttempted(true);
     const isValid = await trigger([
@@ -726,12 +761,17 @@ export default function NewInvoicePage() {
           </CardContent>
         </Card>
 
-        <div className="flex items-center gap-2">
-          <Button type="submit" disabled={formState.isSubmitting}>
-            {formState.isSubmitting ? "Saving..." : "Save Invoice"}
-          </Button>
-          <Button type="button" variant="outline" onClick={() => router.back()}>
-            Cancel
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Button type="submit" disabled={formState.isSubmitting}>
+              {formState.isSubmitting ? "Saving..." : "Save Invoice"}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => router.back()}>
+              Cancel
+            </Button>
+          </div>
+          <Button type="button" variant="outline" onClick={handleSaveDraft} disabled={formState.isSubmitting}>
+            Save Draft
           </Button>
         </div>
       </form>
