@@ -88,6 +88,21 @@ export type UpdateDraftInvoiceInput = {
   }>;
 };
 
+export type UpdateInvoiceInput = {
+  invoice_id: string;
+  payment_method: string;
+  notes?: string;
+  items: Array<{
+    product_id: string;
+    qty: number;
+    free_qty?: number;
+    unit_price: number;
+    unit_cost: number;
+    discount_type?: "percent" | "amount";
+    discount_value?: number;
+  }>;
+};
+
 async function getCurrentUserProfile() {
   const supabase = createClient();
 
@@ -559,6 +574,197 @@ export async function updateDraftInvoice(input: UpdateDraftInvoiceInput): Promis
   revalidatePath("/customers");
 
   return { success: true, message: finalize ? "Invoice updated" : "Draft updated" };
+}
+
+export async function updateInvoice(input: UpdateInvoiceInput): Promise<ActionResult> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!canCreateInvoices(access.profile)) {
+    return { success: false, error: "You do not have permission to update invoices" };
+  }
+
+  const { invoice_id, payment_method, items, notes } = input;
+
+  if (!invoice_id) {
+    return { success: false, error: "Invoice id is required" };
+  }
+
+  if (payment_method !== "cash" && payment_method !== "credit") {
+    return { success: false, error: "Valid payment method is required (cash or credit)" };
+  }
+
+  if (!items || items.length === 0) {
+    return { success: false, error: "At least one item is required" };
+  }
+
+  const { data: invoice, error: invoiceError } = await adminClient
+    .from("invoices")
+    .select("id, issued_by, status, customer_id, total_amount, payment_method")
+    .eq("id", invoice_id)
+    .single();
+
+  if (invoiceError || !invoice) {
+    return { success: false, error: invoiceError?.message || "Invoice not found" };
+  }
+
+  if (!canViewAllInvoices(access.profile) && invoice.issued_by !== access.profile.id) {
+    return { success: false, error: "You do not have permission to update this invoice" };
+  }
+
+  if (invoice.status === "paid") {
+    return { success: false, error: "Paid invoices cannot be edited" };
+  }
+
+  let total_amount = 0;
+  for (const [index, item] of items.entries()) {
+    if (!item.product_id) {
+      return { success: false, error: `Item ${index + 1} is missing a product` };
+    }
+    const qty = Number(item.qty);
+    const unitPrice = Number(item.unit_price);
+    const unitCost = Number(item.unit_cost) || 0;
+    const freeQty = Number(item.free_qty) || 0;
+    const discountType = item.discount_type === "percent" ? "percent" : "amount";
+    const discountValue = Number(item.discount_value) || 0;
+    const discountPerUnit = discountType === "percent" ? (unitPrice * discountValue) / 100 : discountValue;
+    const effectiveUnitPrice = unitPrice - discountPerUnit;
+
+    if (!Number.isFinite(qty) || qty <= 0) {
+      return { success: false, error: `Item ${index + 1} quantity must be greater than 0` };
+    }
+    if (!Number.isFinite(freeQty) || freeQty < 0) {
+      return { success: false, error: `Item ${index + 1} free quantity must be 0 or more` };
+    }
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      return { success: false, error: `Item ${index + 1} unit price cannot be negative` };
+    }
+    if (!Number.isFinite(discountValue) || discountValue < 0) {
+      return { success: false, error: `Item ${index + 1} discount cannot be negative` };
+    }
+    if (discountType === "percent" && discountValue > 100) {
+      return { success: false, error: `Item ${index + 1} discount percent cannot exceed 100` };
+    }
+    if (discountPerUnit > unitPrice) {
+      return { success: false, error: `Item ${index + 1} discount cannot exceed unit price` };
+    }
+    if (effectiveUnitPrice < unitCost) {
+      return { success: false, error: `Cannot bill undercost. Item ${index + 1} price is below the required cost.` };
+    }
+
+    total_amount += qty * Math.max(0, effectiveUnitPrice);
+  }
+
+  const { data: existingItems, error: existingItemsError } = await adminClient
+    .from("invoice_items")
+    .select("product_id, qty")
+    .eq("invoice_id", invoice_id);
+
+  if (existingItemsError) {
+    return { success: false, error: existingItemsError.message };
+  }
+
+  const oldQtyByProduct = new Map<string, number>();
+  for (const item of existingItems ?? []) {
+    const current = oldQtyByProduct.get(item.product_id) ?? 0;
+    oldQtyByProduct.set(item.product_id, current + Number(item.qty));
+  }
+
+  const newQtyByProduct = new Map<string, number>();
+  for (const item of items) {
+    const current = newQtyByProduct.get(item.product_id) ?? 0;
+    newQtyByProduct.set(item.product_id, current + Number(item.qty));
+  }
+
+  const allProductIds = new Set([...oldQtyByProduct.keys(), ...newQtyByProduct.keys()]);
+
+  try {
+    for (const productId of allProductIds) {
+      const oldQty = oldQtyByProduct.get(productId) ?? 0;
+      const newQty = newQtyByProduct.get(productId) ?? 0;
+      const delta = newQty - oldQty;
+
+      if (delta === 0) continue;
+
+      const { data: product, error: productError } = await adminClient
+        .from("products")
+        .select("stock_qty")
+        .eq("id", productId)
+        .single();
+
+      if (!product || productError) continue;
+
+      const nextStock = Math.max(0, Number(product.stock_qty) - delta);
+      await adminClient.from("products").update({ stock_qty: nextStock }).eq("id", productId);
+    }
+  } catch (err) {
+    console.error("Failed to update stock after invoice edit", err);
+  }
+
+  const oldContribution = invoice.payment_method === "credit" ? Number(invoice.total_amount) : 0;
+  const newContribution = payment_method === "credit" ? total_amount : 0;
+  const balanceDelta = newContribution - oldContribution;
+
+  if (balanceDelta !== 0) {
+    try {
+      const { data: customer, error: customerError } = await adminClient
+        .from("customers")
+        .select("balance")
+        .eq("id", invoice.customer_id)
+        .single();
+
+      if (customer && !customerError) {
+        const newBalance = Number(customer.balance) + balanceDelta;
+        await adminClient.from("customers").update({ balance: newBalance }).eq("id", invoice.customer_id);
+      }
+    } catch (err) {
+      console.error("Failed to update customer balance after invoice edit", err);
+    }
+  }
+
+  const { error: updateError } = await adminClient
+    .from("invoices")
+    .update({
+      total_amount,
+      payment_method,
+      notes: notes || null
+    })
+    .eq("id", invoice_id);
+
+  if (updateError) {
+    return { success: false, error: updateError.message };
+  }
+
+  const { error: deleteItemsError } = await adminClient
+    .from("invoice_items")
+    .delete()
+    .eq("invoice_id", invoice_id);
+
+  if (deleteItemsError) {
+    return { success: false, error: deleteItemsError.message };
+  }
+
+  const itemsPayload = items.map((item) => ({
+    invoice_id,
+    product_id: item.product_id,
+    qty: item.qty,
+    free_qty: item.free_qty || 0,
+    unit_price: item.unit_price,
+    discount_type: item.discount_type === "percent" ? "percent" : "amount",
+    discount_value: item.discount_value || 0
+  }));
+
+  const { error: itemsError } = await adminClient.from("invoice_items").insert(itemsPayload);
+
+  if (itemsError) {
+    return { success: false, error: itemsError.message };
+  }
+
+  revalidatePath("/invoices");
+  revalidatePath("/products");
+  revalidatePath("/customers");
+
+  return { success: true, message: "Invoice updated" };
 }
 
 export async function deleteInvoice(invoiceId: string): Promise<ActionResult> {

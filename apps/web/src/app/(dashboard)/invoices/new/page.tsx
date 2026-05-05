@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { createInvoice, getInvoiceDetail, updateDraftInvoice } from "@/app/actions/invoices";
+import { createInvoice, getInvoiceDetail, updateDraftInvoice, updateInvoice } from "@/app/actions/invoices";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
@@ -57,6 +57,7 @@ export default function NewInvoicePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const draftId = searchParams.get("draftId");
+  const editId = searchParams.get("editId");
   const { permissions, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
   const { data: products, isLoading: isProductsLoading } = useProducts();
   const { data: customers, isLoading: isCustomersLoading } = useCustomers();
@@ -65,6 +66,7 @@ export default function NewInvoicePage() {
   const [addAttempted, setAddAttempted] = useState(false);
   const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [invoiceNumber, setInvoiceNumber] = useState<number | null>(null);
 
   const {
     control,
@@ -176,6 +178,8 @@ export default function NewInvoicePage() {
         return;
       }
 
+      setInvoiceNumber(result.data.invoice_number);
+
       setValue("customer_id", result.data.customer_id, { shouldDirty: true });
       setValue("payment_method", result.data.payment_method as InvoiceForm["payment_method"], { shouldDirty: true });
       setValue("notes", result.data.notes ?? "", { shouldDirty: true });
@@ -201,6 +205,64 @@ export default function NewInvoicePage() {
       isMounted = false;
     };
   }, [draftId, replace, resetField, setValue]);
+
+  useEffect(() => {
+    if (!editId || draftId) return;
+    let isMounted = true;
+
+    const loadInvoice = async () => {
+      const result = await getInvoiceDetail(editId);
+      if (!isMounted) return;
+
+      if (!result.success || !result.data) {
+        toast({
+          title: "Unable to load invoice",
+          description: result.error || "Please try again.",
+          variant: "error"
+        });
+        return;
+      }
+
+      if (result.data.status === "draft") {
+        router.replace(`/invoices/new?draftId=${editId}`);
+        return;
+      }
+
+      if (result.data.status === "paid") {
+        toast({
+          title: "Paid invoices cannot be edited",
+          description: "Open this invoice from the list instead.",
+          variant: "error"
+        });
+        return;
+      }
+
+      setInvoiceNumber(result.data.invoice_number);
+      setValue("customer_id", result.data.customer_id, { shouldDirty: true });
+      setValue("payment_method", result.data.payment_method as InvoiceForm["payment_method"], { shouldDirty: true });
+      setValue("notes", result.data.notes ?? "", { shouldDirty: true });
+      replace(
+        result.data.items.map((item) => ({
+          product_id: item.product_id,
+          qty: item.qty,
+          free_qty: item.free_qty || 0,
+          unit_price: item.unit_price,
+          unit_cost: 0,
+          discount_type: item.discount_type || "percent",
+          discount_value: item.discount_value || 0
+        }))
+      );
+      resetField("draft", { defaultValue: emptyDraft });
+      setEditingIndex(null);
+      setAddAttempted(false);
+    };
+
+    loadInvoice();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [draftId, editId, replace, resetField, router, setValue]);
 
   // When a product is selected in the draft and no price is set, determine price modal behavior
   useEffect(() => {
@@ -253,12 +315,19 @@ export default function NewInvoicePage() {
           items: values.items,
           finalize: true
         })
-      : await createInvoice({
-          customer_id: values.customer_id,
-          payment_method: values.payment_method,
-          notes: values.notes?.trim() || undefined,
-          items: values.items
-        });
+      : editId
+        ? await updateInvoice({
+            invoice_id: editId,
+            payment_method: values.payment_method,
+            notes: values.notes?.trim() || undefined,
+            items: values.items
+          })
+        : await createInvoice({
+            customer_id: values.customer_id,
+            payment_method: values.payment_method,
+            notes: values.notes?.trim() || undefined,
+            items: values.items
+          });
 
     if (!result.success) {
       toast({
@@ -296,13 +365,20 @@ export default function NewInvoicePage() {
           items: values.items,
           finalize: false
         })
-      : await createInvoice({
-          customer_id: values.customer_id,
-          payment_method: values.payment_method,
-          notes: values.notes?.trim() || undefined,
-          items: values.items,
-          saveAsDraft: true
-        });
+      : editId
+        ? await updateInvoice({
+            invoice_id: editId,
+            payment_method: values.payment_method,
+            notes: values.notes?.trim() || undefined,
+            items: values.items
+          })
+        : await createInvoice({
+            customer_id: values.customer_id,
+            payment_method: values.payment_method,
+            notes: values.notes?.trim() || undefined,
+            items: values.items,
+            saveAsDraft: true
+          });
 
     if (!result.success) {
       toast({
@@ -526,16 +602,16 @@ export default function NewInvoicePage() {
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-muted-foreground">Invoice Number</label>
-              <Input disabled value="Auto-generated upon save" />
+              <Input disabled value={invoiceNumber ? String(invoiceNumber) : "Auto-generated upon save"} />
             </div>
 
             <div className="space-y-1">
               <label className="text-xs font-semibold text-muted-foreground">Customer</label>
-              <SearchableSelect
+                <SearchableSelect
                 value={watchedCustomerId ?? ""}
                 options={customerOptions}
                 placeholder={isCustomersLoading ? "Loading customers..." : "Select customer"}
-                disabled={isCustomersLoading}
+                  disabled={isCustomersLoading || Boolean(editId)}
                 className={cn(
                   formState.submitCount > 0 && formState.errors.customer_id
                     ? "border-red-400 focus:ring-red-400/40"
@@ -831,18 +907,20 @@ export default function NewInvoicePage() {
           </CardContent>
         </Card>
 
-        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Button type="submit" disabled={formState.isSubmitting}>
-              {formState.isSubmitting ? "Saving..." : "Save Invoice"}
+              <Button type="submit" disabled={formState.isSubmitting}>
+                {formState.isSubmitting ? "Saving..." : editId ? "Save Changes" : "Save Invoice"}
             </Button>
             <Button type="button" variant="outline" onClick={() => router.back()}>
               Cancel
             </Button>
           </div>
-          <Button type="button" variant="outline" onClick={handleSaveDraft} disabled={formState.isSubmitting}>
-            Save Draft
-          </Button>
+            {!editId ? (
+              <Button type="button" variant="outline" onClick={handleSaveDraft} disabled={formState.isSubmitting}>
+                Save Draft
+              </Button>
+            ) : null}
         </div>
       </form>
     </section>

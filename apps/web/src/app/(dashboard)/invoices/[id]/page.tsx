@@ -81,6 +81,19 @@ export default function InvoiceDetailsPage() {
           <p className="text-sm text-muted-foreground">View and print invoice details.</p>
         </div>
         <div className="flex gap-2">
+          {invoice.status !== "paid" ? (
+            <Button asChild variant="outline">
+              <Link
+                href={
+                  invoice.status === "draft"
+                    ? `/invoices/new?draftId=${invoice.id}`
+                    : `/invoices/new?editId=${invoice.id}`
+                }
+              >
+                Edit Invoice
+              </Link>
+            </Button>
+          ) : null}
           <Button variant="default" onClick={handlePrint}>
             Print Invoice
           </Button>
