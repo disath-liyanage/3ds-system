@@ -47,7 +47,7 @@ export default function NewInvoicePage() {
   const { permissions, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
   const { data: products, isLoading: isProductsLoading } = useProducts();
   const { data: customers, isLoading: isCustomersLoading } = useCustomers();
-  
+
   const queryClient = useQueryClient();
   const [addAttempted, setAddAttempted] = useState(false);
   const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
@@ -343,7 +343,7 @@ export default function NewInvoicePage() {
                   <label className="text-xs font-semibold text-muted-foreground">Qty</label>
                   <Input
                     type="number"
-                    step="0.01"
+                    step="1"
                     placeholder="Qty"
                     {...register("draft.qty", {
                       validate: (value) =>
@@ -359,7 +359,7 @@ export default function NewInvoicePage() {
                   <div className="relative">
                     <Input
                       type="number"
-                      step="0.01"
+                      step="1"
                       placeholder="Price"
                       {...register("draft.unit_price", {
                         validate: (value) =>
@@ -383,8 +383,8 @@ export default function NewInvoicePage() {
                 </div>
               </div>
 
-              <Dialog 
-                open={isPriceModalOpen} 
+              <Dialog
+                open={isPriceModalOpen}
                 onOpenChange={setIsPriceModalOpen}
                 title="Select Price Bucket"
               >
