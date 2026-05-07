@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 import { approvePendingCustomer, markNotificationRead, removePendingCustomer } from "@/app/actions/customers";
+import { approveInvoice, rejectInvoice } from "@/app/actions/invoices";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
@@ -18,6 +20,7 @@ type NotificationRow = {
   type: string;
   is_read: boolean;
   customer_id: string | null;
+  invoice_id: string | null;
   created_at: string;
   customer: {
     id: string;
@@ -28,10 +31,24 @@ type NotificationRow = {
     credit_limit: number;
     status: "pending_approval" | "active" | "rejected";
   } | null;
+  invoice: {
+    id: string;
+    invoice_number: number;
+    status: "draft" | "pending_approval" | "approved" | "rejected" | "issued" | "paid";
+    customer_name: string | null;
+  } | null;
+};
+
+type RawInvoiceRow = {
+  id: string;
+  invoice_number: number;
+  status: "draft" | "pending_approval" | "approved" | "rejected" | "issued" | "paid";
+  customer?: { name: string } | { name: string }[] | null;
 };
 
 type RawNotificationRow = Omit<NotificationRow, "customer"> & {
   customer: NotificationRow["customer"] | NotificationRow["customer"][];
+  invoice: RawInvoiceRow | RawInvoiceRow[];
 };
 
 export default function NotificationsPage() {
@@ -53,7 +70,7 @@ export default function NotificationsPage() {
       const { data, error } = await supabase
         .from("notifications")
         .select(
-          "id, title, message, type, is_read, customer_id, created_at, customer:customers(id, name, phone, address, area, credit_limit, status)"
+          "id, title, message, type, is_read, customer_id, invoice_id, created_at, customer:customers(id, name, phone, address, area, credit_limit, status), invoice:invoices(id, invoice_number, status, customer:customers(name))"
         )
         .eq("recipient_id", user.id)
         .order("created_at", { ascending: false });
@@ -61,12 +78,22 @@ export default function NotificationsPage() {
       if (error) throw new Error(error.message);
       return ((data || []) as RawNotificationRow[]).map((row) => ({
         ...row,
-        customer: Array.isArray(row.customer) ? row.customer[0] || null : row.customer
+        customer: Array.isArray(row.customer) ? row.customer[0] || null : row.customer,
+        invoice_id: row.invoice_id ?? null,
+        invoice: row.invoice
+          ? {
+              ...(Array.isArray(row.invoice) ? row.invoice[0] || null : row.invoice),
+              customer_name: Array.isArray(row.invoice)
+                ? row.invoice[0]?.customer?.name ?? null
+                : row.invoice?.customer?.name ?? null
+            }
+          : null
       }));
     }
   });
 
   const canReviewCustomers = user?.role === "admin" || user?.role === "manager";
+  const canReviewInvoices = user?.role === "admin" || user?.role === "manager";
   const selectedNotification = notificationsQuery.data?.find((item) => item.id === selectedNotificationId) || null;
 
   useEffect(() => {
@@ -156,6 +183,41 @@ export default function NotificationsPage() {
     await notificationsQuery.refetch();
   };
 
+  const handleApproveInvoice = async (invoiceId: string, notificationId: string) => {
+    setProcessingId(notificationId);
+    const result = await approveInvoice(invoiceId, notificationId);
+    setProcessingId(null);
+
+    if (!result.success) {
+      toast({ title: "Approval failed", description: result.error, variant: "error" });
+      return;
+    }
+
+    toast({ title: "Invoice approved", description: result.message, variant: "success" });
+    setSelectedNotificationId(null);
+    await queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+    await notificationsQuery.refetch();
+  };
+
+  const handleRejectInvoice = async (invoiceId: string, notificationId: string) => {
+    const confirmed = window.confirm("Reject this invoice request?");
+    if (!confirmed) return;
+
+    setProcessingId(notificationId);
+    const result = await rejectInvoice(invoiceId, notificationId);
+    setProcessingId(null);
+
+    if (!result.success) {
+      toast({ title: "Rejection failed", description: result.error, variant: "error" });
+      return;
+    }
+
+    toast({ title: "Invoice rejected", description: result.message, variant: "success" });
+    setSelectedNotificationId(null);
+    await queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
+    await notificationsQuery.refetch();
+  };
+
   return (
     <section className="space-y-4">
       <header>
@@ -167,8 +229,11 @@ export default function NotificationsPage() {
         <div className="space-y-3">
           {notificationsQuery.data.map((notification) => {
             const pendingApproval = notification.type === "customer_approval_request" && !!notification.customer_id;
+            const pendingInvoiceApproval =
+              notification.type === "invoice_approval_request" && !!notification.invoice_id;
             const isProcessing = processingId === notification.id;
             const showViewCustomer = pendingApproval && !!notification.customer;
+            const showViewInvoice = pendingInvoiceApproval && !!notification.invoice;
 
             return (
               <Card key={notification.id}>
@@ -197,6 +262,11 @@ export default function NotificationsPage() {
                         View Customer
                       </Button>
                     ) : null}
+                    {showViewInvoice ? (
+                      <Button size="sm" variant="outline" onClick={() => setSelectedNotificationId(notification.id)}>
+                        View Invoice
+                      </Button>
+                    ) : null}
                   </div>
                 </CardContent>
               </Card>
@@ -214,8 +284,16 @@ export default function NotificationsPage() {
         onOpenChange={(open) => {
           if (!open) setSelectedNotificationId(null);
         }}
-        title="Customer Request Review"
-        description="Review details and decide whether to approve or remove this pending request."
+        title={
+          selectedNotification?.invoice
+            ? "Invoice Request Review"
+            : "Customer Request Review"
+        }
+        description={
+          selectedNotification?.invoice
+            ? "Review details and decide whether to approve or reject this invoice request."
+            : "Review details and decide whether to approve or remove this pending request."
+        }
       >
         {selectedNotification?.customer ? (
           <div className="space-y-3 text-sm">
@@ -270,8 +348,60 @@ export default function NotificationsPage() {
               ) : null}
             </div>
           </div>
+        ) : selectedNotification?.invoice ? (
+          <div className="space-y-3 text-sm">
+            <p>
+              <strong>Invoice #:</strong> {selectedNotification.invoice.invoice_number}
+            </p>
+            <p>
+              <strong>Status:</strong> {selectedNotification.invoice.status}
+            </p>
+            {selectedNotification.invoice.customer_name ? (
+              <p>
+                <strong>Customer:</strong> {selectedNotification.invoice.customer_name}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              {!selectedNotification.is_read ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={processingId === selectedNotification.id}
+                  onClick={() => handleMarkRead(selectedNotification.id)}
+                >
+                  Mark as read
+                </Button>
+              ) : null}
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/invoices/${selectedNotification.invoice.id}`}>Open Invoice</Link>
+              </Button>
+              {canReviewInvoices && selectedNotification.invoice.status === "pending_approval" ? (
+                <>
+                  <Button
+                    size="sm"
+                    disabled={processingId === selectedNotification.id}
+                    onClick={() =>
+                      handleApproveInvoice(selectedNotification.invoice?.id as string, selectedNotification.id)
+                    }
+                  >
+                    Approve
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    disabled={processingId === selectedNotification.id}
+                    onClick={() =>
+                      handleRejectInvoice(selectedNotification.invoice?.id as string, selectedNotification.id)
+                    }
+                  >
+                    Reject
+                  </Button>
+                </>
+              ) : null}
+            </div>
+          </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Customer record is not available anymore.</p>
+          <p className="text-sm text-muted-foreground">Record is not available anymore.</p>
         )}
       </Dialog>
     </section>

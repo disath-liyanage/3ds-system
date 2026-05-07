@@ -107,7 +107,7 @@ export const collectionSchema = z.object({
   created_at: z.string()
 });
 
-export const invoiceStatusSchema = z.enum(["draft", "issued", "paid"]);
+export const invoiceStatusSchema = z.enum(["draft", "pending_approval", "approved", "rejected", "issued", "paid"]);
 
 export const invoiceSchema = z.object({
   id: z.string().uuid(),
@@ -150,6 +150,7 @@ export const notificationSchema = z.object({
   message: z.string().min(1),
   type: z.string().min(1),
   customer_id: z.string().uuid().nullable(),
+  invoice_id: z.string().uuid().nullable(),
   is_read: z.boolean(),
   read_at: z.string().nullable(),
   created_by: z.string().uuid().nullable(),

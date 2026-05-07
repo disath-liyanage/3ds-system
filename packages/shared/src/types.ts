@@ -108,7 +108,7 @@ export interface Invoice {
   customer_id: string;
   issued_by: string;
   total_amount: number;
-  status: "draft" | "issued" | "paid";
+  status: "draft" | "pending_approval" | "approved" | "rejected" | "issued" | "paid";
   created_at: string;
 }
 
@@ -119,6 +119,7 @@ export interface Notification {
   message: string;
   type: string;
   customer_id: string | null;
+  invoice_id: string | null;
   is_read: boolean;
   read_at: string | null;
   created_by: string | null;

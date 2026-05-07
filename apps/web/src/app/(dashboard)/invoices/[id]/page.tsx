@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
-import { deleteInvoice } from "@/app/actions/invoices";
+import { approveInvoice, deleteInvoice, rejectInvoice } from "@/app/actions/invoices";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +20,8 @@ export default function InvoiceDetailsPage() {
 
   const { permissions, user, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
   const { data: invoice, isLoading: isInvoiceLoading, isError } = useInvoice(invoiceId);
+
+  const [isReviewing, setIsReviewing] = useState(false);
 
   const isAdminOrManager = user?.role === "admin" || user?.role === "manager";
 
@@ -44,6 +46,54 @@ export default function InvoiceDetailsPage() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleApprove = async () => {
+    if (!invoiceId) return;
+    setIsReviewing(true);
+    const result = await approveInvoice(invoiceId);
+    setIsReviewing(false);
+
+    if (!result.success) {
+      toast({ title: "Approval failed", description: result.error, variant: "error" });
+      return;
+    }
+
+    toast({ title: "Invoice approved", description: result.message, variant: "success" });
+    router.refresh();
+  };
+
+  const handleReject = async () => {
+    if (!invoiceId) return;
+    const confirmed = window.confirm("Reject this invoice request?");
+    if (!confirmed) return;
+
+    setIsReviewing(true);
+    const result = await rejectInvoice(invoiceId);
+    setIsReviewing(false);
+
+    if (!result.success) {
+      toast({ title: "Rejection failed", description: result.error, variant: "error" });
+      return;
+    }
+
+    toast({ title: "Invoice rejected", description: result.message, variant: "success" });
+    router.refresh();
+  };
+
+  const statusLabel = (status: string) => {
+    if (status === "pending_approval") return "PENDING APPROVAL";
+    if (status === "approved") return "APPROVED";
+    if (status === "rejected") return "REJECTED";
+    if (status === "issued") return "APPROVED";
+    return status.toUpperCase();
+  };
+
+  const statusVariant = (status: string) => {
+    if (status === "paid" || status === "approved" || status === "issued") return "success";
+    if (status === "rejected") return "danger";
+    if (status === "pending_approval" || status === "draft") return "warning";
+    return "default";
   };
 
   const getDiscountPerUnit = (unitPrice: number, discountType: "percent" | "amount", discountValue: number) => {
@@ -93,6 +143,16 @@ export default function InvoiceDetailsPage() {
                 Edit Invoice
               </Link>
             </Button>
+          ) : null}
+          {isAdminOrManager && invoice.status === "pending_approval" ? (
+            <>
+              <Button onClick={handleApprove} disabled={isReviewing}>
+                Approve
+              </Button>
+              <Button variant="danger" onClick={handleReject} disabled={isReviewing}>
+                Reject
+              </Button>
+            </>
           ) : null}
           <Button variant="default" onClick={handlePrint}>
             Print Invoice
@@ -186,11 +246,9 @@ export default function InvoiceDetailsPage() {
             <div className="flex justify-between items-center text-sm pt-2 border-t">
               <span>Status:</span>
               <Badge
-                variant={
-                  invoice.status === "paid" ? "success" : invoice.status === "draft" ? "warning" : "default"
-                }
+                variant={statusVariant(invoice.status)}
               >
-                {invoice.status.toUpperCase()}
+                {statusLabel(invoice.status)}
               </Badge>
             </div>
           </div>

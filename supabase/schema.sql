@@ -3,7 +3,7 @@ create extension if not exists pgcrypto;
 create type public.app_role as enum ('admin', 'manager', 'sales_rep', 'cashier');
 create type public.order_status as enum ('pending', 'reviewing', 'approved', 'rejected', 'invoiced');
 create type public.collection_status as enum ('pending', 'validated', 'rejected');
-create type public.invoice_status as enum ('draft', 'issued', 'paid');
+create type public.invoice_status as enum ('draft', 'pending_approval', 'approved', 'rejected', 'issued', 'paid');
 
 create sequence if not exists public.order_number_seq start with 1000 increment by 1;
 create sequence if not exists public.collection_number_seq start with 3000 increment by 1;
@@ -91,6 +91,10 @@ create table if not exists public.invoices (
   total_amount numeric(12, 2) not null check (total_amount >= 0),
   payment_method text not null default 'credit',
   status public.invoice_status not null default 'draft',
+  approved_by uuid references public.users_profile (id),
+  approved_at timestamptz,
+  rejected_by uuid references public.users_profile (id),
+  rejected_at timestamptz,
   notes text,
   created_at timestamptz not null default now()
 );
@@ -526,12 +530,46 @@ begin
   end if;
 end $$;
 
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_type t
+    join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'invoice_status'
+      and n.nspname = 'public'
+  ) then
+    create type public.invoice_status as enum ('draft', 'pending_approval', 'approved', 'rejected', 'issued', 'paid');
+  end if;
+end $$;
+
+do $$
+begin
+  if exists (
+    select 1
+    from pg_type t
+    join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'invoice_status'
+      and n.nspname = 'public'
+  ) then
+    alter type public.invoice_status add value if not exists 'pending_approval';
+    alter type public.invoice_status add value if not exists 'approved';
+    alter type public.invoice_status add value if not exists 'rejected';
+  end if;
+end $$;
+
 alter table public.customers
   add column if not exists status public.customer_status not null default 'active',
   add column if not exists created_by uuid references public.users_profile (id),
   add column if not exists approved_by uuid references public.users_profile (id),
   add column if not exists approved_at timestamptz,
   add column if not exists sales_rep_id uuid references public.users_profile (id);
+
+alter table public.invoices
+  add column if not exists approved_by uuid references public.users_profile (id),
+  add column if not exists approved_at timestamptz,
+  add column if not exists rejected_by uuid references public.users_profile (id),
+  add column if not exists rejected_at timestamptz;
 
 create index if not exists idx_customers_status on public.customers (status);
 create index if not exists idx_customers_created_by on public.customers (created_by);
@@ -544,14 +582,19 @@ create table if not exists public.notifications (
   message text not null,
   type text not null default 'general',
   customer_id uuid references public.customers (id) on delete cascade,
+  invoice_id uuid references public.invoices (id) on delete cascade,
   is_read boolean not null default false,
   read_at timestamptz,
   created_by uuid references public.users_profile (id),
   created_at timestamptz not null default now()
 );
 
+alter table public.notifications
+  add column if not exists invoice_id uuid references public.invoices (id) on delete cascade;
+
 create index if not exists idx_notifications_recipient_created on public.notifications (recipient_id, created_at desc);
 create index if not exists idx_notifications_customer_id on public.notifications (customer_id);
+create index if not exists idx_notifications_invoice_id on public.notifications (invoice_id);
 
 alter table public.notifications enable row level security;
 

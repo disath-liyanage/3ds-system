@@ -32,6 +32,30 @@ export default function InvoicesPage() {
   const [minInvoiceNo, setMinInvoiceNo] = useState("");
   const [maxInvoiceNo, setMaxInvoiceNo] = useState("");
 
+  const statusOrder: Record<string, number> = {
+    draft: 0,
+    pending_approval: 1,
+    rejected: 2,
+    approved: 3,
+    issued: 3,
+    paid: 4
+  };
+
+  const getStatusLabel = (status: string) => {
+    if (status === "pending_approval") return "Pending approval";
+    if (status === "approved") return "Approved";
+    if (status === "rejected") return "Rejected";
+    if (status === "issued") return "Approved";
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
+
+  const getStatusVariant = (status: string) => {
+    if (status === "paid" || status === "approved" || status === "issued") return "success";
+    if (status === "rejected") return "danger";
+    if (status === "pending_approval" || status === "draft") return "warning";
+    return "default";
+  };
+
   const hasFilters = 
     customerSearch !== "" ||
     Boolean(dateRange?.from) ||
@@ -75,7 +99,11 @@ export default function InvoicesPage() {
     }
 
     if (statusFilter !== "all") {
-      result = result.filter((inv) => inv.status === statusFilter);
+      if (statusFilter === "approved") {
+        result = result.filter((inv) => inv.status === "approved" || inv.status === "issued");
+      } else {
+        result = result.filter((inv) => inv.status === statusFilter);
+      }
     }
 
     if (minTotal) {
@@ -100,9 +128,10 @@ export default function InvoicesPage() {
       .map((invoice, index) => ({ invoice, index }))
       .sort((a, b) => {
         if (a.invoice.status === b.invoice.status) return a.index - b.index;
-        if (a.invoice.status === "draft") return -1;
-        if (b.invoice.status === "draft") return 1;
-        return a.index - b.index;
+        const orderA = statusOrder[a.invoice.status] ?? 99;
+        const orderB = statusOrder[b.invoice.status] ?? 99;
+        if (orderA === orderB) return a.index - b.index;
+        return orderA - orderB;
       })
       .map(({ invoice }) => invoice),
   [filteredInvoices]
@@ -212,10 +241,13 @@ export default function InvoicesPage() {
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
+                aria-label="Status filter"
               >
                 <option value="all">All</option>
                 <option value="draft">Draft</option>
-                <option value="issued">Issued</option>
+                <option value="pending_approval">Pending approval</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
                 <option value="paid">Paid</option>
               </select>
             </div>
@@ -331,13 +363,7 @@ export default function InvoicesPage() {
                 <TableCell className="capitalize">{row.payment_method}</TableCell>
                 <TableCell>LKR {row.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                 <TableCell>
-                  <Badge
-                    variant={
-                      row.status === "paid" ? "success" : row.status === "draft" ? "warning" : "default"
-                    }
-                  >
-                    {row.status}
-                  </Badge>
+                  <Badge variant={getStatusVariant(row.status)}>{getStatusLabel(row.status)}</Badge>
                 </TableCell>
                 <TableCell>
                   <Button asChild size="sm" variant="outline">

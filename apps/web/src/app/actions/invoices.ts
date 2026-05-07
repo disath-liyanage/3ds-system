@@ -35,7 +35,7 @@ export type InvoiceListRow = {
   issued_by_name: string;
   total_amount: number;
   payment_method: string;
-  status: "draft" | "issued" | "paid";
+  status: "draft" | "pending_approval" | "approved" | "rejected" | "issued" | "paid";
   created_at: string;
 };
 
@@ -103,6 +103,8 @@ export type UpdateInvoiceInput = {
   }>;
 };
 
+type InvoiceStatus = InvoiceListRow["status"];
+
 async function getCurrentUserProfile() {
   const supabase = createClient();
 
@@ -143,6 +145,64 @@ function canCreateInvoices(profile: ProfilePermissionRow): boolean {
 
 function canViewAllInvoices(profile: ProfilePermissionRow): boolean {
   return profile.role === "admin" || profile.role === "manager";
+}
+
+function isAdminOrManager(profile: ProfilePermissionRow): boolean {
+  return profile.role === "admin" || profile.role === "manager";
+}
+
+async function notifyInvoiceApprovers(
+  invoiceId: string,
+  invoiceNumber: number,
+  requestedBy: ProfilePermissionRow
+): Promise<ActionResult> {
+  const { data: approvers, error: approverError } = await adminClient
+    .from("users_profile")
+    .select("id")
+    .in("role", ["admin", "manager"]);
+
+  if (approverError) {
+    return { success: false, error: approverError.message };
+  }
+
+  if (!approvers || approvers.length === 0) {
+    return { success: true };
+  }
+
+  const notifications = approvers.map((approver) => ({
+    recipient_id: approver.id,
+    title: "Invoice approval request",
+    message: `${requestedBy.full_name || requestedBy.email} requested approval for invoice #${invoiceNumber}.`,
+    type: "invoice_approval_request",
+    invoice_id: invoiceId,
+    created_by: requestedBy.id
+  }));
+
+  const { error: notificationError } = await adminClient.from("notifications").insert(notifications);
+  if (notificationError) {
+    return { success: false, error: notificationError.message };
+  }
+
+  return { success: true };
+}
+
+async function notifyInvoiceRequester(
+  invoiceId: string,
+  invoiceNumber: number,
+  requesterId: string | null,
+  reviewer: ProfilePermissionRow,
+  outcome: "approved" | "rejected"
+): Promise<void> {
+  if (!requesterId) return;
+
+  await adminClient.from("notifications").insert({
+    recipient_id: requesterId,
+    title: `Invoice request ${outcome}`,
+    message: `Your invoice request #${invoiceNumber} was ${outcome} by ${reviewer.full_name || reviewer.email}.`,
+    type: "invoice_approval_result",
+    invoice_id: invoiceId,
+    created_by: reviewer.id
+  });
 }
 
 export async function listInvoices(): Promise<{ success: boolean; data?: InvoiceListRow[]; error?: string }> {
@@ -326,9 +386,14 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
     total_amount += qty * Math.max(0, effectiveUnitPrice);
   }
 
-  // Create invoice
-  // status: if cash, we can consider it 'paid' maybe? Let's leave it 'issued' so user can track it.
-  const status = saveAsDraft ? "draft" : payment_method === "cash" ? "paid" : "issued";
+  const isSalesRep = access.profile.role === "sales_rep";
+  const status: InvoiceStatus = saveAsDraft
+    ? "draft"
+    : isSalesRep
+      ? "pending_approval"
+      : payment_method === "cash"
+        ? "paid"
+        : "approved";
 
   const { data: invoice, error: invoiceError } = await adminClient
     .from("invoices")
@@ -340,7 +405,7 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
       status,
       notes: notes || null
     })
-    .select("id")
+    .select("id, invoice_number")
     .single();
 
   if (invoiceError || !invoice) {
@@ -364,7 +429,19 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
     return { success: false, error: itemsError.message };
   }
 
-  if (!saveAsDraft) {
+  if (status === "pending_approval") {
+    const notificationResult = await notifyInvoiceApprovers(
+      invoice.id,
+      Number(invoice.invoice_number),
+      access.profile
+    );
+
+    if (!notificationResult.success) {
+      return notificationResult;
+    }
+  }
+
+  if (status === "approved" || status === "paid" || status === "issued") {
     // Reduce product stock
     try {
       for (const item of items) {
@@ -406,8 +483,17 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
   revalidatePath("/invoices");
   revalidatePath("/products");
   revalidatePath("/customers");
+  revalidatePath("/notifications");
 
-  return { success: true, message: saveAsDraft ? "Invoice draft saved" : "Invoice created successfully" };
+  return {
+    success: true,
+    message:
+      status === "pending_approval"
+        ? "Invoice request submitted. Admins and managers were notified for approval."
+        : saveAsDraft
+          ? "Invoice draft saved"
+          : "Invoice created successfully"
+  };
 }
 
 export async function updateDraftInvoice(input: UpdateDraftInvoiceInput): Promise<ActionResult> {
@@ -434,7 +520,7 @@ export async function updateDraftInvoice(input: UpdateDraftInvoiceInput): Promis
 
   const { data: invoice, error: invoiceError } = await adminClient
     .from("invoices")
-    .select("id, issued_by, status, customer_id")
+    .select("id, invoice_number, issued_by, status, customer_id")
     .eq("id", invoice_id)
     .single();
 
@@ -489,7 +575,14 @@ export async function updateDraftInvoice(input: UpdateDraftInvoiceInput): Promis
     total_amount += qty * Math.max(0, effectiveUnitPrice);
   }
 
-  const status = finalize ? (payment_method === "cash" ? "paid" : "issued") : "draft";
+  const isSalesRep = access.profile.role === "sales_rep";
+  const status: InvoiceStatus = finalize
+    ? isSalesRep
+      ? "pending_approval"
+      : payment_method === "cash"
+        ? "paid"
+        : "approved"
+    : "draft";
 
   const { error: updateError } = await adminClient
     .from("invoices")
@@ -530,7 +623,19 @@ export async function updateDraftInvoice(input: UpdateDraftInvoiceInput): Promis
     return { success: false, error: itemsError.message };
   }
 
-  if (finalize) {
+  if (finalize && status === "pending_approval") {
+    const notificationResult = await notifyInvoiceApprovers(
+      invoice_id,
+      Number(invoice.invoice_number),
+      access.profile
+    );
+
+    if (!notificationResult.success) {
+      return notificationResult;
+    }
+  }
+
+  if (finalize && (status === "approved" || status === "paid" || status === "issued")) {
     // Reduce product stock
     try {
       for (const item of items) {
@@ -571,8 +676,17 @@ export async function updateDraftInvoice(input: UpdateDraftInvoiceInput): Promis
   revalidatePath("/invoices");
   revalidatePath("/products");
   revalidatePath("/customers");
+  revalidatePath("/notifications");
 
-  return { success: true, message: finalize ? "Invoice updated" : "Draft updated" };
+  return {
+    success: true,
+    message:
+      finalize && status === "pending_approval"
+        ? "Invoice request submitted. Admins and managers were notified for approval."
+        : finalize
+          ? "Invoice updated"
+          : "Draft updated"
+  };
 }
 
 export async function updateInvoice(input: UpdateInvoiceInput): Promise<ActionResult> {
@@ -654,70 +768,74 @@ export async function updateInvoice(input: UpdateInvoiceInput): Promise<ActionRe
     total_amount += qty * Math.max(0, effectiveUnitPrice);
   }
 
-  const { data: existingItems, error: existingItemsError } = await adminClient
-    .from("invoice_items")
-    .select("product_id, qty")
-    .eq("invoice_id", invoice_id);
+  const shouldUpdateStock = invoice.status === "approved" || invoice.status === "paid" || invoice.status === "issued";
 
-  if (existingItemsError) {
-    return { success: false, error: existingItemsError.message };
-  }
+  if (shouldUpdateStock) {
+    const { data: existingItems, error: existingItemsError } = await adminClient
+      .from("invoice_items")
+      .select("product_id, qty")
+      .eq("invoice_id", invoice_id);
 
-  const oldQtyByProduct = new Map<string, number>();
-  for (const item of existingItems ?? []) {
-    const current = oldQtyByProduct.get(item.product_id) ?? 0;
-    oldQtyByProduct.set(item.product_id, current + Number(item.qty));
-  }
-
-  const newQtyByProduct = new Map<string, number>();
-  for (const item of items) {
-    const current = newQtyByProduct.get(item.product_id) ?? 0;
-    newQtyByProduct.set(item.product_id, current + Number(item.qty));
-  }
-
-  const allProductIds = new Set([...oldQtyByProduct.keys(), ...newQtyByProduct.keys()]);
-
-  try {
-    for (const productId of allProductIds) {
-      const oldQty = oldQtyByProduct.get(productId) ?? 0;
-      const newQty = newQtyByProduct.get(productId) ?? 0;
-      const delta = newQty - oldQty;
-
-      if (delta === 0) continue;
-
-      const { data: product, error: productError } = await adminClient
-        .from("products")
-        .select("stock_qty")
-        .eq("id", productId)
-        .single();
-
-      if (!product || productError) continue;
-
-      const nextStock = Math.max(0, Number(product.stock_qty) - delta);
-      await adminClient.from("products").update({ stock_qty: nextStock }).eq("id", productId);
+    if (existingItemsError) {
+      return { success: false, error: existingItemsError.message };
     }
-  } catch (err) {
-    console.error("Failed to update stock after invoice edit", err);
-  }
 
-  const oldContribution = invoice.payment_method === "credit" ? Number(invoice.total_amount) : 0;
-  const newContribution = payment_method === "credit" ? total_amount : 0;
-  const balanceDelta = newContribution - oldContribution;
+    const oldQtyByProduct = new Map<string, number>();
+    for (const item of existingItems ?? []) {
+      const current = oldQtyByProduct.get(item.product_id) ?? 0;
+      oldQtyByProduct.set(item.product_id, current + Number(item.qty));
+    }
 
-  if (balanceDelta !== 0) {
+    const newQtyByProduct = new Map<string, number>();
+    for (const item of items) {
+      const current = newQtyByProduct.get(item.product_id) ?? 0;
+      newQtyByProduct.set(item.product_id, current + Number(item.qty));
+    }
+
+    const allProductIds = new Set([...oldQtyByProduct.keys(), ...newQtyByProduct.keys()]);
+
     try {
-      const { data: customer, error: customerError } = await adminClient
-        .from("customers")
-        .select("balance")
-        .eq("id", invoice.customer_id)
-        .single();
+      for (const productId of allProductIds) {
+        const oldQty = oldQtyByProduct.get(productId) ?? 0;
+        const newQty = newQtyByProduct.get(productId) ?? 0;
+        const delta = newQty - oldQty;
 
-      if (customer && !customerError) {
-        const newBalance = Number(customer.balance) + balanceDelta;
-        await adminClient.from("customers").update({ balance: newBalance }).eq("id", invoice.customer_id);
+        if (delta === 0) continue;
+
+        const { data: product, error: productError } = await adminClient
+          .from("products")
+          .select("stock_qty")
+          .eq("id", productId)
+          .single();
+
+        if (!product || productError) continue;
+
+        const nextStock = Math.max(0, Number(product.stock_qty) - delta);
+        await adminClient.from("products").update({ stock_qty: nextStock }).eq("id", productId);
       }
     } catch (err) {
-      console.error("Failed to update customer balance after invoice edit", err);
+      console.error("Failed to update stock after invoice edit", err);
+    }
+
+    const oldContribution = invoice.payment_method === "credit" ? Number(invoice.total_amount) : 0;
+    const newContribution = payment_method === "credit" ? total_amount : 0;
+    const balanceDelta = newContribution - oldContribution;
+
+    if (balanceDelta !== 0) {
+      try {
+        const { data: customer, error: customerError } = await adminClient
+          .from("customers")
+          .select("balance")
+          .eq("id", invoice.customer_id)
+          .single();
+
+        if (customer && !customerError) {
+          const newBalance = Number(customer.balance) + balanceDelta;
+          await adminClient.from("customers").update({ balance: newBalance }).eq("id", invoice.customer_id);
+        }
+      } catch (err) {
+        console.error("Failed to update customer balance after invoice edit", err);
+      }
     }
   }
 
@@ -766,6 +884,229 @@ export async function updateInvoice(input: UpdateInvoiceInput): Promise<ActionRe
   return { success: true, message: "Invoice updated" };
 }
 
+export async function approveInvoice(invoiceId: string, notificationId?: string): Promise<ActionResult> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!isAdminOrManager(access.profile)) {
+    return { success: false, error: "Only admins and managers can approve invoices" };
+  }
+
+  if (!invoiceId) {
+    return { success: false, error: "Invoice id is required" };
+  }
+
+  const { data: invoice, error: invoiceError } = await adminClient
+    .from("invoices")
+    .select("id, invoice_number, issued_by, status, customer_id, payment_method, total_amount")
+    .eq("id", invoiceId)
+    .single();
+
+  if (invoiceError || !invoice) {
+    return { success: false, error: invoiceError?.message || "Invoice not found" };
+  }
+
+  if (invoice.status !== "pending_approval") {
+    return { success: false, error: "Invoice is already reviewed" };
+  }
+
+  const { data: invoiceItems, error: itemsError } = await adminClient
+    .from("invoice_items")
+    .select("product_id, qty")
+    .eq("invoice_id", invoiceId);
+
+  if (itemsError) {
+    return { success: false, error: itemsError.message };
+  }
+
+  const qtyByProduct = new Map<string, number>();
+  for (const item of invoiceItems ?? []) {
+    const current = qtyByProduct.get(item.product_id) ?? 0;
+    qtyByProduct.set(item.product_id, current + Number(item.qty));
+  }
+
+  const productIds = Array.from(qtyByProduct.keys());
+  if (productIds.length === 0) {
+    return { success: false, error: "Invoice has no items to approve" };
+  }
+
+  const { data: products, error: productError } = await adminClient
+    .from("products")
+    .select("id, name, stock_qty")
+    .in("id", productIds);
+
+  if (productError) {
+    return { success: false, error: productError.message };
+  }
+
+  if (!products || products.length !== productIds.length) {
+    return { success: false, error: "One or more products are missing for this invoice." };
+  }
+
+  for (const product of products ?? []) {
+    const requestedQty = qtyByProduct.get(product.id) ?? 0;
+    const availableQty = Number(product.stock_qty);
+    if (requestedQty > availableQty) {
+      return {
+        success: false,
+        error: `Insufficient stock for ${product.name}. Requested ${requestedQty}, available ${availableQty}.`
+      };
+    }
+  }
+
+  const { error: updateError } = await adminClient
+    .from("invoices")
+    .update({
+      status: "approved",
+      approved_by: access.profile.id,
+      approved_at: new Date().toISOString(),
+      rejected_by: null,
+      rejected_at: null
+    })
+    .eq("id", invoiceId);
+
+  if (updateError) {
+    return { success: false, error: updateError.message };
+  }
+
+  try {
+    for (const product of products ?? []) {
+      const requestedQty = qtyByProduct.get(product.id) ?? 0;
+      const nextStock = Math.max(0, Number(product.stock_qty) - requestedQty);
+      await adminClient.from("products").update({ stock_qty: nextStock }).eq("id", product.id);
+    }
+  } catch (err) {
+    console.error("Failed to update stock after invoice approval", err);
+  }
+
+  if (invoice.payment_method === "credit") {
+    try {
+      const { data: customer, error: customerError } = await adminClient
+        .from("customers")
+        .select("balance")
+        .eq("id", invoice.customer_id)
+        .single();
+
+      if (customer && !customerError) {
+        const newBalance = Number(customer.balance) + Number(invoice.total_amount);
+        await adminClient.from("customers").update({ balance: newBalance }).eq("id", invoice.customer_id);
+      }
+    } catch (err) {
+      console.error("Failed to update customer balance after invoice approval", err);
+    }
+  }
+
+  if (notificationId) {
+    await adminClient
+      .from("notifications")
+      .update({
+        is_read: true,
+        read_at: new Date().toISOString()
+      })
+      .eq("id", notificationId)
+      .eq("recipient_id", access.profile.id);
+  }
+
+  await adminClient
+    .from("notifications")
+    .update({
+      is_read: true,
+      read_at: new Date().toISOString()
+    })
+    .eq("invoice_id", invoiceId)
+    .eq("type", "invoice_approval_request");
+
+  await notifyInvoiceRequester(
+    invoiceId,
+    Number(invoice.invoice_number),
+    invoice.issued_by,
+    access.profile,
+    "approved"
+  );
+
+  revalidatePath("/invoices");
+  revalidatePath("/products");
+  revalidatePath("/customers");
+  revalidatePath("/notifications");
+
+  return { success: true, message: "Invoice approved" };
+}
+
+export async function rejectInvoice(invoiceId: string, notificationId?: string): Promise<ActionResult> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!isAdminOrManager(access.profile)) {
+    return { success: false, error: "Only admins and managers can reject invoices" };
+  }
+
+  if (!invoiceId) {
+    return { success: false, error: "Invoice id is required" };
+  }
+
+  const { data: invoice, error: invoiceError } = await adminClient
+    .from("invoices")
+    .select("id, invoice_number, issued_by, status")
+    .eq("id", invoiceId)
+    .single();
+
+  if (invoiceError || !invoice) {
+    return { success: false, error: invoiceError?.message || "Invoice not found" };
+  }
+
+  if (invoice.status !== "pending_approval") {
+    return { success: false, error: "Invoice is already reviewed" };
+  }
+
+  const { error: updateError } = await adminClient
+    .from("invoices")
+    .update({
+      status: "rejected",
+      rejected_by: access.profile.id,
+      rejected_at: new Date().toISOString(),
+      approved_by: null,
+      approved_at: null
+    })
+    .eq("id", invoiceId);
+
+  if (updateError) {
+    return { success: false, error: updateError.message };
+  }
+
+  if (notificationId) {
+    await adminClient
+      .from("notifications")
+      .update({
+        is_read: true,
+        read_at: new Date().toISOString()
+      })
+      .eq("id", notificationId)
+      .eq("recipient_id", access.profile.id);
+  }
+
+  await adminClient
+    .from("notifications")
+    .update({
+      is_read: true,
+      read_at: new Date().toISOString()
+    })
+    .eq("invoice_id", invoiceId)
+    .eq("type", "invoice_approval_request");
+
+  await notifyInvoiceRequester(
+    invoiceId,
+    Number(invoice.invoice_number),
+    invoice.issued_by,
+    access.profile,
+    "rejected"
+  );
+
+  revalidatePath("/invoices");
+  revalidatePath("/notifications");
+
+  return { success: true, message: "Invoice rejected" };
+}
+
 export async function deleteInvoice(invoiceId: string): Promise<ActionResult> {
   const access = await getCurrentUserProfile();
   if ("error" in access) return { success: false, error: access.error };
@@ -781,7 +1122,7 @@ export async function deleteInvoice(invoiceId: string): Promise<ActionResult> {
 
   const { data: invoice, error: invoiceError } = await adminClient
     .from("invoices")
-    .select("total_amount, payment_method, customer_id, invoice_items(product_id, qty)")
+    .select("status, total_amount, payment_method, customer_id, invoice_items(product_id, qty)")
     .eq("id", invoiceId)
     .single();
 
@@ -795,40 +1136,42 @@ export async function deleteInvoice(invoiceId: string): Promise<ActionResult> {
     return { success: false, error: error.message };
   }
 
-  // Restore stock
-  try {
-    for (const item of invoice.invoice_items || []) {
-      const qty = Number(item.qty);
-      const { data: product, error: productError } = await adminClient
-        .from("products")
-        .select("stock_qty")
-        .eq("id", item.product_id)
-        .single();
-        
-      if (product && !productError) {
-        const newStock = Number(product.stock_qty) + qty;
-        await adminClient.from("products").update({ stock_qty: newStock }).eq("id", item.product_id);
-      }
-    }
-  } catch (err) {
-    console.error("Failed to restore stock after invoice deletion", err);
-  }
-
-  // Restore customer balance if credit
-  if (invoice.payment_method === "credit") {
+  if (invoice.status === "approved" || invoice.status === "paid" || invoice.status === "issued") {
+    // Restore stock
     try {
-      const { data: customer, error: customerError } = await adminClient
-        .from("customers")
-        .select("balance")
-        .eq("id", invoice.customer_id)
-        .single();
+      for (const item of invoice.invoice_items || []) {
+        const qty = Number(item.qty);
+        const { data: product, error: productError } = await adminClient
+          .from("products")
+          .select("stock_qty")
+          .eq("id", item.product_id)
+          .single();
 
-      if (customer && !customerError) {
-        const newBalance = Math.max(0, Number(customer.balance) - Number(invoice.total_amount));
-        await adminClient.from("customers").update({ balance: newBalance }).eq("id", invoice.customer_id);
+        if (product && !productError) {
+          const newStock = Number(product.stock_qty) + qty;
+          await adminClient.from("products").update({ stock_qty: newStock }).eq("id", item.product_id);
+        }
       }
     } catch (err) {
-      console.error("Failed to restore customer balance", err);
+      console.error("Failed to restore stock after invoice deletion", err);
+    }
+
+    // Restore customer balance if credit
+    if (invoice.payment_method === "credit") {
+      try {
+        const { data: customer, error: customerError } = await adminClient
+          .from("customers")
+          .select("balance")
+          .eq("id", invoice.customer_id)
+          .single();
+
+        if (customer && !customerError) {
+          const newBalance = Math.max(0, Number(customer.balance) - Number(invoice.total_amount));
+          await adminClient.from("customers").update({ balance: newBalance }).eq("id", invoice.customer_id);
+        }
+      } catch (err) {
+        console.error("Failed to restore customer balance", err);
+      }
     }
   }
 

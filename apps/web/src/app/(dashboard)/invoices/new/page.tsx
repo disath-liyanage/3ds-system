@@ -58,7 +58,7 @@ export default function NewInvoicePage() {
   const searchParams = useSearchParams();
   const draftId = searchParams.get("draftId");
   const editId = searchParams.get("editId");
-  const { permissions, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
+  const { permissions, user, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
   const { data: products, isLoading: isProductsLoading } = useProducts();
   const { data: customers, isLoading: isCustomersLoading } = useCustomers();
 
@@ -67,6 +67,7 @@ export default function NewInvoicePage() {
   const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [invoiceNumber, setInvoiceNumber] = useState<number | null>(null);
+  const [currentStatus, setCurrentStatus] = useState<string | null>(null);
 
   const {
     control,
@@ -179,6 +180,7 @@ export default function NewInvoicePage() {
       }
 
       setInvoiceNumber(result.data.invoice_number);
+      setCurrentStatus(result.data.status);
 
       setValue("customer_id", result.data.customer_id, { shouldDirty: true });
       setValue("payment_method", result.data.payment_method as InvoiceForm["payment_method"], { shouldDirty: true });
@@ -238,6 +240,7 @@ export default function NewInvoicePage() {
       }
 
       setInvoiceNumber(result.data.invoice_number);
+      setCurrentStatus(result.data.status);
       setValue("customer_id", result.data.customer_id, { shouldDirty: true });
       setValue("payment_method", result.data.payment_method as InvoiceForm["payment_method"], { shouldDirty: true });
       setValue("notes", result.data.notes ?? "", { shouldDirty: true });
@@ -338,7 +341,13 @@ export default function NewInvoicePage() {
       return;
     }
 
-    toast({ title: "Invoice created successfully", variant: "success" });
+    const successTitle = result.message?.includes("request")
+      ? "Invoice request submitted"
+      : editId
+        ? "Invoice updated"
+        : "Invoice saved";
+
+    toast({ title: successTitle, description: result.message, variant: "success" });
     await queryClient.invalidateQueries({ queryKey: ["invoices"] });
     await queryClient.invalidateQueries({ queryKey: ["products"] });
     router.push("/invoices");
@@ -591,7 +600,11 @@ export default function NewInvoicePage() {
     <section className="space-y-6 w-full max-w-6xl mx-auto">
       <header>
         <h1 className="text-2xl font-bold">New Invoice</h1>
-        <p className="text-sm text-muted-foreground">Create a direct invoice for a customer.</p>
+        <p className="text-sm text-muted-foreground">
+          {user?.role === "sales_rep"
+            ? "Create an invoice request for approval."
+            : "Create a direct invoice for a customer."}
+        </p>
       </header>
 
       <form className="space-y-6" onSubmit={handleSubmit(onSubmit, onSubmitInvalid)}>
@@ -910,7 +923,15 @@ export default function NewInvoicePage() {
           <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
               <Button type="submit" disabled={formState.isSubmitting}>
-                {formState.isSubmitting ? "Saving..." : editId ? "Save Changes" : "Save Invoice"}
+                {formState.isSubmitting
+                  ? "Saving..."
+                  : editId
+                    ? user?.role === "sales_rep" && currentStatus === "pending_approval"
+                      ? "Update Request"
+                      : "Save Changes"
+                    : user?.role === "sales_rep"
+                      ? "Request Invoice"
+                      : "Save Invoice"}
             </Button>
             <Button type="button" variant="outline" onClick={() => router.back()}>
               Cancel
