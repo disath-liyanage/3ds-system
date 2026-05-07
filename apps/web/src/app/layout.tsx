@@ -5,8 +5,8 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
-  title: "PaintDist",
-  description: "Paint distribution management platform",
+  title: "3D's Distributors (PVT) Ltd.",
+  description: "3D's Distributors POS System",
   icons: {
     icon: "/logo.svg"
   }
