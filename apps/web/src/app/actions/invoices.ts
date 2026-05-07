@@ -464,7 +464,7 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
     }
   }
 
-  if (status === "approved" || status === "paid" || status === "issued") {
+  if (status === "approved" || status === "paid") {
     // Reduce product stock
     try {
       for (const item of items) {
