@@ -6,7 +6,10 @@ import { Providers } from "@/components/providers";
 
 export const metadata: Metadata = {
   title: "PaintDist",
-  description: "Paint distribution management platform"
+  description: "Paint distribution management platform",
+  icons: {
+    icon: "/logo.svg"
+  }
 };
 
 type RootLayoutProps = {
