@@ -75,19 +75,26 @@ export default function NotificationsPage() {
         .order("created_at", { ascending: false });
 
       if (error) throw new Error(error.message);
-      return ((data || []) as RawNotificationRow[]).map((row) => ({
-        ...row,
-        customer: Array.isArray(row.customer) ? row.customer[0] || null : row.customer,
-        invoice_id: row.invoice_id ?? null,
-        invoice: row.invoice
-          ? {
-              ...(Array.isArray(row.invoice) ? row.invoice[0] || null : row.invoice),
-              customer_name: Array.isArray(row.invoice)
-                ? row.invoice[0]?.customer?.name ?? null
-                : row.invoice?.customer?.name ?? null
-            }
-          : null
-      }));
+      return ((data || []) as RawNotificationRow[]).map((row) => {
+        const rawInvoice = Array.isArray(row.invoice) ? row.invoice[0] || null : row.invoice;
+        const rawCustomer = rawInvoice
+          ? Array.isArray(rawInvoice.customer)
+            ? rawInvoice.customer[0] || null
+            : rawInvoice.customer ?? null
+          : null;
+
+        return {
+          ...row,
+          customer: Array.isArray(row.customer) ? row.customer[0] || null : row.customer,
+          invoice_id: row.invoice_id ?? null,
+          invoice: rawInvoice
+            ? {
+                ...rawInvoice,
+                customer_name: rawCustomer?.name ?? null
+              }
+            : null
+        };
+      });
     }
   });
 
@@ -192,12 +199,13 @@ export default function NotificationsPage() {
       {notificationsQuery.data?.length ? (
         <div className="space-y-3">
           {notificationsQuery.data.map((notification) => {
+            const invoiceTargetId = notification.invoice_id ?? notification.invoice?.id ?? null;
             const pendingApproval = notification.type === "customer_approval_request" && !!notification.customer_id;
             const pendingInvoiceApproval =
               notification.type === "invoice_approval_request" && !!notification.invoice_id;
             const isProcessing = processingId === notification.id;
             const showViewCustomer = pendingApproval && !!notification.customer;
-            const showViewInvoice = pendingInvoiceApproval && !!notification.invoice_id;
+            const showViewInvoice = pendingInvoiceApproval && !!invoiceTargetId;
 
             return (
               <Card key={notification.id}>
@@ -228,7 +236,7 @@ export default function NotificationsPage() {
                     ) : null}
                     {showViewInvoice ? (
                       <Button asChild size="sm" variant="outline">
-                        <Link href={`/invoices/${notification.invoice_id}`}>View Invoice</Link>
+                        <Link href={`/invoices/${invoiceTargetId}`}>View Invoice</Link>
                       </Button>
                     ) : null}
                   </div>

@@ -164,6 +164,7 @@ language sql
 stable
 security definer
 set search_path = public
+set row_security = off
 as $$
   select role
   from public.users_profile

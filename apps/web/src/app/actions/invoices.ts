@@ -22,6 +22,7 @@ type ProfilePermissionRow = {
   email: string;
   role: UserRole;
   full_name: string;
+  custom_role_id?: string | null;
   custom_role: CustomRolePermissionSummary | CustomRolePermissionSummary[] | null;
 };
 
@@ -117,17 +118,27 @@ async function getCurrentUserProfile() {
     return { error: "Unauthorized" as const };
   }
 
-  const { data: profile } = await adminClient
+  const { data: profile, error: profileError } = await adminClient
     .from("users_profile")
-    .select("id, email, role, full_name, custom_role:custom_roles(perm_create_invoices)")
+    .select("id, email, role, full_name, custom_role_id")
     .eq("id", user.id)
     .maybeSingle<ProfilePermissionRow>();
 
-  if (!profile) {
-    return { error: "Profile not found" as const };
+  if (profileError || !profile) {
+    return { error: profileError?.message || "Profile not found" as const };
   }
 
-  return { profile };
+  let custom_role: CustomRolePermissionSummary | null = null;
+  if (profile.custom_role_id) {
+    const { data: roleRow } = await adminClient
+      .from("custom_roles")
+      .select("perm_create_invoices")
+      .eq("id", profile.custom_role_id)
+      .maybeSingle<CustomRolePermissionSummary>();
+    custom_role = roleRow ?? null;
+  }
+
+  return { profile: { ...profile, custom_role } };
 }
 
 function canCreateInvoices(profile: ProfilePermissionRow): boolean {
@@ -213,15 +224,17 @@ export async function listInvoices(): Promise<{ success: boolean; data?: Invoice
     return { success: false, error: "You do not have permission to view invoices" };
   }
 
+  const supabase = createClient();
+
   let query = adminClient
     .from("invoices")
     .select(
-      "id, invoice_number, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at, customer:customers(name), issuer:users_profile(full_name)"
+      "id, invoice_number, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at, customer:customers(name), issuer:users_profile!invoices_issued_by_fkey(full_name)"
     )
     .order("created_at", { ascending: false });
 
   if (!canViewAllInvoices(access.profile)) {
-    query = query.eq("issued_by", access.profile.id);
+    query = query.or(`issued_by.eq.${access.profile.id},status.in.(approved,issued,paid)`);
   }
 
   const { data, error } = await query;
@@ -268,13 +281,15 @@ export async function getInvoiceDetail(
     return { success: false, error: "You do not have permission to view invoices" };
   }
 
+  const supabase = createClient();
+
   let query = adminClient
     .from("invoices")
     .select(
       `
         id, invoice_number, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at, notes,
         customer:customers(name, phone, address),
-        issuer:users_profile(full_name),
+        issuer:users_profile!invoices_issued_by_fkey(full_name),
         invoice_items (
           id, product_id, qty, free_qty, unit_price, discount_type, discount_value,
           product:products(name, unit)
@@ -284,13 +299,21 @@ export async function getInvoiceDetail(
     .eq("id", invoiceId);
 
   if (!canViewAllInvoices(access.profile)) {
-    query = query.eq("issued_by", access.profile.id);
+    query = query.or(`issued_by.eq.${access.profile.id},status.in.(approved,issued,paid)`);
   }
 
   const { data, error } = await query.single();
 
   if (error) return { success: false, error: error.message };
   if (!data) return { success: true, data: null };
+
+  if (!canViewAllInvoices(access.profile)) {
+    const canSeeOwn = data.issued_by === access.profile.id;
+    const canSeeApproved = ["approved", "issued", "paid"].includes(data.status);
+    if (!canSeeOwn && !canSeeApproved) {
+      return { success: false, error: "You do not have permission to view this invoice" };
+    }
+  }
 
   const invoiceData = data as any;
 

@@ -18,7 +18,7 @@ import { useInvoices } from "@/hooks/useInvoices";
 
 export default function InvoicesPage() {
   const { permissions, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
-  const { data: invoices, isLoading: isInvoicesLoading } = useInvoices();
+  const { data: invoices, isLoading: isInvoicesLoading, isError, error } = useInvoices();
   const router = useRouter();
 
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -169,6 +169,16 @@ export default function InvoicesPage() {
 
   if (isPermissionsLoading) {
     return <p className="text-sm text-muted-foreground">Loading permissions...</p>;
+  }
+
+  if (isError) {
+    return (
+      <section className="space-y-4">
+        <h1 className="text-2xl font-bold">Invoices</h1>
+        <p className="text-sm text-muted-foreground">Failed to load invoices.</p>
+        <p className="text-xs text-muted-foreground">{error instanceof Error ? error.message : "Unknown error"}</p>
+      </section>
+    );
   }
 
   // NOTE: assuming canCreateInvoices also grants view permissions for simplicity,
