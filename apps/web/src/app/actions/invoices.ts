@@ -658,7 +658,7 @@ export async function updateDraftInvoice(input: UpdateDraftInvoiceInput): Promis
     }
   }
 
-  if (finalize && (status === "approved" || status === "paid" || status === "issued")) {
+  if (finalize && (status === "approved" || status === "paid")) {
     // Reduce product stock
     try {
       for (const item of items) {
