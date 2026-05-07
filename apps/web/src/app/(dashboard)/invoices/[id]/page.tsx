@@ -144,16 +144,6 @@ export default function InvoiceDetailsPage() {
               </Link>
             </Button>
           ) : null}
-          {isAdminOrManager && invoice.status === "pending_approval" ? (
-            <>
-              <Button onClick={handleApprove} disabled={isReviewing}>
-                Approve
-              </Button>
-              <Button variant="danger" onClick={handleReject} disabled={isReviewing}>
-                Reject
-              </Button>
-            </>
-          ) : null}
           <Button variant="default" onClick={handlePrint}>
             Print Invoice
           </Button>
@@ -259,6 +249,17 @@ export default function InvoiceDetailsPage() {
           <p>Issued by: {invoice.issued_by_name}</p>
         </div>
       </div>
+
+      {isAdminOrManager && invoice.status === "pending_approval" ? (
+        <div className="flex justify-end gap-2 print:hidden">
+          <Button onClick={handleApprove} disabled={isReviewing}>
+            Accept
+          </Button>
+          <Button variant="danger" onClick={handleReject} disabled={isReviewing}>
+            Reject
+          </Button>
+        </div>
+      ) : null}
 
     </section>
   );

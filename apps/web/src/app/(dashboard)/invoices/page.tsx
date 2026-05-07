@@ -354,7 +354,9 @@ export default function InvoicesPage() {
                 className={
                   row.status === "draft"
                     ? "bg-muted/30 cursor-pointer"
-                    : "cursor-pointer"
+                    : row.status === "pending_approval"
+                      ? "bg-orange-50 hover:bg-orange-100 cursor-pointer"
+                      : "cursor-pointer"
                 }
               >
                 <TableCell className="font-medium">{row.invoice_number}</TableCell>

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { createInvoice, getInvoiceDetail, updateDraftInvoice, updateInvoice } from "@/app/actions/invoices";
+import { approveInvoice, createInvoice, getInvoiceDetail, updateDraftInvoice, updateInvoice } from "@/app/actions/invoices";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
@@ -93,6 +93,8 @@ export default function NewInvoicePage() {
   const watchedPaymentMethod = useWatch({ control, name: "payment_method" });
   const watchedDraft = useWatch({ control, name: "draft" });
   const draftErrors = formState.errors?.draft;
+
+  const isAdminOrManager = user?.role === "admin" || user?.role === "manager";
 
   const { data: stockByPrice, isLoading: isStockLoading } = useProductStockByPrice(watchedDraft?.product_id);
 
@@ -339,6 +341,18 @@ export default function NewInvoicePage() {
         variant: "error"
       });
       return;
+    }
+
+    if (editId && isAdminOrManager && currentStatus === "pending_approval") {
+      const approval = await approveInvoice(editId);
+      if (!approval.success) {
+        toast({
+          title: "Approval failed",
+          description: approval.error || "Please try again.",
+          variant: "error"
+        });
+        return;
+      }
     }
 
     const successTitle = result.message?.includes("request")
@@ -926,9 +940,11 @@ export default function NewInvoicePage() {
                 {formState.isSubmitting
                   ? "Saving..."
                   : editId
-                    ? user?.role === "sales_rep" && currentStatus === "pending_approval"
-                      ? "Update Request"
-                      : "Save Changes"
+                    ? isAdminOrManager && currentStatus === "pending_approval"
+                      ? "Edit & Accept"
+                      : user?.role === "sales_rep" && currentStatus === "pending_approval"
+                        ? "Update Request"
+                        : "Save Changes"
                     : user?.role === "sales_rep"
                       ? "Request Invoice"
                       : "Save Invoice"}
