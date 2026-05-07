@@ -52,7 +52,7 @@ export default function LoginPage() {
       <Card className="w-full">
         <CardHeader>
           <CardTitle>Sign in</CardTitle>
-          <CardDescription>Use your PaintDist account credentials.</CardDescription>
+          <CardDescription>Use your 3D's Distributors (PVT) Ltd. account credentials.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

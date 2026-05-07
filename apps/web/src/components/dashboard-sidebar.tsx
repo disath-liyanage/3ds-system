@@ -209,7 +209,7 @@ export function DashboardSidebar({ isAdmin, user }: DashboardSidebarProps) {
 
   return (
     <Sidebar
-      title="PaintDist"
+      title="3D's Distributors (PVT) Ltd."
       items={navItems}
       adminItems={isAdmin ? adminNavItems : []}
       footer={

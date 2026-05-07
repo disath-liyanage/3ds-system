@@ -1,4 +1,4 @@
-# PaintDist Setup Notes
+# 3D's Distributors (PVT) Ltd. Setup Notes
 
 ## 1) What to copy into Supabase SQL Editor
 

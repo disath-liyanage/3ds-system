@@ -32,7 +32,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>PaintDist Login</Text>
+      <Text style={styles.title}>3D's Distributors (PVT) Ltd. Login</Text>
 
       <Controller
         control={control}
