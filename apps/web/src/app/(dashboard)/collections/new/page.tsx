@@ -49,7 +49,7 @@ export default function NewCollectionPage() {
   const recipientsQuery = useQuery({
     queryKey: ["collection-recipients"],
     queryFn: async () => await getCollectionRecipients(),
-    enabled: Boolean(isManagerOrAdmin)
+    enabled: true
   });
 
   const availableInvoices = useMemo(() => {
@@ -90,12 +90,23 @@ export default function NewCollectionPage() {
   }, [selectedInvoice, isManagerOrAdmin, recipientRole, setValue]);
 
   const recipientOptions = useMemo(() => {
+    if (!recipientsQuery.data || recipientsQuery.data.length === 0) {
+      console.log("[DEBUG] recipientsQuery.data is empty or not loaded", {
+        data: recipientsQuery.data,
+        isLoading: recipientsQuery.isLoading,
+        error: recipientsQuery.error
+      });
+      return [];
+    }
+    console.log("[DEBUG] All recipients fetched:", recipientsQuery.data);
     const rows = (recipientsQuery.data || []).filter((recipient) => recipient.role === recipientRole);
+    console.log("[DEBUG] Filtered recipients for role", recipientRole, ":", rows);
     return rows.map((recipient) => ({
       value: recipient.id,
-      label: recipient.full_name
+      label: recipient.full_name,
+      meta: recipient.role
     }));
-  }, [recipientsQuery.data, recipientRole]);
+  }, [recipientsQuery.data, recipientRole, isManagerOrAdmin]);
 
   const onSubmit = async (values: NewCollectionForm) => {
     const result = await recordCollection({
@@ -158,9 +169,8 @@ export default function NewCollectionPage() {
               <Input type="number" step="0.01" {...register("amount", { valueAsNumber: true })} />
             </div>
             {isManagerOrAdmin ? (
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Recipient role</label>
+              <div className="flex items-center gap-3">
+                <div className="w-48">
                   <Select
                     options={[
                       { value: "sales_rep", label: "Sales rep" },
@@ -174,12 +184,18 @@ export default function NewCollectionPage() {
                     }}
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-sm font-medium">Incentive recipient</label>
+                <div className="flex-1">
                   <SearchableSelect
                     value={watch("incentive_recipient_id")}
                     options={recipientOptions}
-                    placeholder={recipientRole === "driver" ? "Select driver" : "Select sales rep"}
+                    placeholder={
+                      recipientsQuery.isLoading
+                        ? "Loading..."
+                        : recipientRole === "driver"
+                          ? "Select driver"
+                          : "Select sales rep"
+                    }
+                    disabled={recipientOptions.length === 0}
                     onChange={(value) => setValue("incentive_recipient_id", value)}
                   />
                 </div>
