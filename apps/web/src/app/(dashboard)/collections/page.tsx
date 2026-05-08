@@ -134,10 +134,6 @@ export default function CollectionsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDatePickerOpen]);
 
-  const toggleSettled = () => {
-    setStatusFilter((prev) => (prev === "settled" ? "unsettled" : "settled"));
-  };
-
   if (!isLoading && !canViewCollections) {
     return (
       <section className="space-y-4">
@@ -156,7 +152,7 @@ export default function CollectionsPage() {
         </div>
         {canRecordCollections ? (
           <Button asChild>
-            <Link href="/collections/new">Record Collection</Link>
+            <Link href="/collections/new">Record Outside Collection</Link>
           </Button>
         ) : null}
       </div>
@@ -192,9 +188,6 @@ export default function CollectionsPage() {
               disabled={!hasFilters}
             >
               Reset
-            </Button>
-            <Button type="button" variant="outline" onClick={toggleSettled}>
-              {statusFilter === "settled" ? "Show Unsettled" : "Show Settled"}
             </Button>
           </div>
         </div>

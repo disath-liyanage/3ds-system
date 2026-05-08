@@ -48,23 +48,31 @@ export default function NewCollectionPage() {
     enabled: Boolean(isManagerOrAdmin)
   });
 
+  const availableInvoices = useMemo(() => {
+    let rows = (invoices || []).filter((row) => !row.is_settled);
+
+    if (user?.role === "sales_rep") {
+      rows = rows.filter((row) => !row.sales_rep_id || row.sales_rep_id !== user.id);
+    }
+
+    return rows;
+  }, [invoices, user?.id, user?.role]);
+
   const invoiceOptions = useMemo(
     () =>
-      (invoices || [])
-        .filter((row) => !row.is_settled)
-        .map((row) => ({
-          value: row.id,
-          label: `#${row.invoice_number} · ${row.customer_name}`,
-          subLabel: `Amount ${formatCurrency(row.total_amount)} · Due ${new Date(row.due_date).toLocaleDateString()}`,
-          meta: row.sales_rep_name || "Unassigned"
-        })),
-    [invoices]
+      availableInvoices.map((row) => ({
+        value: row.id,
+        label: `#${row.invoice_number} · ${row.customer_name}`,
+        subLabel: `Amount ${formatCurrency(row.total_amount)} · Due ${new Date(row.due_date).toLocaleDateString()}`,
+        meta: row.sales_rep_name || "Unassigned"
+      })),
+    [availableInvoices]
   );
 
   const selectedInvoiceId = watch("invoice_id");
   const selectedInvoice = useMemo(
-    () => (invoices || []).find((row) => row.id === selectedInvoiceId) || null,
-    [invoices, selectedInvoiceId]
+    () => availableInvoices.find((row) => row.id === selectedInvoiceId) || null,
+    [availableInvoices, selectedInvoiceId]
   );
 
   useEffect(() => {

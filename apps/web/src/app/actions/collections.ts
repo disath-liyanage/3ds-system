@@ -169,7 +169,10 @@ export async function listCollectionInvoices(): Promise<{ success: boolean; data
   }));
 
   if (!canViewAllCollections(access.profile)) {
-    rows = rows.filter((row) => row.sales_rep_id === access.profile.id);
+    rows = rows.filter((row) => {
+      if (row.sales_rep_id === access.profile.id) return true;
+      return !row.is_settled && !row.sales_rep_id;
+    });
   }
 
   const repIds = Array.from(new Set(rows.map((row) => row.sales_rep_id).filter(Boolean))) as string[];
