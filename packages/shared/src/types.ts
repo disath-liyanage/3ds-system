@@ -93,11 +93,27 @@ export interface Collection {
   id: string;
   collection_number: number;
   customer_id: string;
+  invoice_id?: string | null;
   collected_by: string;
+  sales_rep_id?: string | null;
   amount: number;
+  incentive_total?: number;
   validated_by: string | null;
   status: "pending" | "validated" | "rejected";
   notes: string | null;
+  created_at: string;
+}
+
+export interface CollectionIncentive {
+  id: string;
+  collection_id: string;
+  sales_rep_id: string;
+  invoice_id: string;
+  invoice_item_id: string;
+  product_id: string;
+  qty: number;
+  rate: number;
+  amount: number;
   created_at: string;
 }
 
@@ -109,6 +125,9 @@ export interface Invoice {
   issued_by: string;
   total_amount: number;
   status: "draft" | "pending_approval" | "approved" | "rejected" | "issued" | "paid";
+  is_settled?: boolean;
+  settled_at?: string | null;
+  settled_by?: string | null;
   created_at: string;
 }
 

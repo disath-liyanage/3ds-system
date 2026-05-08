@@ -258,6 +258,43 @@ end;
 $$;
 
 drop trigger if exists trg_orders_set_updated_at on public.orders;
+
+-- Collections enhancements for settlement + incentives
+alter table if exists public.customers
+  add column if not exists status text not null default 'active' check (status in ('pending_approval', 'active', 'rejected')),
+  add column if not exists created_by uuid references public.users_profile (id),
+  add column if not exists sales_rep_id uuid references public.users_profile (id),
+  add column if not exists approved_by uuid references public.users_profile (id),
+  add column if not exists approved_at timestamptz;
+
+alter table if exists public.invoices
+  add column if not exists is_settled boolean not null default false,
+  add column if not exists settled_at timestamptz,
+  add column if not exists settled_by uuid references public.users_profile (id);
+
+alter table if exists public.collections
+  add column if not exists invoice_id uuid references public.invoices (id),
+  add column if not exists sales_rep_id uuid references public.users_profile (id),
+  add column if not exists incentive_total numeric(12, 2) not null default 0 check (incentive_total >= 0);
+
+create table if not exists public.collection_incentives (
+  id uuid primary key default gen_random_uuid(),
+  collection_id uuid not null references public.collections (id) on delete cascade,
+  sales_rep_id uuid not null references public.users_profile (id),
+  invoice_id uuid not null references public.invoices (id),
+  invoice_item_id uuid not null references public.invoice_items (id),
+  product_id uuid not null references public.products (id),
+  qty numeric(12, 2) not null check (qty >= 0),
+  rate numeric(12, 2) not null default 0 check (rate >= 0),
+  amount numeric(12, 2) not null default 0 check (amount >= 0),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_invoices_is_settled on public.invoices (is_settled);
+create index if not exists idx_collections_invoice_id on public.collections (invoice_id);
+create index if not exists idx_collections_sales_rep_id on public.collections (sales_rep_id);
+create index if not exists idx_collection_incentives_collection_id on public.collection_incentives (collection_id);
+create index if not exists idx_collection_incentives_sales_rep_id on public.collection_incentives (sales_rep_id);
 create trigger trg_orders_set_updated_at
 before update on public.orders
 for each row

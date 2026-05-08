@@ -99,11 +99,27 @@ export const collectionSchema = z.object({
   id: z.string().uuid(),
   collection_number: z.number().int(),
   customer_id: z.string().uuid(),
+  invoice_id: z.string().uuid().nullable().optional(),
   collected_by: z.string().uuid(),
+  sales_rep_id: z.string().uuid().nullable().optional(),
   amount: z.number(),
+  incentive_total: z.number().optional(),
   validated_by: z.string().uuid().nullable(),
   status: collectionStatusSchema,
   notes: z.string().nullable(),
+  created_at: z.string()
+});
+
+export const collectionIncentiveSchema = z.object({
+  id: z.string().uuid(),
+  collection_id: z.string().uuid(),
+  sales_rep_id: z.string().uuid(),
+  invoice_id: z.string().uuid(),
+  invoice_item_id: z.string().uuid(),
+  product_id: z.string().uuid(),
+  qty: z.number(),
+  rate: z.number(),
+  amount: z.number(),
   created_at: z.string()
 });
 
@@ -117,6 +133,9 @@ export const invoiceSchema = z.object({
   issued_by: z.string().uuid(),
   total_amount: z.number(),
   status: invoiceStatusSchema,
+  is_settled: z.boolean().optional(),
+  settled_at: z.string().nullable().optional(),
+  settled_by: z.string().uuid().nullable().optional(),
   created_at: z.string()
 });
 
@@ -165,6 +184,7 @@ export type ProductSchemaType = z.infer<typeof productSchema>;
 export type OrderSchemaType = z.infer<typeof orderSchema>;
 export type OrderItemSchemaType = z.infer<typeof orderItemSchema>;
 export type CollectionSchemaType = z.infer<typeof collectionSchema>;
+export type CollectionIncentiveSchemaType = z.infer<typeof collectionIncentiveSchema>;
 export type InvoiceSchemaType = z.infer<typeof invoiceSchema>;
 export type ReceiveNoteSchemaType = z.infer<typeof receiveNoteSchema>;
 export type ReceiveNoteItemSchemaType = z.infer<typeof receiveNoteItemSchema>;
