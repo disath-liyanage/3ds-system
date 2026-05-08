@@ -1,6 +1,6 @@
 create extension if not exists pgcrypto;
 
-create type public.app_role as enum ('admin', 'manager', 'sales_rep', 'cashier');
+create type public.app_role as enum ('admin', 'manager', 'sales_rep', 'cashier', 'driver');
 create type public.order_status as enum ('pending', 'reviewing', 'approved', 'rejected', 'invoiced');
 create type public.collection_status as enum ('pending', 'validated', 'rejected');
 create type public.invoice_status as enum ('draft', 'pending_approval', 'approved', 'rejected', 'issued', 'paid');
@@ -38,6 +38,13 @@ create table if not exists public.suppliers (
   created_by uuid references public.users_profile (id),
   created_at timestamptz not null default now()
 );
+
+do $$
+begin
+  alter type public.app_role add value if not exists 'driver';
+exception
+  when duplicate_object then null;
+end $$;
 
 create table if not exists public.products (
   id uuid primary key default gen_random_uuid(),

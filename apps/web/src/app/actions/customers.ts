@@ -87,6 +87,21 @@ export async function getSalesReps(): Promise<{ id: string; full_name: string }[
   return data || [];
 }
 
+export async function getCollectionRecipients(): Promise<{ id: string; full_name: string; role: UserRole }[]> {
+  const { data, error } = await adminClient
+    .from("users_profile")
+    .select("id, full_name, role")
+    .in("role", ["sales_rep", "driver"])
+    .order("full_name");
+
+  if (error) {
+    console.error("Failed to fetch collection recipients:", error);
+    return [];
+  }
+
+  return (data || []) as { id: string; full_name: string; role: UserRole }[];
+}
+
 export async function createCustomer(input: CreateCustomerInput): Promise<ActionResult> {
   const access = await getCurrentUserProfile();
   if ("error" in access) return { success: false, error: access.error };

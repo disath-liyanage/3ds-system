@@ -152,7 +152,9 @@ export default function CollectionsPage() {
         </div>
         {canRecordCollections ? (
           <Button asChild>
-            <Link href="/collections/new">Record Outside Collection</Link>
+            <Link href="/collections/new">
+              {isManagerOrAdmin ? "Record Collection" : "Record Outside Collection"}
+            </Link>
           </Button>
         ) : null}
       </div>

@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 
 import { recordCollection } from "@/app/actions/collections";
-import { getSalesReps } from "@/app/actions/customers";
+import { getCollectionRecipients } from "@/app/actions/customers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Select } from "@/components/ui/select";
 import { useCollectionInvoices } from "@/hooks/useCollectionInvoices";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { toast } from "@/lib/toast";
@@ -21,6 +22,8 @@ type NewCollectionForm = {
   notes: string;
   incentive_recipient_id: string;
 };
+
+type RecipientRole = "sales_rep" | "driver";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-LK", { style: "currency", currency: "LKR", maximumFractionDigits: 2 }).format(value);
@@ -41,10 +44,11 @@ export default function NewCollectionPage() {
   });
 
   const isManagerOrAdmin = user?.role === "admin" || user?.role === "manager";
+  const [recipientRole, setRecipientRole] = useState<RecipientRole>("sales_rep");
 
-  const salesRepsQuery = useQuery({
-    queryKey: ["sales-reps"],
-    queryFn: async () => await getSalesReps(),
+  const recipientsQuery = useQuery({
+    queryKey: ["collection-recipients"],
+    queryFn: async () => await getCollectionRecipients(),
     enabled: Boolean(isManagerOrAdmin)
   });
 
@@ -79,18 +83,19 @@ export default function NewCollectionPage() {
     if (!selectedInvoice) return;
     setValue("amount", Number(selectedInvoice.total_amount));
     if (isManagerOrAdmin) {
-      setValue("incentive_recipient_id", selectedInvoice.sales_rep_id || "");
+      if (recipientRole === "sales_rep") {
+        setValue("incentive_recipient_id", selectedInvoice.sales_rep_id || "");
+      }
     }
-  }, [selectedInvoice, isManagerOrAdmin, setValue]);
+  }, [selectedInvoice, isManagerOrAdmin, recipientRole, setValue]);
 
-  const salesRepOptions = useMemo(
-    () =>
-      (salesRepsQuery.data || []).map((rep) => ({
-        value: rep.id,
-        label: rep.full_name
-      })),
-    [salesRepsQuery.data]
-  );
+  const recipientOptions = useMemo(() => {
+    const rows = (recipientsQuery.data || []).filter((recipient) => recipient.role === recipientRole);
+    return rows.map((recipient) => ({
+      value: recipient.id,
+      label: recipient.full_name
+    }));
+  }, [recipientsQuery.data, recipientRole]);
 
   const onSubmit = async (values: NewCollectionForm) => {
     const result = await recordCollection({
@@ -153,14 +158,31 @@ export default function NewCollectionPage() {
               <Input type="number" step="0.01" {...register("amount", { valueAsNumber: true })} />
             </div>
             {isManagerOrAdmin ? (
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Incentive recipient</label>
-                <SearchableSelect
-                  value={watch("incentive_recipient_id")}
-                  options={salesRepOptions}
-                  placeholder="Select sales rep"
-                  onChange={(value) => setValue("incentive_recipient_id", value)}
-                />
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Recipient role</label>
+                  <Select
+                    options={[
+                      { value: "sales_rep", label: "Sales rep" },
+                      { value: "driver", label: "Driver" }
+                    ]}
+                    value={recipientRole}
+                    onChange={(event) => {
+                      const nextRole = event.target.value as RecipientRole;
+                      setRecipientRole(nextRole);
+                      setValue("incentive_recipient_id", "");
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Incentive recipient</label>
+                  <SearchableSelect
+                    value={watch("incentive_recipient_id")}
+                    options={recipientOptions}
+                    placeholder={recipientRole === "driver" ? "Select driver" : "Select sales rep"}
+                    onChange={(value) => setValue("incentive_recipient_id", value)}
+                  />
+                </div>
               </div>
             ) : null}
             <div className="space-y-1">
