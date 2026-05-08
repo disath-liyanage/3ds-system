@@ -1,8 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { ChevronRight } from "lucide-react";
+import { DayPicker, type DateRange } from "react-day-picker";
+
+import "react-day-picker/dist/style.css";
 
 import { getSalesReps } from "@/app/actions/customers";
 import { Badge } from "@/components/ui/badge";
@@ -28,10 +33,13 @@ export default function CollectionsPage() {
   const { permissions, isLoading, user } = useCurrentUserPermissions();
   const { data: invoices, isLoading: isInvoicesLoading, error } = useCollectionInvoices();
 
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const datePickerRef = useRef<HTMLDivElement>(null);
+  const [customerSearch, setCustomerSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("unsettled");
   const [salesRepFilter, setSalesRepFilter] = useState("all");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
 
   const canRecordCollections = permissions?.canRecordCollections ?? false;
   const canViewCollections = permissions
@@ -59,6 +67,13 @@ export default function CollectionsPage() {
   const filteredInvoices = useMemo(() => {
     let rows = invoices ?? [];
 
+    if (customerSearch) {
+      const lowerSearch = customerSearch.toLowerCase();
+      rows = rows.filter((row) =>
+        `${row.customer_name} ${row.invoice_number}`.toLowerCase().includes(lowerSearch)
+      );
+    }
+
     if (statusFilter === "settled") {
       rows = rows.filter((row) => row.is_settled);
     }
@@ -70,19 +85,54 @@ export default function CollectionsPage() {
       rows = rows.filter((row) => row.sales_rep_id === salesRepFilter);
     }
 
-    if (fromDate) {
-      const from = new Date(fromDate);
-      rows = rows.filter((row) => new Date(row.created_at) >= from);
+    if (dateRange?.from) {
+      const start = new Date(dateRange.from).getTime();
+      rows = rows.filter((row) => new Date(row.created_at).getTime() >= start);
     }
 
-    if (toDate) {
-      const end = new Date(toDate);
+    if (dateRange?.to) {
+      const end = new Date(dateRange.to);
       end.setHours(23, 59, 59, 999);
-      rows = rows.filter((row) => new Date(row.created_at) <= end);
+      rows = rows.filter((row) => new Date(row.created_at).getTime() <= end.getTime());
     }
 
     return rows;
-  }, [invoices, statusFilter, salesRepFilter, fromDate, toDate]);
+  }, [invoices, customerSearch, statusFilter, salesRepFilter, dateRange]);
+
+  const hasFilters =
+    customerSearch !== "" ||
+    Boolean(dateRange?.from) ||
+    Boolean(dateRange?.to) ||
+    statusFilter !== "unsettled" ||
+    salesRepFilter !== "all";
+
+  const handleResetFilters = () => {
+    setCustomerSearch("");
+    setDateRange(undefined);
+    setStatusFilter("unsettled");
+    setSalesRepFilter("all");
+  };
+
+  const dateRangeLabel = useMemo(() => {
+    if (dateRange?.from && dateRange?.to) {
+      return `${format(dateRange.from, "MMM dd, yyyy")} - ${format(dateRange.to, "MMM dd, yyyy")}`;
+    }
+    if (dateRange?.from) {
+      return `${format(dateRange.from, "MMM dd, yyyy")} - ...`;
+    }
+    return "Select date range";
+  }, [dateRange]);
+
+  useEffect(() => {
+    if (!isDatePickerOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!datePickerRef.current || datePickerRef.current.contains(event.target as Node)) return;
+      setIsDatePickerOpen(false);
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isDatePickerOpen]);
 
   const toggleSettled = () => {
     setStatusFilter((prev) => (prev === "settled" ? "unsettled" : "settled"));
@@ -111,38 +161,79 @@ export default function CollectionsPage() {
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-end gap-3 rounded-md border border-border bg-white p-4">
-        <div className="min-w-[180px] space-y-1">
-          <label className="text-xs font-semibold text-muted-foreground">Status</label>
-          <Select
-            options={statusOptions}
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
-          />
-        </div>
-        <div className="min-w-[160px] space-y-1">
-          <label className="text-xs font-semibold text-muted-foreground">From</label>
-          <Input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
-        </div>
-        <div className="min-w-[160px] space-y-1">
-          <label className="text-xs font-semibold text-muted-foreground">To</label>
-          <Input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
-        </div>
-        {isManagerOrAdmin ? (
-          <div className="min-w-[200px] space-y-1">
-            <label className="text-xs font-semibold text-muted-foreground">Sales rep</label>
-            <Select
-              options={salesRepOptions}
-              value={salesRepFilter}
-              onChange={(event) => setSalesRepFilter(event.target.value)}
+      <div className="flex flex-col gap-3 rounded-md border border-border bg-white p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-1 items-center gap-3">
+            <Input
+              placeholder="Search customer or invoice #..."
+              value={customerSearch}
+              onChange={(event) => setCustomerSearch(event.target.value)}
+              className="lg:max-w-md"
             />
+            {hasFilters ? <span className="text-xs text-muted-foreground">Filters active</span> : null}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="ghost" onClick={() => setFiltersOpen((prev) => !prev)}>
+              <span className="flex items-center gap-2">
+                <ChevronRight
+                  className={
+                    filtersOpen
+                      ? "h-4 w-4 rotate-90 transition-transform"
+                      : "h-4 w-4 rotate-0 transition-transform"
+                  }
+                />
+                {filtersOpen ? "Hide filters" : "Show filters"}
+              </span>
+            </Button>
+            <Button
+              variant={hasFilters ? "default" : "outline"}
+              size="sm"
+              onClick={handleResetFilters}
+              disabled={!hasFilters}
+            >
+              Reset
+            </Button>
+            <Button type="button" variant="outline" onClick={toggleSettled}>
+              {statusFilter === "settled" ? "Show Unsettled" : "Show Settled"}
+            </Button>
+          </div>
+        </div>
+
+        {filtersOpen ? (
+          <div className="grid grid-cols-1 gap-4 rounded-md border border-border bg-muted/30 p-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Status</label>
+              <Select
+                options={statusOptions}
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Date range</label>
+              <div className="relative" ref={datePickerRef}>
+                <Button type="button" variant="outline" onClick={() => setIsDatePickerOpen((prev) => !prev)}>
+                  {dateRangeLabel}
+                </Button>
+                {isDatePickerOpen ? (
+                  <div className="absolute left-0 top-12 z-20 rounded-md border border-border bg-white p-2 shadow-lg">
+                    <DayPicker mode="range" selected={dateRange} onSelect={setDateRange} numberOfMonths={2} />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            {isManagerOrAdmin ? (
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted-foreground">Sales rep</label>
+                <Select
+                  options={salesRepOptions}
+                  value={salesRepFilter}
+                  onChange={(event) => setSalesRepFilter(event.target.value)}
+                />
+              </div>
+            ) : null}
           </div>
         ) : null}
-        <div className="ml-auto flex items-center gap-2">
-          <Button type="button" variant="outline" onClick={toggleSettled}>
-            {statusFilter === "settled" ? "Show Unsettled" : "Show Settled"}
-          </Button>
-        </div>
       </div>
 
       <Table>
