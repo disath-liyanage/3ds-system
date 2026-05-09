@@ -34,6 +34,7 @@ const baseRoleOptions = [
   { value: "manager", label: "Manager" },
   { value: "cashier", label: "Cashier" },
   { value: "sales_rep", label: "Sales Representative" },
+  { value: "driver", label: "Driver" },
   { value: "custom", label: "Custom" }
 ] as const;
 

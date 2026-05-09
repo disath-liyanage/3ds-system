@@ -38,6 +38,10 @@ function getRoleBadgeMeta(user: AdminUserRow) {
     return { label: "Sales Rep", className: "bg-blue-100 text-blue-700" };
   }
 
+  if (user.role === "driver") {
+    return { label: "Driver", className: "bg-amber-100 text-amber-700" };
+  }
+
   return {
     label: user.custom_role?.name ? `Custom: ${user.custom_role.name}` : "Custom",
     className: "bg-slate-200 text-slate-700"

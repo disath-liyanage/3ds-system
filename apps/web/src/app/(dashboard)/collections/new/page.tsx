@@ -195,9 +195,13 @@ export default function NewCollectionPage() {
                           ? "Select driver"
                           : "Select sales rep"
                     }
-                    disabled={recipientOptions.length === 0}
                     onChange={(value) => setValue("incentive_recipient_id", value)}
                   />
+                  {recipientOptions.length === 0 ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      No {recipientRole === "driver" ? "drivers" : "sales reps"} found.
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ) : null}

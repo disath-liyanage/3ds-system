@@ -88,18 +88,31 @@ export async function getSalesReps(): Promise<{ id: string; full_name: string }[
 }
 
 export async function getCollectionRecipients(): Promise<{ id: string; full_name: string; role: UserRole }[]> {
-  const { data, error } = await adminClient
+  const { data: salesReps, error: salesError } = await adminClient
     .from("users_profile")
     .select("id, full_name, role")
-    .in("role", ["sales_rep", "driver"])
+    .eq("role", "sales_rep")
     .order("full_name");
 
-  if (error) {
-    console.error("Failed to fetch collection recipients:", error);
-    return [];
+  if (salesError) {
+    console.error("Failed to fetch sales reps:", salesError);
   }
 
-  return (data || []) as { id: string; full_name: string; role: UserRole }[];
+  let drivers: { id: string; full_name: string; role: UserRole }[] = [];
+  const { data: driverRows, error: driverError } = await adminClient
+    .from("users_profile")
+    .select("id, full_name, role")
+    .eq("role", "driver")
+    .order("full_name");
+
+  if (driverError) {
+    console.error("Failed to fetch drivers:", driverError);
+  } else {
+    drivers = (driverRows || []) as { id: string; full_name: string; role: UserRole }[];
+  }
+
+  const recipients = [...(salesReps || []), ...drivers] as { id: string; full_name: string; role: UserRole }[];
+  return recipients;
 }
 
 export async function createCustomer(input: CreateCustomerInput): Promise<ActionResult> {
