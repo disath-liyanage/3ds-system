@@ -1,6 +1,7 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 
 import type { ReceiveNote } from "@paintdist/shared";
+import { formatDate } from "@/lib/utils";
 
 export type ReceiveNotePdfItem = {
   description: string;
@@ -43,7 +44,7 @@ export function ReceiveNoteTemplate({ receiveNote, items, companyName }: Receive
         <Text style={styles.title}>{companyName}</Text>
         <Text style={styles.subTitle}>Receive Note #{receiveNote.rn_number}</Text>
         <Text style={styles.subTitle}>Supplier: {receiveNote.supplier_name}</Text>
-        <Text style={styles.subTitle}>Date: {new Date(receiveNote.created_at).toLocaleDateString()}</Text>
+        <Text style={styles.subTitle}>Date: {formatDate(receiveNote.created_at)}</Text>
 
         <View style={styles.tableHeader}>
           <Text style={styles.colDesc}>Description</Text>

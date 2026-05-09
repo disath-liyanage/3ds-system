@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useProducts } from "@/hooks/useProducts";
 import { useProductStockByPrice } from "@/hooks/useProductStockByPrice";
+import { formatDate } from "@/lib/utils";
 
 function toNumber(value: number | string | null | undefined): number {
   const parsed = typeof value === "number" ? value : Number(value ?? 0);
@@ -160,7 +161,7 @@ export default function ProductStockDetailPage() {
                     <TableCell>{formatQuantity(row.free_qty)}</TableCell>
                     <TableCell className="font-medium">{formatQuantity(row.total_qty)}</TableCell>
                     <TableCell>
-                      {row.last_received_at ? new Date(row.last_received_at).toLocaleDateString() : "-"}
+                      {row.last_received_at ? formatDate(row.last_received_at) : "-"}
                     </TableCell>
                   </TableRow>
                 ))}

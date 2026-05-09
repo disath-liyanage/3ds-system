@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useReceiveNotes } from "@/hooks/useReceiveNotes";
 import { toast } from "@/lib/toast";
+import { formatDate } from "@/lib/utils";
 
 import { useRouter } from "next/navigation";
 
@@ -100,7 +101,7 @@ export default function ReceiveNotesPage() {
                 <TableCell>{row.rn_number}</TableCell>
                 <TableCell>{row.invoice_number}</TableCell>
                 <TableCell>{row.supplier_name}</TableCell>
-                <TableCell>{new Date(row.created_at).toLocaleDateString()}</TableCell>
+                <TableCell>{formatDate(row.created_at)}</TableCell>
               </TableRow>
             ))
           )}

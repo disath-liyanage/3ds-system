@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePermissions } from "@/hooks/usePermissions";
 import { toast } from "@/lib/toast";
+import { formatDate } from "@/lib/utils";
 
 import { AddUserDialog } from "./AddUserDialog";
 import { EditUserDialog } from "./EditUserDialog";
@@ -170,7 +171,7 @@ export function UsersTableClient({ users, customRoles, currentUser }: UsersTable
                     {user.is_active ? "Active" : "Inactive"}
                   </Badge>
                 </TableCell>
-                <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                <TableCell>{formatDate(user.created_at)}</TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-2">
                     <Button

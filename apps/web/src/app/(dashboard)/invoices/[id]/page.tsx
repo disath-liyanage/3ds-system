@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useInvoice } from "@/hooks/useInvoice";
 import { toast } from "@/lib/toast";
+import { formatDate } from "@/lib/utils";
 
 export default function InvoiceDetailsPage() {
   const router = useRouter();
@@ -165,7 +166,7 @@ export default function InvoiceDetailsPage() {
             <h2 className="text-3xl font-bold text-primary mb-2">INVOICE</h2>
             <div className="text-sm text-muted-foreground">
               <p>Invoice #: {invoice.invoice_number}</p>
-              <p>Date: {new Date(invoice.created_at).toLocaleDateString()}</p>
+              <p>Date: {formatDate(invoice.created_at)}</p>
               <p className="capitalize">Payment Method: {invoice.payment_method}</p>
             </div>
           </div>

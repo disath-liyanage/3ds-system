@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useInvoices } from "@/hooks/useInvoices";
+import { formatDate } from "@/lib/utils";
 
 export default function InvoicesPage() {
   const { permissions, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
@@ -370,7 +371,7 @@ export default function InvoicesPage() {
                 }
               >
                 <TableCell className="font-medium">{row.invoice_number}</TableCell>
-                <TableCell>{new Date(row.created_at).toLocaleDateString()}</TableCell>
+                <TableCell>{formatDate(row.created_at)}</TableCell>
                 <TableCell>{row.customer_name}</TableCell>
                 <TableCell className="capitalize">{row.payment_method}</TableCell>
                 <TableCell>LKR {row.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>

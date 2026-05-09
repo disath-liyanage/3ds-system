@@ -11,6 +11,7 @@ import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useProducts } from "@/hooks/useProducts";
 import { useReceiveNote } from "@/hooks/useReceiveNote";
 import { toast } from "@/lib/toast";
+import { formatDate } from "@/lib/utils";
 
 export default function ViewReceiveNotePage() {
   const router = useRouter();
@@ -106,7 +107,7 @@ export default function ViewReceiveNotePage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium">Date Received:</span>
-            <span>{new Date(receiveNote.created_at).toLocaleDateString()}</span>
+            <span>{formatDate(receiveNote.created_at)}</span>
           </div>
           {receiveNote.notes && (
             <div className="flex flex-wrap items-center gap-2">

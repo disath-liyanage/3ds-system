@@ -1,6 +1,7 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 
 import type { Invoice } from "@paintdist/shared";
+import { formatDate } from "@/lib/utils";
 
 export type InvoicePdfItem = {
   description: string;
@@ -54,7 +55,7 @@ export function InvoiceTemplate({ invoice, items, companyName }: InvoiceTemplate
 
         <View style={styles.row}>
           <Text>Customer ID: {invoice.customer_id}</Text>
-          <Text>Date: {new Date(invoice.created_at).toLocaleDateString()}</Text>
+          <Text>Date: {formatDate(invoice.created_at)}</Text>
         </View>
 
         <View style={styles.tableHeader}>

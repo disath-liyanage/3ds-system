@@ -17,6 +17,7 @@ import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCollectionInvoices } from "@/hooks/useCollectionInvoices";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
+import { formatDate } from "@/lib/utils";
 
 type StatusFilter = "unsettled" | "settled" | "all";
 
@@ -269,14 +270,14 @@ export default function CollectionsPage() {
                 <TableCell>{row.invoice_number}</TableCell>
                 <TableCell>{row.customer_name}</TableCell>
                 <TableCell>{formatCurrency(row.total_amount)}</TableCell>
-                <TableCell>{new Date(row.due_date).toLocaleDateString()}</TableCell>
+                <TableCell>{formatDate(row.due_date)}</TableCell>
                 <TableCell>{row.sales_rep_name || "Unassigned"}</TableCell>
                 <TableCell>
                   <Badge variant={row.is_settled ? "success" : "warning"}>
                     {row.is_settled ? "settled" : "unsettled"}
                   </Badge>
                 </TableCell>
-                <TableCell>{row.settled_at ? new Date(row.settled_at).toLocaleDateString() : "-"}</TableCell>
+                <TableCell>{row.settled_at ? formatDate(row.settled_at) : "-"}</TableCell>
                 <TableCell>
                   {!row.is_settled && canRecordCollections ? (
                     <Button asChild size="sm">

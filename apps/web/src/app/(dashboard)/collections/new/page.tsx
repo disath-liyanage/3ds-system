@@ -15,6 +15,7 @@ import { Select } from "@/components/ui/select";
 import { useCollectionInvoices } from "@/hooks/useCollectionInvoices";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { toast } from "@/lib/toast";
+import { formatDate } from "@/lib/utils";
 
 type NewCollectionForm = {
   invoice_id: string;
@@ -67,7 +68,7 @@ export default function NewCollectionPage() {
       availableInvoices.map((row) => ({
         value: row.id,
         label: `#${row.invoice_number} · ${row.customer_name}`,
-        subLabel: `Amount ${formatCurrency(row.total_amount)} · Due ${new Date(row.due_date).toLocaleDateString()}`,
+        subLabel: `Amount ${formatCurrency(row.total_amount)} · Due ${formatDate(row.due_date)}`,
         meta: row.sales_rep_name || "Unassigned"
       })),
     [availableInvoices]
@@ -161,7 +162,7 @@ export default function NewCollectionPage() {
             </div>
             {selectedInvoice ? (
               <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                Assigned rep: {selectedInvoice.sales_rep_name || "Unassigned"} · Due {new Date(selectedInvoice.due_date).toLocaleDateString()}
+                Assigned rep: {selectedInvoice.sales_rep_name || "Unassigned"} · Due {formatDate(selectedInvoice.due_date)}
               </div>
             ) : null}
             <div className="space-y-1">
