@@ -1,6 +1,7 @@
 "use client";
 
 import type { User } from "@paintdist/shared";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -144,7 +145,12 @@ export function UsersTableClient({ users, customRoles, workers, currentUser }: U
           <p className="text-sm text-muted-foreground">Create users, assign roles, and control account access.</p>
         </div>
         {permissions.canManageUsers ? (
-          <Button onClick={() => setIsAddDialogOpen(true)}>Add User</Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline">
+              <Link href="/admin/roles">Define Role</Link>
+            </Button>
+            <Button onClick={() => setIsAddDialogOpen(true)}>Add User</Button>
+          </div>
         ) : null}
       </div>
 
@@ -154,7 +160,6 @@ export function UsersTableClient({ users, customRoles, workers, currentUser }: U
             <TableHead>Name</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Role</TableHead>
-            <TableHead>Worker</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Created</TableHead>
             <TableHead>Actions</TableHead>
@@ -173,7 +178,6 @@ export function UsersTableClient({ users, customRoles, workers, currentUser }: U
                 <TableCell>
                   <Badge className={roleMeta.className}>{roleMeta.label}</Badge>
                 </TableCell>
-                <TableCell>{user.worker ? `${user.worker.name} (${user.worker.identity_card_no})` : "-"}</TableCell>
                 <TableCell>
                   <Badge variant={user.is_active ? "success" : "danger"}>
                     {user.is_active ? "Active" : "Inactive"}

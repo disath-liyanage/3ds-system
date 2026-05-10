@@ -25,7 +25,7 @@ type AddUserFormState = {
   email: string;
   password: string;
   phone: string;
-  role: UserRoleOption;
+  role: UserRoleOption | "";
   custom_role_id: string;
   worker_id: string;
 };
@@ -44,7 +44,7 @@ const initialState: AddUserFormState = {
   email: "",
   password: "",
   phone: "",
-  role: "sales_rep",
+  role: "",
   custom_role_id: "",
   worker_id: ""
 };
@@ -84,6 +84,12 @@ export function AddUserDialog({ open, onOpenChange, customRoles, workers, usedWo
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitError(null);
+
+    if (!form.role) {
+      setSubmitError("Please select a role");
+      return;
+    }
+
     setIsSubmitting(true);
 
     const result = await createUser({
@@ -180,6 +186,7 @@ export function AddUserDialog({ open, onOpenChange, customRoles, workers, usedWo
           </label>
           <SearchableSelect
             id="add-user-role"
+            required
             value={form.role}
             placeholder="Select role"
             options={roleOptions.map((option) => ({ value: option.value, label: option.label }))}

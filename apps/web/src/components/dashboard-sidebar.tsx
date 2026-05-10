@@ -10,7 +10,6 @@ import {
   LogOut,
   Package,
   ReceiptText,
-  ShieldCheck,
   Users
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -44,8 +43,7 @@ const baseNavItems: SidebarItem[] = [
 
 const adminNavItems: SidebarItem[] = [
   { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/workers", label: "Workers", icon: Users },
-  { href: "/admin/roles", label: "Roles", icon: ShieldCheck }
+  { href: "/admin/workers", label: "Workers", icon: Users }
 ];
 
 export function DashboardSidebar({ isAdmin, user }: DashboardSidebarProps) {

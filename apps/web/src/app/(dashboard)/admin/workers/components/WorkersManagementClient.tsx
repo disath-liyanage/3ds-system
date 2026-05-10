@@ -23,14 +23,14 @@ type WorkersManagementClientProps = {
 type WorkerFormState = {
   name: string;
   identity_card_no: string;
-  salary_type: "daily" | "monthly_basic";
+  salary_type: "daily" | "monthly_basic" | "";
   salary_amount: string;
 };
 
 const initialFormState: WorkerFormState = {
   name: "",
   identity_card_no: "",
-  salary_type: "daily",
+  salary_type: "",
   salary_amount: ""
 };
 
@@ -116,6 +116,10 @@ export function WorkersManagementClient({ workers, currentUser }: WorkersManagem
     setSubmitError(null);
 
     const parsedSalary = Number(form.salary_amount);
+    if (!form.salary_type) {
+      setSubmitError("Please select salary type");
+      return;
+    }
     if (!Number.isFinite(parsedSalary) || parsedSalary < 0) {
       setSubmitError("Salary amount must be a valid non-negative number");
       return;
@@ -257,6 +261,7 @@ export function WorkersManagementClient({ workers, currentUser }: WorkersManagem
             </label>
             <SearchableSelect
               id="worker-salary-type"
+              required
               value={form.salary_type}
               placeholder="Select salary type"
               options={[
