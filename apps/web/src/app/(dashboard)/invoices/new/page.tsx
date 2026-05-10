@@ -97,18 +97,52 @@ export default function NewInvoicePage() {
   const isAdminOrManager = user?.role === "admin" || user?.role === "manager";
 
   const { data: stockByPrice, isLoading: isStockLoading } = useProductStockByPrice(watchedDraft?.product_id);
+  const selectedProduct = useMemo(
+    () => (products ?? []).find((product) => product.id === watchedDraft?.product_id),
+    [products, watchedDraft?.product_id]
+  );
 
   const availableQty = useMemo(() => {
     if (!watchedDraft?.product_id) return null;
+    if (isAdminOrManager) return Number(selectedProduct?.stock_qty) || 0;
     if (isStockLoading || !stockByPrice || stockByPrice.length === 0) return 0;
-    
-    if (watchedDraft.unit_price !== undefined) {
-      const bucket = stockByPrice.find((b) => b.selling_price === watchedDraft.unit_price);
-      return bucket ? bucket.total_qty : 0;
+
+    const selectedPrice = Number(watchedDraft.unit_price);
+    const hasSelectedPrice = watchedDraft.unit_price !== undefined && Number.isFinite(selectedPrice);
+    const samePrice = (a: number, b: number) => Math.abs(a - b) < 0.0001;
+
+    if (hasSelectedPrice) {
+      const bucket = stockByPrice.find((b) => samePrice(Number(b.selling_price), selectedPrice));
+      const bucketTotal = bucket ? Number(bucket.total_qty) || 0 : 0;
+
+      const allocatedToSameBucket = (watchedItems ?? []).reduce((sum, item, index) => {
+        if (editingIndex !== null && index === editingIndex) return sum;
+        if (item.product_id !== watchedDraft.product_id) return sum;
+        if (!samePrice(Number(item.unit_price), selectedPrice)) return sum;
+        return sum + (Number(item.qty) || 0) + (Number(item.free_qty) || 0);
+      }, 0);
+
+      return Math.max(0, bucketTotal - allocatedToSameBucket);
     }
-    
-    return stockByPrice.reduce((sum, b) => sum + b.total_qty, 0);
-  }, [stockByPrice, watchedDraft?.product_id, watchedDraft?.unit_price, isStockLoading]);
+
+    const totalByProduct = stockByPrice.reduce((sum, b) => sum + (Number(b.total_qty) || 0), 0);
+    const allocatedToProduct = (watchedItems ?? []).reduce((sum, item, index) => {
+      if (editingIndex !== null && index === editingIndex) return sum;
+      if (item.product_id !== watchedDraft.product_id) return sum;
+      return sum + (Number(item.qty) || 0) + (Number(item.free_qty) || 0);
+    }, 0);
+
+    return Math.max(0, totalByProduct - allocatedToProduct);
+  }, [
+    editingIndex,
+    isAdminOrManager,
+    isStockLoading,
+    selectedProduct?.stock_qty,
+    stockByPrice,
+    watchedDraft?.product_id,
+    watchedDraft?.unit_price,
+    watchedItems
+  ]);
 
   const discountTypeOptions = useMemo(
     () => [
@@ -459,6 +493,13 @@ export default function NewInvoicePage() {
 
     if (discountPerUnit > draftPrice) {
       window.alert("Discount cannot exceed the unit price.");
+      return;
+    }
+
+    const requestedTotalQty = draftQty + draftFreeQty;
+    const effectiveAvailableQty = availableQty ?? 0;
+    if (requestedTotalQty > effectiveAvailableQty) {
+      window.alert(`No stock available for requested quantity. Available: ${effectiveAvailableQty}`);
       return;
     }
 

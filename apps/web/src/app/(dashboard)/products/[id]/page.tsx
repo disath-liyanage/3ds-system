@@ -124,7 +124,7 @@ export default function ProductStockDetailPage() {
               <span>{product.unit}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">Total stock:</span>
+              <span className="font-medium">Available Stock:</span>
               <span>{formatQuantity(product.stock_qty)}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
