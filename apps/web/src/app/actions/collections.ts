@@ -326,8 +326,8 @@ export async function recordCollection(input: RecordCollectionInput): Promise<Ac
   }
 
   const totalAmount = Number(invoice.total_amount);
-  if (Math.abs(amount - totalAmount) > 0.01) {
-    return { success: false, error: "Amount must match the invoice total" };
+  if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+    return { success: false, error: "Invoice total is invalid" };
   }
 
   const customer = Array.isArray(invoice.customer) ? invoice.customer[0] : invoice.customer;
@@ -662,18 +662,43 @@ export async function approveCollectionRep(salesRepId: string): Promise<ActionRe
 
   if (collectionsUpdateError) return { success: false, error: collectionsUpdateError.message };
 
+  const invoiceIds = Array.from(
+    new Set((pendingCollections ?? []).map((row) => row.invoice_id).filter(Boolean))
+  ) as string[];
+
+  const validatedTotals = new Map<string, number>();
+  if (invoiceIds.length > 0) {
+    const { data: validatedRows, error: validatedError } = await adminClient
+      .from("collections")
+      .select("invoice_id, amount")
+      .in("invoice_id", invoiceIds)
+      .eq("status", "validated");
+
+    if (validatedError) return { success: false, error: validatedError.message };
+
+    for (const row of validatedRows ?? []) {
+      const invoiceId = (row as { invoice_id: string }).invoice_id;
+      const amount = Number((row as { amount: number }).amount);
+      validatedTotals.set(invoiceId, (validatedTotals.get(invoiceId) ?? 0) + amount);
+    }
+  }
+
   for (const row of pendingCollections ?? []) {
     if (!row.invoice_id || !row.invoice) continue;
 
-    await adminClient
-      .from("invoices")
-      .update({
-        is_settled: true,
-        settled_at: new Date().toISOString(),
-        settled_by: access.profile.id,
-        status: "paid"
-      })
-      .eq("id", row.invoice_id);
+    const totalAmount = Number(row.invoice.total_amount);
+    const totalCollected = validatedTotals.get(row.invoice_id) ?? 0;
+    if (totalCollected + 0.01 >= totalAmount) {
+      await adminClient
+        .from("invoices")
+        .update({
+          is_settled: true,
+          settled_at: new Date().toISOString(),
+          settled_by: access.profile.id,
+          status: "paid"
+        })
+        .eq("id", row.invoice_id);
+    }
 
     const customerBalance = row.invoice.customer?.balance;
     if (customerBalance != null) {

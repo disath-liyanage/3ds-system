@@ -168,6 +168,28 @@ export default function NewCollectionPage() {
             <div className="space-y-1">
               <label className="text-sm font-medium">Amount</label>
               <Input type="number" step="0.01" {...register("amount", { valueAsNumber: true })} />
+              {selectedInvoice ? (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span>Invoice total {formatCurrency(selectedInvoice.total_amount)}</span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setValue("amount", Number(selectedInvoice.total_amount) / 2)}
+                  >
+                    Set 50%
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setValue("amount", Number(selectedInvoice.total_amount))}
+                  >
+                    Set full
+                  </Button>
+                </div>
+              ) : null}
+              <p className="text-xs text-muted-foreground">Partial or over payments are allowed.</p>
             </div>
             {isManagerOrAdmin ? (
               <div className="flex items-center gap-3">
