@@ -19,11 +19,13 @@ import { useCollectionInvoices } from "@/hooks/useCollectionInvoices";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { formatDate } from "@/lib/utils";
 
-type StatusFilter = "unsettled" | "settled" | "all";
+type StatusFilter = "open" | "unpaid" | "partially_paid" | "paid" | "all";
 
 const statusOptions = [
-  { value: "unsettled", label: "Unsettled" },
-  { value: "settled", label: "Settled" },
+  { value: "open", label: "Unpaid + P. Paid" },
+  { value: "unpaid", label: "Unpaid" },
+  { value: "partially_paid", label: "Partially Paid" },
+  { value: "paid", label: "Paid" },
   { value: "all", label: "All" }
 ];
 
@@ -39,7 +41,7 @@ export default function CollectionsPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const [customerSearch, setCustomerSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("unsettled");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("open");
   const [salesRepFilter, setSalesRepFilter] = useState("all");
 
   const canRecordCollections = permissions?.canRecordCollections ?? false;
@@ -75,11 +77,10 @@ export default function CollectionsPage() {
       );
     }
 
-    if (statusFilter === "settled") {
-      rows = rows.filter((row) => row.is_settled);
-    }
-    if (statusFilter === "unsettled") {
-      rows = rows.filter((row) => !row.is_settled);
+    if (statusFilter === "open") {
+      rows = rows.filter((row) => row.payment_status === "unpaid" || row.payment_status === "partially_paid");
+    } else if (statusFilter !== "all") {
+      rows = rows.filter((row) => row.payment_status === statusFilter);
     }
 
     if (salesRepFilter !== "all") {
@@ -104,13 +105,13 @@ export default function CollectionsPage() {
     customerSearch !== "" ||
     Boolean(dateRange?.from) ||
     Boolean(dateRange?.to) ||
-    statusFilter !== "unsettled" ||
+    statusFilter !== "open" ||
     salesRepFilter !== "all";
 
   const handleResetFilters = () => {
     setCustomerSearch("");
     setDateRange(undefined);
-    setStatusFilter("unsettled");
+    setStatusFilter("open");
     setSalesRepFilter("all");
   };
 
@@ -249,7 +250,7 @@ export default function CollectionsPage() {
           <TableRow>
             <TableHead>Invoice #</TableHead>
             <TableHead>Customer</TableHead>
-            <TableHead>Amount</TableHead>
+            <TableHead>Remaining</TableHead>
             <TableHead>Due Date</TableHead>
             <TableHead>Sales Rep</TableHead>
             <TableHead>Status</TableHead>
@@ -281,16 +282,33 @@ export default function CollectionsPage() {
               <TableRow key={row.id}>
                 <TableCell>{row.invoice_number}</TableCell>
                 <TableCell>{row.customer_name}</TableCell>
-                <TableCell>{formatCurrency(row.total_amount)}</TableCell>
+                <TableCell>
+                  <div className="flex flex-col">
+                    <span>{formatCurrency(row.remaining_amount)}</span>
+                    {row.payment_status === "partially_paid" ? (
+                      <span className="text-xs text-muted-foreground">
+                        Collected {formatCurrency(row.collected_total)} / {formatCurrency(row.total_amount)}
+                      </span>
+                    ) : null}
+                  </div>
+                </TableCell>
                 <TableCell>{formatDate(row.due_date)}</TableCell>
                 <TableCell>{row.sales_rep_name || "Unassigned"}</TableCell>
                 <TableCell>
                   <Badge
                     variant={
-                      row.is_settled ? "success" : row.is_partially_settled ? "default" : "warning"
+                      row.payment_status === "paid"
+                        ? "success"
+                        : row.payment_status === "partially_paid"
+                          ? "default"
+                          : "warning"
                     }
                   >
-                    {row.is_settled ? "settled" : row.is_partially_settled ? "partially settled" : "unsettled"}
+                    {row.payment_status === "paid"
+                      ? "Paid"
+                      : row.payment_status === "partially_paid"
+                        ? "P. Paid"
+                        : "Unpaid"}
                   </Badge>
                 </TableCell>
                 <TableCell>{row.settled_at ? formatDate(row.settled_at) : "-"}</TableCell>

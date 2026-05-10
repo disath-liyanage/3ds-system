@@ -16,7 +16,10 @@ export type CollectionInvoiceRow = {
   sales_rep_name: string | null;
   total_amount: number;
   collected_total: number;
+  remaining_amount: number;
   is_partially_settled: boolean;
+  payment_status: "unpaid" | "partially_paid" | "paid";
+  last_recorded_by_name: string | null;
   status: "approved" | "issued" | "paid";
   created_at: string;
   due_date: string;
@@ -241,7 +244,7 @@ export async function listCollectionInvoices(): Promise<{ success: boolean; data
 
   if (error) return { success: false, error: error.message };
 
-  let rows = (data ?? []).map((row) => ({
+  let rows: CollectionInvoiceRow[] = (data ?? []).map((row) => ({
     id: row.id,
     invoice_number: row.invoice_number,
     customer_id: row.customer_id,
@@ -250,7 +253,10 @@ export async function listCollectionInvoices(): Promise<{ success: boolean; data
     sales_rep_name: null,
     total_amount: Number(row.total_amount),
     collected_total: 0,
+    remaining_amount: Number(row.total_amount),
     is_partially_settled: false,
+    payment_status: row.is_settled ? "paid" : "unpaid",
+    last_recorded_by_name: null,
     status: row.status,
     created_at: row.created_at,
     due_date: buildDueDate(row.created_at),
@@ -283,26 +289,77 @@ export async function listCollectionInvoices(): Promise<{ success: boolean; data
   if (invoiceIds.length > 0) {
     const { data: collectionRows, error: collectionError } = await adminClient
       .from("collections")
-      .select("invoice_id, amount")
+      .select("invoice_id, amount, status, collected_by, created_at")
       .in("invoice_id", invoiceIds)
-      .eq("status", "validated");
+      .in("status", ["pending", "validated"]);
 
     if (collectionError) return { success: false, error: collectionError.message };
 
-    const totals = new Map<string, number>();
+    const validatedTotals = new Map<string, number>();
+    const latestByInvoice = new Map<
+      string,
+      { collected_by: string | null; created_at: string }
+    >();
+    const collectorIds = new Set<string>();
+
     for (const row of collectionRows ?? []) {
-      const invoiceId = (row as { invoice_id: string }).invoice_id;
-      const amount = Number((row as { amount: number }).amount);
-      totals.set(invoiceId, (totals.get(invoiceId) ?? 0) + amount);
+      const typedRow = row as {
+        invoice_id: string;
+        amount: number;
+        status: "pending" | "validated";
+        collected_by: string | null;
+        created_at: string;
+      };
+      const invoiceId = typedRow.invoice_id;
+
+      if (typedRow.status === "validated") {
+        const amount = Number(typedRow.amount);
+        validatedTotals.set(invoiceId, (validatedTotals.get(invoiceId) ?? 0) + amount);
+      }
+
+      const prevLatest = latestByInvoice.get(invoiceId);
+      if (!prevLatest || new Date(typedRow.created_at).getTime() > new Date(prevLatest.created_at).getTime()) {
+        latestByInvoice.set(invoiceId, {
+          collected_by: typedRow.collected_by,
+          created_at: typedRow.created_at
+        });
+      }
+
+      if (typedRow.collected_by) collectorIds.add(typedRow.collected_by);
+    }
+
+    const collectorMap = new Map<string, string>();
+    if (collectorIds.size > 0) {
+      const { data: collectors } = await adminClient
+        .from("users_profile")
+        .select("id, full_name")
+        .in("id", Array.from(collectorIds));
+
+      for (const collector of collectors ?? []) {
+        collectorMap.set(collector.id, collector.full_name);
+      }
     }
 
     rows = rows.map((row) => {
-      const collectedTotal = totals.get(row.id) ?? 0;
-      const halfTotal = row.total_amount > 0 ? row.total_amount / 2 : Number.POSITIVE_INFINITY;
+      const collectedTotal = validatedTotals.get(row.id) ?? 0;
+      const remainingAmount = Math.max(0, row.total_amount - collectedTotal);
+      const isPartiallySettled = !row.is_settled && collectedTotal > 0 && remainingAmount > 0;
+      const paymentStatus: CollectionInvoiceRow["payment_status"] = row.is_settled
+        ? "paid"
+        : isPartiallySettled
+          ? "partially_paid"
+          : "unpaid";
+      const latestEntry = latestByInvoice.get(row.id);
+      const lastRecordedByName =
+        latestEntry?.collected_by ? (collectorMap.get(latestEntry.collected_by) ?? "Unknown") : null;
+
       return {
         ...row,
         collected_total: collectedTotal,
-        is_partially_settled: !row.is_settled && collectedTotal + 0.01 >= halfTotal
+        remaining_amount: remainingAmount,
+        is_partially_settled: isPartiallySettled,
+        payment_status: paymentStatus,
+        last_recorded_by_name: lastRecordedByName
       };
     });
   }

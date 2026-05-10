@@ -63,7 +63,7 @@ export default function NewCollectionPage() {
     let rows = (invoices || []).filter((row) => !row.is_settled);
 
     if (user?.role === "sales_rep") {
-      rows = rows.filter((row) => !row.sales_rep_id || row.sales_rep_id !== user.id);
+      rows = rows.filter((row) => !row.sales_rep_id || row.sales_rep_id === user.id);
     }
 
     return rows;
@@ -88,7 +88,7 @@ export default function NewCollectionPage() {
 
   useEffect(() => {
     if (!selectedInvoice) return;
-    setValue("amount", Number(selectedInvoice.total_amount));
+    setValue("amount", Number(selectedInvoice.remaining_amount));
     if (isManagerOrAdmin) {
       if (recipientRole === "sales_rep") {
         setValue("incentive_recipient_id", selectedInvoice.sales_rep_id || "");
@@ -202,12 +202,14 @@ export default function NewCollectionPage() {
               <Input type="number" step="0.01" {...register("amount", { valueAsNumber: true })} />
               {selectedInvoice ? (
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span>Invoice total {formatCurrency(selectedInvoice.total_amount)}</span>
+                  <span>
+                    Remaining {formatCurrency(selectedInvoice.remaining_amount)} · Total {formatCurrency(selectedInvoice.total_amount)}
+                  </span>
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    onClick={() => setValue("amount", Number(selectedInvoice.total_amount) / 2)}
+                    onClick={() => setValue("amount", Number(selectedInvoice.remaining_amount) / 2)}
                   >
                     Set 50%
                   </Button>
@@ -215,9 +217,9 @@ export default function NewCollectionPage() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    onClick={() => setValue("amount", Number(selectedInvoice.total_amount))}
+                    onClick={() => setValue("amount", Number(selectedInvoice.remaining_amount))}
                   >
-                    Set full
+                    Set remaining
                   </Button>
                 </div>
               ) : null}
