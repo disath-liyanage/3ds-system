@@ -175,6 +175,14 @@ export async function updateProduct(id: string, data: ProductInput): Promise<Act
     return { success: false, error: normalized.error || "Invalid product data" };
   }
 
+  const { data: currentProduct } = await adminClient
+    .from("products")
+    .select("stock_qty")
+    .eq("id", id)
+    .maybeSingle();
+
+  const stockBefore = Number(currentProduct?.stock_qty) || 0;
+
   const { data: updatedProduct, error } = await adminClient
     .from("products")
     .update(normalized.data)
@@ -188,6 +196,23 @@ export async function updateProduct(id: string, data: ProductInput): Promise<Act
 
   if (!updatedProduct) {
     return { success: false, error: "Product not found" };
+  }
+
+  const stockAfter = Number(normalized.data.stock_qty) || 0;
+  if (stockBefore !== stockAfter) {
+    await adminClient.from("audit_log").insert({
+      table_name: "product_stock_adjustments",
+      record_id: id,
+      action: "manual_stock_update",
+      performed_by: access.userId,
+      old_data: {
+        stock_qty: stockBefore
+      },
+      new_data: {
+        stock_qty: stockAfter,
+        changed_by: access.userId
+      }
+    });
   }
 
   revalidatePath("/products");

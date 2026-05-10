@@ -1145,7 +1145,7 @@ export async function deleteInvoice(invoiceId: string): Promise<ActionResult> {
 
   const { data: invoice, error: invoiceError } = await adminClient
     .from("invoices")
-    .select("status, total_amount, payment_method, customer_id, invoice_items(product_id, qty)")
+    .select("id, invoice_number, status, total_amount, payment_method, customer_id, invoice_items(product_id, qty, free_qty)")
     .eq("id", invoiceId)
     .single();
 
@@ -1163,7 +1163,9 @@ export async function deleteInvoice(invoiceId: string): Promise<ActionResult> {
     // Restore stock
     try {
       for (const item of invoice.invoice_items || []) {
-        const qty = Number(item.qty);
+        const qty = Number(item.qty) || 0;
+        const freeQty = Number(item.free_qty) || 0;
+        const restoreQty = qty + freeQty;
         const { data: product, error: productError } = await adminClient
           .from("products")
           .select("stock_qty")
@@ -1171,8 +1173,26 @@ export async function deleteInvoice(invoiceId: string): Promise<ActionResult> {
           .single();
 
         if (product && !productError) {
-          const newStock = Number(product.stock_qty) + qty;
+          const stockBefore = Number(product.stock_qty) || 0;
+          const newStock = stockBefore + restoreQty;
           await adminClient.from("products").update({ stock_qty: newStock }).eq("id", item.product_id);
+          await adminClient.from("audit_log").insert({
+            table_name: "invoice_cancellations",
+            record_id: item.product_id,
+            action: "stock_restored",
+            performed_by: access.profile.id,
+            old_data: {
+              invoice_id: invoice.id,
+              invoice_number: Number(invoice.invoice_number),
+              qty,
+              free_qty: freeQty,
+              stock_before: stockBefore
+            },
+            new_data: {
+              stock_after: newStock,
+              restored_qty: restoreQty
+            }
+          });
         }
       }
     } catch (err) {

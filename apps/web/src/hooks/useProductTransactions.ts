@@ -31,6 +31,14 @@ export type ProductInvoicedEntry = {
 export type ProductTransactions = {
   received: ProductReceivedEntry[];
   invoiced: ProductInvoicedEntry[];
+  cancelled: ProductInvoicedEntry[];
+  stockAdjustments: Array<{
+    id: string;
+    created_at: string;
+    stock_before: number;
+    stock_after: number;
+    changed_by: string;
+  }>;
 };
 
 const productTransactionsKey = (productId: string) => ["product-transactions", productId] as const;
@@ -39,7 +47,12 @@ async function fetchProductTransactions(
   supabase: ReturnType<typeof createClient>,
   productId: string
 ): Promise<ProductTransactions> {
-  const [{ data: receivedRows, error: receivedError }, { data: invoicedRows, error: invoicedError }] =
+  const [
+    { data: receivedRows, error: receivedError },
+    { data: invoicedRows, error: invoicedError },
+    { data: cancelledRows, error: cancelledError },
+    { data: stockAdjustmentRows, error: stockAdjustmentError }
+  ] =
     await Promise.all([
       supabase
         .from("receive_note_items")
@@ -52,11 +65,25 @@ async function fetchProductTransactions(
         .from("invoice_items")
         .select("id, invoice_id, qty, free_qty, unit_price, created_at, invoice:invoices(id, invoice_number, created_at)")
         .eq("product_id", productId)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("audit_log")
+        .select("id, created_at, old_data, new_data")
+        .eq("table_name", "invoice_cancellations")
+        .eq("record_id", productId)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("audit_log")
+        .select("id, created_at, old_data, new_data")
+        .eq("table_name", "product_stock_adjustments")
+        .eq("record_id", productId)
         .order("created_at", { ascending: false })
     ]);
 
   if (receivedError) throw receivedError;
   if (invoicedError) throw invoicedError;
+  if (cancelledError) throw cancelledError;
+  if (stockAdjustmentError) throw stockAdjustmentError;
 
   const received: ProductReceivedEntry[] = (receivedRows ?? []).map((row: any) => {
     const note = Array.isArray(row.receive_note) ? row.receive_note[0] : row.receive_note;
@@ -87,10 +114,30 @@ async function fetchProductTransactions(
     };
   });
 
+  const cancelled: ProductInvoicedEntry[] = (cancelledRows ?? []).map((row: any) => ({
+    id: row.id,
+    invoice_id: String(row.old_data?.invoice_id || ""),
+    invoice_number: Number(row.old_data?.invoice_number) || 0,
+    qty: Number(row.old_data?.qty) || 0,
+    free_qty: Number(row.old_data?.free_qty) || 0,
+    unit_price: 0,
+    created_at: row.created_at ?? ""
+  }));
+
+  const stockAdjustments = (stockAdjustmentRows ?? []).map((row: any) => ({
+    id: row.id,
+    created_at: row.created_at ?? "",
+    stock_before: Number(row.old_data?.stock_qty) || 0,
+    stock_after: Number(row.new_data?.stock_qty) || 0,
+    changed_by: row.new_data?.changed_by || "Manual edit"
+  }));
+
   received.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   invoiced.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  cancelled.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  stockAdjustments.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
 
-  return { received, invoiced };
+  return { received, invoiced, cancelled, stockAdjustments };
 }
 
 export function useProductTransactions(productId?: string) {
@@ -102,4 +149,3 @@ export function useProductTransactions(productId?: string) {
     enabled: Boolean(productId)
   });
 }
-

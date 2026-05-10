@@ -221,6 +221,72 @@ export default function ProductStockDetailPage() {
         </Card>
       </div>
 
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Cancelled / Returned Invoices</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isTransactionsError ? (
+              <p className="text-sm text-red-600">Failed to load cancelled invoice entries.</p>
+            ) : transactions?.cancelled && transactions.cancelled.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Invoice</TableHead>
+                    <TableHead>Restored Qty</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transactions.cancelled.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{row.invoice_number > 0 ? `INV-${row.invoice_number}` : "-"}</TableCell>
+                      <TableCell>{formatQuantity(row.qty + row.free_qty)}</TableCell>
+                      <TableCell>{row.created_at ? formatDate(row.created_at) : "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground">No cancelled invoice entries yet.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Stock Adjustments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isTransactionsError ? (
+              <p className="text-sm text-red-600">Failed to load stock adjustments.</p>
+            ) : transactions?.stockAdjustments && transactions.stockAdjustments.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Before</TableHead>
+                    <TableHead>After</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transactions.stockAdjustments.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>{formatQuantity(row.stock_before)}</TableCell>
+                      <TableCell>{formatQuantity(row.stock_after)}</TableCell>
+                      <TableCell>{row.created_at ? formatDate(row.created_at) : "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground">No stock adjustments yet.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Stock by selling price</CardTitle>

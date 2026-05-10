@@ -1,6 +1,7 @@
 "use server";
 
 import { adminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 export async function updateProductGRNPrices(
@@ -29,6 +30,18 @@ export async function updateProductGRNStock(
   sellingPrice: number,
   newTotalStock: number
 ) {
+  const supabase = createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  const { data: currentProduct } = await adminClient
+    .from("products")
+    .select("stock_qty")
+    .eq("id", productId)
+    .maybeSingle();
+  const stockBefore = Number(currentProduct?.stock_qty) || 0;
+
   // 1. Fetch all items for this product and price
   const { data: items, error: fetchError } = await adminClient
     .from("receive_note_items")
@@ -75,6 +88,22 @@ export async function updateProductGRNStock(
 
   if (productError) {
     return { success: false, error: productError.message };
+  }
+
+  if (stockBefore !== newProductTotal) {
+    await adminClient.from("audit_log").insert({
+      table_name: "product_stock_adjustments",
+      record_id: productId,
+      action: "manual_stock_update",
+      performed_by: null,
+      old_data: {
+        stock_qty: stockBefore
+      },
+      new_data: {
+        stock_qty: newProductTotal,
+        changed_by: user?.id || "system"
+      }
+    });
   }
 
   revalidatePath("/products");
