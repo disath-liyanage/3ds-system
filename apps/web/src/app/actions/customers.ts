@@ -29,7 +29,7 @@ export type CreateCustomerInput = {
   name: string;
   phone: string;
   address: string;
-  area: string;
+  area?: string | null;
   credit_limit?: number;
   sales_rep_id?: string;
 };
@@ -87,6 +87,41 @@ export async function getSalesReps(): Promise<{ id: string; full_name: string }[
   return data || [];
 }
 
+export async function getAreas(): Promise<{ id: string; name: string }[]> {
+  const { data, error } = await adminClient.from("areas").select("id, name").order("name");
+
+  if (error) {
+    console.error("Failed to fetch areas:", error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function createArea(name: string): Promise<ActionResult> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (access.profile.role !== "admin" && access.profile.role !== "manager") {
+    return { success: false, error: "Only admins and managers can add areas" };
+  }
+
+  const areaName = name.trim();
+  if (!areaName) {
+    return { success: false, error: "Area name is required" };
+  }
+
+  const { error } = await adminClient.from("areas").insert({ name: areaName });
+  if (error) {
+    if (error.code === "23505") {
+      return { success: false, error: "Area already exists." };
+    }
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/customers");
+  return { success: true, message: "Area added successfully." };
+}
+
 export async function getCollectionRecipients(): Promise<{ id: string; full_name: string; role: UserRole }[]> {
   const { data: salesReps, error: salesError } = await adminClient
     .from("users_profile")
@@ -126,11 +161,11 @@ export async function createCustomer(input: CreateCustomerInput): Promise<Action
   const name = input.name.trim();
   const phone = input.phone.trim();
   const address = input.address.trim();
-  const area = input.area.trim();
+  const area = input.area?.trim() || null;
   const creditLimit = Number(input.credit_limit ?? 0);
 
-  if (!name || !phone || !address || !area) {
-    return { success: false, error: "Name, phone, address, and area are required" };
+  if (!name || !phone || !address) {
+    return { success: false, error: "Name, phone, and address are required" };
   }
 
   if (!Number.isFinite(creditLimit) || creditLimit < 0) {
@@ -357,11 +392,11 @@ export async function updateCustomer(customerId: string, input: UpdateCustomerIn
   const name = input.name.trim();
   const phone = input.phone.trim();
   const address = input.address.trim();
-  const area = input.area.trim();
+  const area = input.area?.trim() || null;
   const creditLimit = Number(input.credit_limit ?? 0);
 
-  if (!name || !phone || !address || !area) {
-    return { success: false, error: "Name, phone, address, and area are required" };
+  if (!name || !phone || !address) {
+    return { success: false, error: "Name, phone, and address are required" };
   }
 
   if (!Number.isFinite(creditLimit) || creditLimit < 0) {

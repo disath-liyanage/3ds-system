@@ -5,8 +5,10 @@ import { type FormEvent, useMemo, useState } from "react";
 
 import {
   approvePendingCustomer,
+  createArea,
   createCustomer,
   deleteCustomer,
+  getAreas,
   getSalesReps,
   removePendingCustomer,
   updateCustomer
@@ -26,7 +28,7 @@ type CustomerRow = {
   name: string;
   phone: string;
   address: string;
-  area: string;
+  area: string | null;
   credit_limit: number;
   balance: number;
   status: "pending_approval" | "active" | "rejected";
@@ -41,7 +43,10 @@ const NOTIFICATIONS_UNREAD_QUERY_KEY = ["notifications-unread-count"] as const;
 export default function CustomersPage() {
   const [query, setQuery] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isAddAreaOpen, setIsAddAreaOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAreaSubmitting, setIsAreaSubmitting] = useState(false);
+  const [areaName, setAreaName] = useState("");
   const [processingCustomerId, setProcessingCustomerId] = useState<string | null>(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -70,6 +75,10 @@ export default function CustomersPage() {
     queryKey: ["sales-reps"],
     queryFn: async () => await getSalesReps()
   });
+  const areasQuery = useQuery({
+    queryKey: ["areas"],
+    queryFn: async () => await getAreas()
+  });
 
   useRealtimeInvalidate({
     channel: "customers-realtime",
@@ -93,7 +102,7 @@ export default function CustomersPage() {
   const filtered = useMemo(
     () =>
       (customersQuery.data || []).filter((customer) =>
-        `${customer.name} ${customer.phone} ${customer.area}`.toLowerCase().includes(query.toLowerCase())
+        `${customer.name} ${customer.phone} ${customer.area || ""}`.toLowerCase().includes(query.toLowerCase())
       ),
     [customersQuery.data, query]
   );
@@ -161,7 +170,7 @@ export default function CustomersPage() {
       name: customer.name,
       phone: customer.phone,
       address: customer.address,
-      area: customer.area,
+      area: customer.area || "",
       credit_limit: String(customer.credit_limit ?? 0),
       sales_rep_id: customer.sales_rep_id || ""
     });
@@ -288,7 +297,14 @@ export default function CustomersPage() {
           <h1 className="text-2xl font-bold">Customers</h1>
           <p className="text-sm text-muted-foreground">Click a customer row to view details.</p>
         </div>
-        {canAddCustomers ? <Button onClick={() => setIsAddOpen(true)}>Add Customer</Button> : null}
+        <div className="flex items-center gap-2">
+          {isAdminOrManager ? (
+            <Button variant="outline" onClick={() => setIsAddAreaOpen(true)}>
+              Add Area
+            </Button>
+          ) : null}
+          {canAddCustomers ? <Button onClick={() => setIsAddOpen(true)}>Add Customer</Button> : null}
+        </div>
       </header>
 
       <div className="max-w-sm">
@@ -314,7 +330,7 @@ export default function CustomersPage() {
             >
               <TableCell>{customer.name}</TableCell>
               <TableCell>{customer.phone}</TableCell>
-              <TableCell>{customer.area}</TableCell>
+              <TableCell>{customer.area || "-"}</TableCell>
               <TableCell>LKR {Number(customer.balance).toLocaleString()}</TableCell>
               <TableCell>
                 {customer.status === "pending_approval"
@@ -359,11 +375,12 @@ export default function CustomersPage() {
               disabled={!isEditing}
               onChange={(event) => setEditForm((prev) => ({ ...prev, address: event.target.value }))}
             />
-            <Input
-              placeholder="Area"
-              value={editForm.area}
+            <SearchableSelect
+              placeholder={areasQuery.isLoading ? "Loading areas..." : "Select Area"}
+              options={(areasQuery.data || []).map((area) => ({ value: area.name, label: area.name }))}
+              value={editForm.area || ""}
               disabled={!isEditing}
-              onChange={(event) => setEditForm((prev) => ({ ...prev, area: event.target.value }))}
+              onChange={(value) => setEditForm((prev) => ({ ...prev, area: value }))}
             />
             <Input
               type="number"
@@ -489,11 +506,11 @@ export default function CustomersPage() {
             onChange={(event) => setForm((prev) => ({ ...prev, address: event.target.value }))}
             required
           />
-          <Input
-            placeholder="Area"
-            value={form.area}
-            onChange={(event) => setForm((prev) => ({ ...prev, area: event.target.value }))}
-            required
+          <SearchableSelect
+            placeholder={areasQuery.isLoading ? "Loading areas..." : "Select Area"}
+            options={(areasQuery.data || []).map((area) => ({ value: area.name, label: area.name }))}
+            value={form.area || ""}
+            onChange={(value) => setForm((prev) => ({ ...prev, area: value }))}
           />
           <Input
             type="number"
@@ -513,6 +530,44 @@ export default function CustomersPage() {
           ) : null}
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Saving..." : "Submit"}
+          </Button>
+        </form>
+      </Dialog>
+
+      <Dialog
+        open={isAddAreaOpen}
+        onOpenChange={setIsAddAreaOpen}
+        title="Add area"
+        description="Create a new area to use in customer records."
+      >
+        <form
+          className="space-y-3"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (isAreaSubmitting) return;
+            setIsAreaSubmitting(true);
+            const result = await createArea(areaName);
+            setIsAreaSubmitting(false);
+
+            if (!result.success) {
+              toast({ title: "Failed to add area", description: result.error, variant: "error" });
+              return;
+            }
+
+            toast({ title: "Area added", description: result.message, variant: "success" });
+            setAreaName("");
+            setIsAddAreaOpen(false);
+            await areasQuery.refetch();
+          }}
+        >
+          <Input
+            placeholder="Area name"
+            value={areaName}
+            onChange={(event) => setAreaName(event.target.value)}
+            required
+          />
+          <Button type="submit" disabled={isAreaSubmitting}>
+            {isAreaSubmitting ? "Saving..." : "Save Area"}
           </Button>
         </form>
       </Dialog>

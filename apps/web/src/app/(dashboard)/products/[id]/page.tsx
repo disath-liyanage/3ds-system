@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useProducts } from "@/hooks/useProducts";
 import { useProductStockByPrice } from "@/hooks/useProductStockByPrice";
+import { useProductTransactions } from "@/hooks/useProductTransactions";
 import { formatDate } from "@/lib/utils";
 
 function toNumber(value: number | string | null | undefined): number {
@@ -55,6 +56,11 @@ export default function ProductStockDetailPage() {
     isLoading: isStockLoading,
     isError: isStockError
   } = useProductStockByPrice(productId);
+  const {
+    data: transactions,
+    isLoading: isTransactionsLoading,
+    isError: isTransactionsError
+  } = useProductTransactions(productId);
 
   const product = useMemo(
     () => (products ?? []).find((item) => item.id === productId) ?? null,
@@ -63,7 +69,7 @@ export default function ProductStockDetailPage() {
 
   const stockStatus = product ? getStockStatus(product.stock_qty, product.low_stock_threshold) : null;
 
-  const isLoading = isProductsLoading || isStockLoading;
+  const isLoading = isProductsLoading || isStockLoading || isTransactionsLoading;
 
   if (!productId) {
     return (
@@ -134,6 +140,86 @@ export default function ProductStockDetailPage() {
           Product not found.
         </div>
       )}
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Received</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isTransactionsError ? (
+              <p className="text-sm text-red-600">Failed to load GRN entries.</p>
+            ) : transactions?.received && transactions.received.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>GRN</TableHead>
+                    <TableHead>Supplier</TableHead>
+                    <TableHead>Qty</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transactions.received.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        <Link href={`/receive-notes/${row.receive_note_id}`} className="underline">
+                          RN-{row.rn_number}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{row.supplier_name}</TableCell>
+                      <TableCell>{formatQuantity(row.qty + row.free_qty)}</TableCell>
+                      <TableCell>{formatCurrencyLKR(row.selling_price)}</TableCell>
+                      <TableCell>{row.created_at ? formatDate(row.created_at) : "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground">No GRN stock entries yet.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Invoiced</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isTransactionsError ? (
+              <p className="text-sm text-red-600">Failed to load invoice entries.</p>
+            ) : transactions?.invoiced && transactions.invoiced.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Invoice</TableHead>
+                    <TableHead>Qty</TableHead>
+                    <TableHead>Unit Price</TableHead>
+                    <TableHead>Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transactions.invoiced.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        <Link href={`/invoices/${row.invoice_id}`} className="underline">
+                          INV-{row.invoice_number}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{formatQuantity(row.qty + row.free_qty)}</TableCell>
+                      <TableCell>{formatCurrencyLKR(row.unit_price)}</TableCell>
+                      <TableCell>{row.created_at ? formatDate(row.created_at) : "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground">No invoice entries yet.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader>
