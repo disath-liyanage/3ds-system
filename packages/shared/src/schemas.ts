@@ -31,8 +31,20 @@ export const userSchema = z.object({
   phone: z.string().nullable(),
   custom_role_id: z.string().uuid().nullable().optional(),
   custom_role: customRoleSchema.nullable().optional(),
+  worker_id: z.string().uuid().nullable().optional(),
   is_active: z.boolean().optional(),
   created_by: z.string().uuid().nullable().optional(),
+  created_at: z.string()
+});
+
+export const workerSalaryTypeSchema = z.enum(["daily", "monthly_basic"]);
+
+export const workerSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().min(1),
+  identity_card_no: z.string().min(1),
+  salary_type: workerSalaryTypeSchema,
+  salary_amount: z.number().nonnegative(),
   created_at: z.string()
 });
 
@@ -204,3 +216,4 @@ export type InvoiceSchemaType = z.infer<typeof invoiceSchema>;
 export type ReceiveNoteSchemaType = z.infer<typeof receiveNoteSchema>;
 export type ReceiveNoteItemSchemaType = z.infer<typeof receiveNoteItemSchema>;
 export type NotificationSchemaType = z.infer<typeof notificationSchema>;
+export type WorkerSchemaType = z.infer<typeof workerSchema>;

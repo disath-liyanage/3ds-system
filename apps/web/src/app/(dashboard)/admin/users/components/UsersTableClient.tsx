@@ -14,11 +14,12 @@ import { formatDate } from "@/lib/utils";
 
 import { AddUserDialog } from "./AddUserDialog";
 import { EditUserDialog } from "./EditUserDialog";
-import type { AdminUserRow, CustomRoleSelectOption } from "./types";
+import type { AdminUserRow, CustomRoleSelectOption, WorkerSelectOption } from "./types";
 
 type UsersTableClientProps = {
   users: AdminUserRow[];
   customRoles: CustomRoleSelectOption[];
+  workers: WorkerSelectOption[];
   currentUser: User;
 };
 
@@ -49,7 +50,7 @@ function getRoleBadgeMeta(user: AdminUserRow) {
   };
 }
 
-export function UsersTableClient({ users, customRoles, currentUser }: UsersTableClientProps) {
+export function UsersTableClient({ users, customRoles, workers, currentUser }: UsersTableClientProps) {
   const router = useRouter();
   const [rows, setRows] = useState(users);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -65,6 +66,10 @@ export function UsersTableClient({ users, customRoles, currentUser }: UsersTable
 
   const sortedRows = useMemo(
     () => [...rows].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()),
+    [rows]
+  );
+  const usedWorkerIds = useMemo(
+    () => rows.map((row) => row.worker_id).filter((workerId): workerId is string => Boolean(workerId)),
     [rows]
   );
 
@@ -83,6 +88,7 @@ export function UsersTableClient({ users, customRoles, currentUser }: UsersTable
       phone: user.phone || "",
       role: user.role,
       custom_role_id: user.role === "custom" ? user.custom_role_id || undefined : undefined,
+      worker_id: user.role === "admin" || user.role === "manager" ? undefined : user.worker_id || undefined,
       is_active: !user.is_active
     });
 
@@ -148,6 +154,7 @@ export function UsersTableClient({ users, customRoles, currentUser }: UsersTable
             <TableHead>Name</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Role</TableHead>
+            <TableHead>Worker</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Created</TableHead>
             <TableHead>Actions</TableHead>
@@ -166,6 +173,7 @@ export function UsersTableClient({ users, customRoles, currentUser }: UsersTable
                 <TableCell>
                   <Badge className={roleMeta.className}>{roleMeta.label}</Badge>
                 </TableCell>
+                <TableCell>{user.worker ? `${user.worker.name} (${user.worker.identity_card_no})` : "-"}</TableCell>
                 <TableCell>
                   <Badge variant={user.is_active ? "success" : "danger"}>
                     {user.is_active ? "Active" : "Inactive"}
@@ -213,6 +221,8 @@ export function UsersTableClient({ users, customRoles, currentUser }: UsersTable
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
         customRoles={customRoles}
+        workers={workers}
+        usedWorkerIds={usedWorkerIds}
         onCreated={handleRefresh}
       />
 
@@ -221,6 +231,8 @@ export function UsersTableClient({ users, customRoles, currentUser }: UsersTable
         onOpenChange={setIsEditDialogOpen}
         user={editingUser}
         customRoles={customRoles}
+        workers={workers}
+        usedWorkerIds={usedWorkerIds}
         onUpdated={handleRefresh}
       />
     </section>

@@ -29,8 +29,20 @@ export interface User {
   phone: string | null;
   custom_role_id?: string | null;
   custom_role?: CustomRole | null;
+  worker_id?: string | null;
   is_active?: boolean;
   created_by?: string | null;
+  created_at: string;
+}
+
+export type WorkerSalaryType = "daily" | "monthly_basic";
+
+export interface Worker {
+  id: string;
+  name: string;
+  identity_card_no: string;
+  salary_type: WorkerSalaryType;
+  salary_amount: number;
   created_at: string;
 }
 

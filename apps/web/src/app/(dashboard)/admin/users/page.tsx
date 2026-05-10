@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 
 import { UsersTableClient } from "./components/UsersTableClient";
 import type { AdminUserRow, CustomRoleSelectOption, UserCustomRoleSummary } from "./components/types";
+import type { WorkerSelectOption, WorkerSummary } from "./components/types";
 
 type RawUserRow = {
   id: string;
@@ -17,6 +18,8 @@ type RawUserRow = {
   created_at: string;
   custom_role_id: string | null;
   custom_role: UserCustomRoleSummary | UserCustomRoleSummary[] | null;
+  worker_id: string | null;
+  worker: WorkerSummary | WorkerSummary[] | null;
 };
 
 export default async function AdminUsersPage() {
@@ -63,13 +66,18 @@ export default async function AdminUsersPage() {
   const { data: users, error: usersError } = await adminClient
     .from("users_profile")
     .select(
-      "id, email, role, full_name, phone, is_active, created_at, custom_role_id, custom_role:custom_roles(id, name)"
+      "id, email, role, full_name, phone, is_active, created_at, custom_role_id, custom_role:custom_roles(id, name), worker_id, worker:workers(id, name, identity_card_no)"
     )
     .order("created_at", { ascending: false });
 
   const { data: customRoles, error: customRolesError } = await adminClient
     .from("custom_roles")
     .select("id, name")
+    .order("name", { ascending: true });
+
+  const { data: workers, error: workersError } = await adminClient
+    .from("workers")
+    .select("id, name, identity_card_no")
     .order("name", { ascending: true });
 
   const normalizedUsers: AdminUserRow[] = ((users ?? []) as RawUserRow[]).map((row) => ({
@@ -81,10 +89,13 @@ export default async function AdminUsersPage() {
     created_at: row.created_at,
     custom_role_id: row.custom_role_id,
     custom_role: Array.isArray(row.custom_role) ? row.custom_role[0] || null : row.custom_role,
+    worker_id: row.worker_id,
+    worker: Array.isArray(row.worker) ? row.worker[0] || null : row.worker,
     is_active: row.is_active ?? true
   }));
 
   const normalizedCustomRoles: CustomRoleSelectOption[] = (customRoles ?? []) as CustomRoleSelectOption[];
+  const normalizedWorkers: WorkerSelectOption[] = (workers ?? []) as WorkerSelectOption[];
 
   const currentUser: User = {
     id: currentProfile.id,
@@ -94,6 +105,7 @@ export default async function AdminUsersPage() {
     phone: currentProfile.phone,
     created_at: currentProfile.created_at,
     custom_role_id: currentProfile.custom_role_id,
+    worker_id: null,
     is_active: true
   };
 
@@ -103,8 +115,14 @@ export default async function AdminUsersPage() {
       {customRolesError ? (
         <p className="text-sm text-red-600">Failed to load custom roles: {customRolesError.message}</p>
       ) : null}
+      {workersError ? <p className="text-sm text-red-600">Failed to load workers: {workersError.message}</p> : null}
 
-      <UsersTableClient users={normalizedUsers} customRoles={normalizedCustomRoles} currentUser={currentUser} />
+      <UsersTableClient
+        users={normalizedUsers}
+        customRoles={normalizedCustomRoles}
+        workers={normalizedWorkers}
+        currentUser={currentUser}
+      />
     </div>
   );
 }

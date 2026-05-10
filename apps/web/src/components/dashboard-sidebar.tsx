@@ -44,6 +44,7 @@ const baseNavItems: SidebarItem[] = [
 
 const adminNavItems: SidebarItem[] = [
   { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/workers", label: "Workers", icon: Users },
   { href: "/admin/roles", label: "Roles", icon: ShieldCheck }
 ];
 

@@ -546,17 +546,45 @@ create table if not exists public.custom_roles (
   perm_view_users boolean default false
 );
 
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_type t
+    join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'worker_salary_type'
+      and n.nspname = 'public'
+  ) then
+    create type public.worker_salary_type as enum ('daily', 'monthly_basic');
+  end if;
+end $$;
+
+create table if not exists public.workers (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  identity_card_no text not null unique,
+  salary_type public.worker_salary_type not null,
+  salary_amount numeric(12, 2) not null check (salary_amount >= 0),
+  created_at timestamptz not null default now()
+);
+
 alter table public.users_profile
   add column if not exists custom_role_id uuid references public.custom_roles (id),
+  add column if not exists worker_id uuid references public.workers (id),
   add column if not exists is_active boolean default true,
   add column if not exists created_by uuid references auth.users (id);
 
 create index if not exists idx_users_profile_custom_role_id on public.users_profile (custom_role_id);
+create unique index if not exists idx_users_profile_worker_id_unique on public.users_profile (worker_id) where worker_id is not null;
+create index if not exists idx_workers_name on public.workers (name);
 
 alter table public.custom_roles enable row level security;
+alter table public.workers enable row level security;
 
 drop policy if exists "admin_all_custom_roles" on public.custom_roles;
 drop policy if exists "manager_view_custom_roles" on public.custom_roles;
+drop policy if exists "admin_all_workers" on public.workers;
+drop policy if exists "manager_view_workers" on public.workers;
 
 create policy "admin_all_custom_roles" on public.custom_roles
   for all
@@ -568,6 +596,21 @@ create policy "admin_all_custom_roles" on public.custom_roles
   );
 
 create policy "manager_view_custom_roles" on public.custom_roles
+  for select
+  using (
+    public.current_user_role() in ('admin', 'manager')
+  );
+
+create policy "admin_all_workers" on public.workers
+  for all
+  using (
+    public.current_user_role() = 'admin'
+  )
+  with check (
+    public.current_user_role() = 'admin'
+  );
+
+create policy "manager_view_workers" on public.workers
   for select
   using (
     public.current_user_role() in ('admin', 'manager')

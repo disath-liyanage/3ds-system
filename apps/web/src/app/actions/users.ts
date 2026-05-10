@@ -50,6 +50,7 @@ export type CreateUserInput = {
   phone?: string;
   role: UserRole;
   custom_role_id?: string;
+  worker_id?: string;
 };
 
 export type UpdateUserInput = {
@@ -59,7 +60,15 @@ export type UpdateUserInput = {
   phone?: string;
   role: UserRole;
   custom_role_id?: string;
+  worker_id?: string;
   is_active: boolean;
+};
+
+export type WorkerInput = {
+  name: string;
+  identity_card_no: string;
+  salary_type: "daily" | "monthly_basic";
+  salary_amount: number;
 };
 
 export type CustomRoleInput = {
@@ -143,6 +152,31 @@ export async function createUser(data: CreateUserInput): Promise<ActionResult> {
   if (data.role === "custom" && !data.custom_role_id) {
     return { success: false, error: "Please select a custom role" };
   }
+  const needsWorker = data.role !== "admin" && data.role !== "manager";
+  if (needsWorker && !data.worker_id) {
+    return { success: false, error: "Please select a worker for this user" };
+  }
+  if (!needsWorker && data.worker_id) {
+    return { success: false, error: "Admins and managers cannot be linked to a worker" };
+  }
+
+  if (data.worker_id) {
+    const { data: workerRow, error: workerError } = await admin.supabase
+      .from("workers")
+      .select("id")
+      .eq("id", data.worker_id)
+      .maybeSingle();
+    if (workerError) return { success: false, error: workerError.message };
+    if (!workerRow) return { success: false, error: "Selected worker was not found" };
+
+    const { data: existingWorkerLink, error: existingWorkerLinkError } = await admin.supabase
+      .from("users_profile")
+      .select("id")
+      .eq("worker_id", data.worker_id)
+      .maybeSingle();
+    if (existingWorkerLinkError) return { success: false, error: existingWorkerLinkError.message };
+    if (existingWorkerLink) return { success: false, error: "Selected worker is already linked to another user" };
+  }
 
   const { data: createdAuthUser, error: createAuthError } = await adminClient.auth.admin.createUser({
     email: data.email.trim(),
@@ -163,6 +197,7 @@ export async function createUser(data: CreateUserInput): Promise<ActionResult> {
     full_name: data.full_name.trim(),
     phone: data.phone?.trim() || null,
     custom_role_id: data.role === "custom" ? data.custom_role_id || null : null,
+    worker_id: data.worker_id || null,
     is_active: true,
     created_by: admin.userId
   });
@@ -189,8 +224,34 @@ export async function updateUser(id: string, data: UpdateUserInput): Promise<Act
   if (data.role === "custom" && !data.custom_role_id) {
     return { success: false, error: "Please select a custom role" };
   }
+  const needsWorker = data.role !== "admin" && data.role !== "manager";
+  if (needsWorker && !data.worker_id) {
+    return { success: false, error: "Please select a worker for this user" };
+  }
+  if (!needsWorker && data.worker_id) {
+    return { success: false, error: "Admins and managers cannot be linked to a worker" };
+  }
   if (id === admin.userId && (!data.is_active || data.role !== "admin")) {
     return { success: false, error: "You cannot remove admin access from your own account" };
+  }
+
+  if (data.worker_id) {
+    const { data: workerRow, error: workerError } = await admin.supabase
+      .from("workers")
+      .select("id")
+      .eq("id", data.worker_id)
+      .maybeSingle();
+    if (workerError) return { success: false, error: workerError.message };
+    if (!workerRow) return { success: false, error: "Selected worker was not found" };
+
+    const { data: existingWorkerLink, error: existingWorkerLinkError } = await admin.supabase
+      .from("users_profile")
+      .select("id")
+      .eq("worker_id", data.worker_id)
+      .neq("id", id)
+      .maybeSingle();
+    if (existingWorkerLinkError) return { success: false, error: existingWorkerLinkError.message };
+    if (existingWorkerLink) return { success: false, error: "Selected worker is already linked to another user" };
   }
 
   const { data: existingUser, error: existingUserError } = await admin.supabase
@@ -243,6 +304,7 @@ export async function updateUser(id: string, data: UpdateUserInput): Promise<Act
       phone: data.phone?.trim() || null,
       role: data.role,
       custom_role_id: data.role === "custom" ? data.custom_role_id || null : null,
+      worker_id: data.worker_id || null,
       is_active: data.is_active
     })
     .eq("id", id);
@@ -348,6 +410,92 @@ export async function deleteCustomRole(id: string): Promise<ActionResult> {
   }
 
   revalidatePath("/admin/roles");
+  revalidatePath("/admin/users");
+  return { success: true };
+}
+
+export async function createWorker(data: WorkerInput): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if ("error" in admin) return { success: false, error: admin.error };
+
+  const name = data.name.trim();
+  const identityCardNo = data.identity_card_no.trim();
+  if (!name || !identityCardNo) {
+    return { success: false, error: "Worker name and identity card no are required" };
+  }
+  if (!Number.isFinite(data.salary_amount) || data.salary_amount < 0) {
+    return { success: false, error: "Salary amount must be a valid non-negative number" };
+  }
+
+  const { error } = await admin.supabase.from("workers").insert({
+    name,
+    identity_card_no: identityCardNo,
+    salary_type: data.salary_type,
+    salary_amount: data.salary_amount
+  });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/admin/workers");
+  revalidatePath("/admin/users");
+  return { success: true };
+}
+
+export async function updateWorker(id: string, data: WorkerInput): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if ("error" in admin) return { success: false, error: admin.error };
+
+  if (!id) return { success: false, error: "Worker id is required" };
+
+  const name = data.name.trim();
+  const identityCardNo = data.identity_card_no.trim();
+  if (!name || !identityCardNo) {
+    return { success: false, error: "Worker name and identity card no are required" };
+  }
+  if (!Number.isFinite(data.salary_amount) || data.salary_amount < 0) {
+    return { success: false, error: "Salary amount must be a valid non-negative number" };
+  }
+
+  const { error } = await admin.supabase
+    .from("workers")
+    .update({
+      name,
+      identity_card_no: identityCardNo,
+      salary_type: data.salary_type,
+      salary_amount: data.salary_amount
+    })
+    .eq("id", id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  revalidatePath("/admin/workers");
+  revalidatePath("/admin/users");
+  return { success: true };
+}
+
+export async function deleteWorker(id: string): Promise<ActionResult> {
+  const admin = await requireAdmin();
+  if ("error" in admin) return { success: false, error: admin.error };
+
+  if (!id) return { success: false, error: "Worker id is required" };
+
+  const { count, error: usageError } = await admin.supabase
+    .from("users_profile")
+    .select("id", { count: "exact", head: true })
+    .eq("worker_id", id);
+  if (usageError) return { success: false, error: usageError.message };
+  if ((count ?? 0) > 0) {
+    return { success: false, error: "Worker is already linked to a user" };
+  }
+
+  const { error } = await admin.supabase.from("workers").delete().eq("id", id);
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/admin/workers");
   revalidatePath("/admin/users");
   return { success: true };
 }

@@ -9,13 +9,15 @@ import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { toast } from "@/lib/toast";
 
-import type { AdminUserRow, CustomRoleSelectOption, UserRoleOption } from "./types";
+import type { AdminUserRow, CustomRoleSelectOption, UserRoleOption, WorkerSelectOption } from "./types";
 
 type EditUserDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   user: AdminUserRow | null;
   customRoles: CustomRoleSelectOption[];
+  workers: WorkerSelectOption[];
+  usedWorkerIds: string[];
   onUpdated: () => void;
 };
 
@@ -26,6 +28,7 @@ type EditUserFormState = {
   phone: string;
   role: UserRoleOption;
   custom_role_id: string;
+  worker_id: string;
   is_active: boolean;
 };
 
@@ -45,10 +48,11 @@ const initialState: EditUserFormState = {
   phone: "",
   role: "manager",
   custom_role_id: "",
+  worker_id: "",
   is_active: true
 };
 
-export function EditUserDialog({ open, onOpenChange, user, customRoles, onUpdated }: EditUserDialogProps) {
+export function EditUserDialog({ open, onOpenChange, user, customRoles, workers, usedWorkerIds, onUpdated }: EditUserDialogProps) {
   const [form, setForm] = useState<EditUserFormState>(initialState);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,6 +67,7 @@ export function EditUserDialog({ open, onOpenChange, user, customRoles, onUpdate
       phone: user.phone || "",
       role: user.role,
       custom_role_id: user.custom_role_id || "",
+      worker_id: user.worker_id || "",
       is_active: user.is_active
     });
     setSubmitError(null);
@@ -81,6 +86,18 @@ export function EditUserDialog({ open, onOpenChange, user, customRoles, onUpdate
     () => customRoles.map((role) => ({ value: role.id, label: role.name })),
     [customRoles]
   );
+  const workerOptions = useMemo(() => {
+    const allowedWorkerIds = new Set(usedWorkerIds);
+    if (user?.worker_id) allowedWorkerIds.delete(user.worker_id);
+
+    return workers
+      .filter((worker) => !allowedWorkerIds.has(worker.id))
+      .map((worker) => ({
+        value: worker.id,
+        label: `${worker.name} (${worker.identity_card_no})`
+      }));
+  }, [workers, usedWorkerIds, user?.worker_id]);
+  const needsWorker = form.role !== "admin" && form.role !== "manager";
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -100,6 +117,7 @@ export function EditUserDialog({ open, onOpenChange, user, customRoles, onUpdate
       phone: form.phone,
       role: form.role,
       custom_role_id: form.role === "custom" ? form.custom_role_id : undefined,
+      worker_id: needsWorker ? form.worker_id : undefined,
       is_active: form.is_active
     });
 
@@ -193,11 +211,28 @@ export function EditUserDialog({ open, onOpenChange, user, customRoles, onUpdate
               setForm((prev) => ({
                 ...prev,
                 role: nextRole,
-                custom_role_id: nextRole === "custom" ? prev.custom_role_id : ""
+                custom_role_id: nextRole === "custom" ? prev.custom_role_id : "",
+                worker_id: nextRole === "admin" || nextRole === "manager" ? "" : prev.worker_id
               }));
             }}
           />
         </div>
+
+        {needsWorker ? (
+          <div className="space-y-1">
+            <label htmlFor="edit-user-worker" className="text-sm font-medium">
+              Worker
+            </label>
+            <SearchableSelect
+              id="edit-user-worker"
+              required
+              value={form.worker_id}
+              placeholder={workerOptions.length > 0 ? "Select worker" : "No available workers"}
+              options={workerOptions}
+              onChange={(value) => setForm((prev) => ({ ...prev, worker_id: value }))}
+            />
+          </div>
+        ) : null}
 
         {form.role === "custom" ? (
           <div className="space-y-1">

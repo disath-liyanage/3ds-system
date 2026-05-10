@@ -9,12 +9,14 @@ import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { toast } from "@/lib/toast";
 
-import type { CustomRoleSelectOption, UserRoleOption } from "./types";
+import type { CustomRoleSelectOption, UserRoleOption, WorkerSelectOption } from "./types";
 
 type AddUserDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   customRoles: CustomRoleSelectOption[];
+  workers: WorkerSelectOption[];
+  usedWorkerIds: string[];
   onCreated: () => void;
 };
 
@@ -25,6 +27,7 @@ type AddUserFormState = {
   phone: string;
   role: UserRoleOption;
   custom_role_id: string;
+  worker_id: string;
 };
 
 const roleOptions = [
@@ -42,10 +45,11 @@ const initialState: AddUserFormState = {
   password: "",
   phone: "",
   role: "sales_rep",
-  custom_role_id: ""
+  custom_role_id: "",
+  worker_id: ""
 };
 
-export function AddUserDialog({ open, onOpenChange, customRoles, onCreated }: AddUserDialogProps) {
+export function AddUserDialog({ open, onOpenChange, customRoles, workers, usedWorkerIds, onCreated }: AddUserDialogProps) {
   const [form, setForm] = useState<AddUserFormState>(initialState);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,6 +58,17 @@ export function AddUserDialog({ open, onOpenChange, customRoles, onCreated }: Ad
     () => customRoles.map((role) => ({ value: role.id, label: role.name })),
     [customRoles]
   );
+  const workerOptions = useMemo(
+    () =>
+      workers
+        .filter((worker) => !usedWorkerIds.includes(worker.id))
+        .map((worker) => ({
+          value: worker.id,
+          label: `${worker.name} (${worker.identity_card_no})`
+        })),
+    [workers, usedWorkerIds]
+  );
+  const needsWorker = form.role !== "admin" && form.role !== "manager";
 
   const resetForm = () => {
     setForm(initialState);
@@ -77,7 +92,8 @@ export function AddUserDialog({ open, onOpenChange, customRoles, onCreated }: Ad
       password: form.password,
       phone: form.phone,
       role: form.role,
-      custom_role_id: form.role === "custom" ? form.custom_role_id : undefined
+      custom_role_id: form.role === "custom" ? form.custom_role_id : undefined,
+      worker_id: needsWorker ? form.worker_id : undefined
     });
 
     if (!result.success) {
@@ -172,11 +188,28 @@ export function AddUserDialog({ open, onOpenChange, customRoles, onCreated }: Ad
               setForm((prev) => ({
                 ...prev,
                 role: nextRole,
-                custom_role_id: nextRole === "custom" ? prev.custom_role_id : ""
+                custom_role_id: nextRole === "custom" ? prev.custom_role_id : "",
+                worker_id: nextRole === "admin" || nextRole === "manager" ? "" : prev.worker_id
               }));
             }}
           />
         </div>
+
+        {needsWorker ? (
+          <div className="space-y-1">
+            <label htmlFor="add-user-worker" className="text-sm font-medium">
+              Worker
+            </label>
+            <SearchableSelect
+              id="add-user-worker"
+              required
+              value={form.worker_id}
+              placeholder={workerOptions.length > 0 ? "Select worker" : "No available workers"}
+              options={workerOptions}
+              onChange={(value) => setForm((prev) => ({ ...prev, worker_id: value }))}
+            />
+          </div>
+        ) : null}
 
         {form.role === "custom" ? (
           <div className="space-y-1">
