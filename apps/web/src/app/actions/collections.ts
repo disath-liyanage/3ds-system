@@ -29,30 +29,28 @@ export type RecordCollectionInput = {
   incentive_recipient_id?: string;
 };
 
-export type CollectionReportStatus = "draft" | "submitted" | "approved" | "rejected";
+export type CollectionExpenseStatus = "pending" | "approved" | "rejected";
 
-export type CollectionReportSummary = {
-  report_id: string | null;
-  sales_rep_id: string;
-  sales_rep_name: string;
-  report_date: string;
-  status: CollectionReportStatus | "none";
-  collected_total: number;
-  expense_total: number;
-  net_total: number;
-};
-
-export type CollectionReportExpenseRow = {
+export type CollectionExpenseRow = {
   id: string;
-  report_id: string;
-  expense_date: string;
+  sales_rep_id: string;
+  title: string;
   category: string;
   amount: number;
-  note: string | null;
+  notes: string | null;
+  status: CollectionExpenseStatus;
   created_at: string;
 };
 
-export type CollectionReportCollectionRow = {
+export type CollectionApprovalSummary = {
+  sales_rep_id: string;
+  sales_rep_name: string;
+  pending_collections_total: number;
+  pending_expenses_total: number;
+  cash_in_hand: number;
+};
+
+export type PendingCollectionRow = {
   id: string;
   invoice_number: number | null;
   customer_name: string;
@@ -61,23 +59,15 @@ export type CollectionReportCollectionRow = {
   created_at: string;
 };
 
-export type CollectionReportDetail = {
-  report: {
-    id: string;
-    sales_rep_id: string;
-    sales_rep_name: string;
-    report_date: string;
-    status: CollectionReportStatus;
-    submitted_at: string | null;
-    approved_at: string | null;
-    rejected_at: string | null;
-  };
-  collections: CollectionReportCollectionRow[];
-  expenses: CollectionReportExpenseRow[];
+export type CollectionApprovalDetail = {
+  sales_rep_id: string;
+  sales_rep_name: string;
+  collections: PendingCollectionRow[];
+  expenses: CollectionExpenseRow[];
   totals: {
-    collected_total: number;
-    expense_total: number;
-    net_total: number;
+    collections_total: number;
+    expenses_total: number;
+    cash_in_hand: number;
   };
 };
 
@@ -128,33 +118,36 @@ type ReceiveNoteRateRow = {
   created_at: string;
 };
 
-type CollectionReportRow = {
-  id: string;
-  sales_rep_id: string;
-  report_date: string;
-  status: CollectionReportStatus;
-  submitted_at: string | null;
-  approved_at: string | null;
-  rejected_at: string | null;
-};
-
-type CollectionReportExpenseAmountRow = {
-  report_id: string;
-  amount: number;
-};
-
-type CollectionReportSalesRepRow = {
+type CollectionApprovalSalesRepRow = {
   id: string;
   full_name: string;
 };
 
-type CollectionReportCollectionQueryRow = {
+type PendingCollectionQueryRow = {
   id: string;
   amount: number;
   notes: string | null;
   created_at: string;
   invoice: { invoice_number: number | null } | null;
   customer: { name: string } | null;
+};
+
+type PendingCollectionApprovalRow = {
+  id: string;
+  amount: number;
+  invoice_id: string | null;
+  customer_id: string;
+  invoice: {
+    id: string;
+    total_amount: number;
+    customer_id: string;
+    customer: { balance: number | null } | null;
+  } | null;
+};
+
+type PendingExpenseAmountRow = {
+  sales_rep_id: string;
+  amount: number;
 };
 
 async function getCurrentUserProfile() {
@@ -208,7 +201,7 @@ function canViewAllCollections(profile: ProfilePermissionRow): boolean {
   return profile.role === "admin" || profile.role === "manager" || profile.role === "cashier";
 }
 
-function canManageCollectionReports(profile: ProfilePermissionRow): boolean {
+function canManageCollectionApprovals(profile: ProfilePermissionRow): boolean {
   const roleRelation = profile.custom_role;
   const customRole = Array.isArray(roleRelation) ? roleRelation[0] || null : roleRelation;
 
@@ -218,12 +211,6 @@ function canManageCollectionReports(profile: ProfilePermissionRow): boolean {
     profile.role === "cashier" ||
     Boolean(customRole?.perm_validate_collections)
   );
-}
-
-function buildReportDateRange(reportDate: string): { start: string; end: string } {
-  const start = new Date(`${reportDate}T00:00:00`);
-  const end = new Date(`${reportDate}T23:59:59.999`);
-  return { start: start.toISOString(), end: end.toISOString() };
 }
 
 function buildDueDate(issuedAt: string): string {
@@ -419,45 +406,24 @@ export async function recordCollection(input: RecordCollectionInput): Promise<Ac
     .update({ incentive_total: incentiveTotal })
     .eq("id", collection.id);
 
-  await adminClient
-    .from("invoices")
-    .update({
-      is_settled: true,
-      settled_at: new Date().toISOString(),
-      settled_by: access.profile.id,
-      status: "paid"
-    })
-    .eq("id", invoice.id);
-
-  if (customer?.balance != null) {
-    const nextBalance = Math.max(0, Number(customer.balance) - amount);
-    await adminClient.from("customers").update({ balance: nextBalance }).eq("id", invoice.customer_id);
-  }
-
   revalidatePath("/collections");
-  revalidatePath("/invoices");
-  revalidatePath("/customers");
+  revalidatePath("/collections/approvals");
 
-  return { success: true, message: "Collection recorded and invoice settled." };
+  return { success: true, message: "Collection recorded and pending approval." };
 }
 
-async function fetchReportCollections(
-  salesRepId: string,
-  reportDate: string
-): Promise<{ rows: CollectionReportCollectionRow[]; total: number }> {
-  const { start, end } = buildReportDateRange(reportDate);
+async function fetchPendingCollections(salesRepId: string): Promise<PendingCollectionRow[]> {
   const { data, error } = await adminClient
     .from("collections")
     .select("id, amount, notes, created_at, invoice:invoices(invoice_number), customer:customers(name)")
     .eq("collected_by", salesRepId)
-    .gte("created_at", start)
-    .lte("created_at", end)
+    .eq("status", "pending")
     .order("created_at", { ascending: true })
-    .returns<CollectionReportCollectionQueryRow[]>();
+    .returns<PendingCollectionQueryRow[]>();
 
   if (error) throw error;
 
-  const rows = (data ?? []).map((row) => ({
+  return (data ?? []).map((row) => ({
     id: row.id,
     invoice_number: row.invoice?.invoice_number ?? null,
     customer_name: row.customer?.name ?? "Unknown",
@@ -465,256 +431,68 @@ async function fetchReportCollections(
     notes: row.notes ?? null,
     created_at: row.created_at
   }));
-
-  const total = rows.reduce((sum, row) => sum + row.amount, 0);
-  return { rows, total };
 }
 
-async function fetchReportExpenses(
-  reportId: string
-): Promise<{ rows: CollectionReportExpenseRow[]; total: number }> {
+async function fetchPendingExpenses(salesRepId: string): Promise<CollectionExpenseRow[]> {
   const { data, error } = await adminClient
-    .from("collection_report_expenses")
-    .select("id, report_id, expense_date, category, amount, note, created_at")
-    .eq("report_id", reportId)
-    .order("expense_date", { ascending: true })
-    .returns<CollectionReportExpenseRow[]>();
+    .from("collection_expenses")
+    .select("id, sales_rep_id, title, category, amount, notes, status, created_at")
+    .eq("sales_rep_id", salesRepId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: true })
+    .returns<CollectionExpenseRow[]>();
 
   if (error) throw error;
+
+  return (data ?? []).map((row) => ({
+    ...row,
+    amount: Number(row.amount)
+  }));
+}
+
+export async function listMyCollectionExpenses(): Promise<{
+  success: boolean;
+  data?: CollectionExpenseRow[];
+  error?: string;
+}> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!canRecordCollections(access.profile)) {
+    return { success: false, error: "You do not have permission to view expenses" };
+  }
+
+  const { data, error } = await adminClient
+    .from("collection_expenses")
+    .select("id, sales_rep_id, title, category, amount, notes, status, created_at")
+    .eq("sales_rep_id", access.profile.id)
+    .order("created_at", { ascending: false })
+    .returns<CollectionExpenseRow[]>();
+
+  if (error) return { success: false, error: error.message };
 
   const rows = (data ?? []).map((row) => ({
     ...row,
     amount: Number(row.amount)
   }));
-  const total = rows.reduce((sum, row) => sum + row.amount, 0);
-  return { rows, total };
+
+  return { success: true, data: rows };
 }
 
-export async function listDailyCollectionReports(
-  reportDate: string
-): Promise<{ success: boolean; data?: CollectionReportSummary[]; error?: string }> {
-  const access = await getCurrentUserProfile();
-  if ("error" in access) return { success: false, error: access.error };
-
-  if (!canManageCollectionReports(access.profile)) {
-    return { success: false, error: "You do not have permission to view collection reports" };
-  }
-
-  if (!reportDate) {
-    return { success: false, error: "Report date is required" };
-  }
-
-  const { data: reps, error: repsError } = await adminClient
-    .from("users_profile")
-    .select("id, full_name")
-    .eq("role", "sales_rep")
-    .order("full_name", { ascending: true })
-    .returns<CollectionReportSalesRepRow[]>();
-
-  if (repsError) return { success: false, error: repsError.message };
-
-  const repRows = reps ?? [];
-  const repIds = repRows.map((rep) => rep.id);
-  if (repIds.length === 0) return { success: true, data: [] };
-
-  const { data: reports, error: reportsError } = await adminClient
-    .from("collection_reports")
-    .select("id, sales_rep_id, report_date, status, submitted_at, approved_at, rejected_at")
-    .eq("report_date", reportDate)
-    .in("sales_rep_id", repIds)
-    .returns<CollectionReportRow[]>();
-
-  if (reportsError) return { success: false, error: reportsError.message };
-
-  const reportMap = new Map((reports ?? []).map((report) => [report.sales_rep_id, report]));
-
-  const reportIds = (reports ?? []).map((report) => report.id);
-  const expenseTotals = new Map<string, number>();
-  if (reportIds.length > 0) {
-    const { data: expenseRows, error: expenseError } = await adminClient
-      .from("collection_report_expenses")
-      .select("report_id, amount")
-      .in("report_id", reportIds)
-      .returns<CollectionReportExpenseAmountRow[]>();
-
-    if (expenseError) return { success: false, error: expenseError.message };
-
-    for (const row of expenseRows ?? []) {
-      const current = expenseTotals.get(row.report_id) ?? 0;
-      expenseTotals.set(row.report_id, current + Number(row.amount));
-    }
-  }
-
-  const { start, end } = buildReportDateRange(reportDate);
-  const { data: collectionRows, error: collectionsError } = await adminClient
-    .from("collections")
-    .select("collected_by, amount, created_at")
-    .in("collected_by", repIds)
-    .gte("created_at", start)
-    .lte("created_at", end);
-
-  if (collectionsError) return { success: false, error: collectionsError.message };
-
-  const collectionTotals = new Map<string, number>();
-  for (const row of collectionRows ?? []) {
-    const repId = (row as { collected_by: string }).collected_by;
-    const amount = Number((row as { amount: number }).amount);
-    const current = collectionTotals.get(repId) ?? 0;
-    collectionTotals.set(repId, current + amount);
-  }
-
-  const summaries: CollectionReportSummary[] = repRows.map((rep) => {
-    const report = reportMap.get(rep.id) ?? null;
-    const collectedTotal = collectionTotals.get(rep.id) ?? 0;
-    const expenseTotal = report ? expenseTotals.get(report.id) ?? 0 : 0;
-    const netTotal = collectedTotal - expenseTotal;
-
-    return {
-      report_id: report?.id ?? null,
-      sales_rep_id: rep.id,
-      sales_rep_name: rep.full_name,
-      report_date: reportDate,
-      status: report?.status ?? "none",
-      collected_total: collectedTotal,
-      expense_total: expenseTotal,
-      net_total: netTotal
-    };
-  });
-
-  return { success: true, data: summaries };
-}
-
-export async function getDailyCollectionReport(
-  reportDate: string
-): Promise<{ success: boolean; data?: CollectionReportDetail; error?: string }> {
-  const access = await getCurrentUserProfile();
-  if ("error" in access) return { success: false, error: access.error };
-
-  if (!canRecordCollections(access.profile)) {
-    return { success: false, error: "You do not have permission to view collection reports" };
-  }
-
-  if (!reportDate) {
-    return { success: false, error: "Report date is required" };
-  }
-
-  let { data: report, error: reportError } = await adminClient
-    .from("collection_reports")
-    .select("id, sales_rep_id, report_date, status, submitted_at, approved_at, rejected_at")
-    .eq("sales_rep_id", access.profile.id)
-    .eq("report_date", reportDate)
-    .maybeSingle<CollectionReportRow>();
-
-  if (reportError) return { success: false, error: reportError.message };
-
-  if (!report) {
-    const { data: inserted, error: insertError } = await adminClient
-      .from("collection_reports")
-      .insert({
-        sales_rep_id: access.profile.id,
-        report_date: reportDate,
-        status: "draft"
-      })
-      .select("id, sales_rep_id, report_date, status, submitted_at, approved_at, rejected_at")
-      .single<CollectionReportRow>();
-
-    if (insertError || !inserted) {
-      return { success: false, error: insertError?.message || "Failed to create report" };
-    }
-    report = inserted;
-  }
-
-  const collections = await fetchReportCollections(report.sales_rep_id, report.report_date);
-  const expenses = await fetchReportExpenses(report.id);
-
-  return {
-    success: true,
-    data: {
-      report: {
-        id: report.id,
-        sales_rep_id: report.sales_rep_id,
-        sales_rep_name: access.profile.full_name,
-        report_date: report.report_date,
-        status: report.status,
-        submitted_at: report.submitted_at,
-        approved_at: report.approved_at,
-        rejected_at: report.rejected_at
-      },
-      collections: collections.rows,
-      expenses: expenses.rows,
-      totals: {
-        collected_total: collections.total,
-        expense_total: expenses.total,
-        net_total: collections.total - expenses.total
-      }
-    }
-  };
-}
-
-export async function getCollectionReportDetail(
-  reportId: string
-): Promise<{ success: boolean; data?: CollectionReportDetail; error?: string }> {
-  const access = await getCurrentUserProfile();
-  if ("error" in access) return { success: false, error: access.error };
-
-  if (!reportId) return { success: false, error: "Report id is required" };
-
-  const { data: reportRow, error: reportError } = await adminClient
-    .from("collection_reports")
-    .select(
-      "id, sales_rep_id, report_date, status, submitted_at, approved_at, rejected_at, sales_rep:users_profile(full_name)"
-    )
-    .eq("id", reportId)
-    .maybeSingle<CollectionReportRow & { sales_rep: { full_name: string } | null }>();
-
-  if (reportError || !reportRow) {
-    return { success: false, error: reportError?.message || "Report not found" };
-  }
-
-  const isOwner = reportRow.sales_rep_id === access.profile.id;
-  if (!isOwner && !canManageCollectionReports(access.profile)) {
-    return { success: false, error: "You do not have permission to view this report" };
-  }
-
-  const collections = await fetchReportCollections(reportRow.sales_rep_id, reportRow.report_date);
-  const expenses = await fetchReportExpenses(reportRow.id);
-
-  return {
-    success: true,
-    data: {
-      report: {
-        id: reportRow.id,
-        sales_rep_id: reportRow.sales_rep_id,
-        sales_rep_name: reportRow.sales_rep?.full_name ?? "Unknown",
-        report_date: reportRow.report_date,
-        status: reportRow.status,
-        submitted_at: reportRow.submitted_at,
-        approved_at: reportRow.approved_at,
-        rejected_at: reportRow.rejected_at
-      },
-      collections: collections.rows,
-      expenses: expenses.rows,
-      totals: {
-        collected_total: collections.total,
-        expense_total: expenses.total,
-        net_total: collections.total - expenses.total
-      }
-    }
-  };
-}
-
-export async function addCollectionReportExpense(input: {
-  report_id: string;
-  expense_date: string;
+export async function addCollectionExpense(input: {
+  title: string;
   category: string;
   amount: number;
-  note?: string;
+  notes?: string;
 }): Promise<ActionResult> {
   const access = await getCurrentUserProfile();
   if ("error" in access) return { success: false, error: access.error };
 
-  if (!input.report_id) return { success: false, error: "Report id is required" };
-  if (!input.expense_date) return { success: false, error: "Expense date is required" };
+  if (!canRecordCollections(access.profile)) {
+    return { success: false, error: "You do not have permission to add expenses" };
+  }
+
+  if (!input.title.trim()) return { success: false, error: "Title is required" };
   if (!input.category.trim()) return { success: false, error: "Category is required" };
 
   const amount = Number(input.amount);
@@ -722,204 +500,202 @@ export async function addCollectionReportExpense(input: {
     return { success: false, error: "Amount must be greater than 0" };
   }
 
-  const { data: report, error: reportError } = await adminClient
-    .from("collection_reports")
-    .select("id, sales_rep_id, status")
-    .eq("id", input.report_id)
-    .maybeSingle<CollectionReportRow>();
+  const { error } = await adminClient.from("collection_expenses").insert({
+    sales_rep_id: access.profile.id,
+    title: input.title.trim(),
+    category: input.category.trim(),
+    amount,
+    notes: input.notes?.trim() || null
+  });
 
-  if (reportError || !report) {
-    return { success: false, error: reportError?.message || "Report not found" };
-  }
+  if (error) return { success: false, error: error.message };
 
-  if (report.sales_rep_id !== access.profile.id) {
-    return { success: false, error: "You do not have permission to edit this report" };
-  }
-
-  if (!["draft", "rejected"].includes(report.status)) {
-    return { success: false, error: "This report can no longer be edited" };
-  }
-
-  const { error: insertError } = await adminClient
-    .from("collection_report_expenses")
-    .insert({
-      report_id: input.report_id,
-      expense_date: input.expense_date,
-      category: input.category.trim(),
-      amount,
-      note: input.note?.trim() || null
-    });
-
-  if (insertError) return { success: false, error: insertError.message };
-
-  revalidatePath("/collections/reports");
-  revalidatePath("/collections/reports/my");
+  revalidatePath("/collections/expenses");
+  revalidatePath("/collections/approvals");
 
   return { success: true, message: "Expense added" };
 }
 
-export async function deleteCollectionReportExpense(reportId: string, expenseId: string): Promise<ActionResult> {
+export async function listCollectionApprovalSummaries(): Promise<{
+  success: boolean;
+  data?: CollectionApprovalSummary[];
+  error?: string;
+}> {
   const access = await getCurrentUserProfile();
   if ("error" in access) return { success: false, error: access.error };
 
-  if (!reportId || !expenseId) return { success: false, error: "Expense id is required" };
-
-  const { data: report, error: reportError } = await adminClient
-    .from("collection_reports")
-    .select("id, sales_rep_id, status")
-    .eq("id", reportId)
-    .maybeSingle<CollectionReportRow>();
-
-  if (reportError || !report) {
-    return { success: false, error: reportError?.message || "Report not found" };
+  if (!canManageCollectionApprovals(access.profile)) {
+    return { success: false, error: "You do not have permission to view approvals" };
   }
 
-  if (report.sales_rep_id !== access.profile.id) {
-    return { success: false, error: "You do not have permission to edit this report" };
+  const { data: reps, error: repsError } = await adminClient
+    .from("users_profile")
+    .select("id, full_name")
+    .eq("role", "sales_rep")
+    .order("full_name", { ascending: true })
+    .returns<CollectionApprovalSalesRepRow[]>();
+
+  if (repsError) return { success: false, error: repsError.message };
+
+  const repRows = reps ?? [];
+  if (repRows.length === 0) return { success: true, data: [] };
+
+  const repIds = repRows.map((rep) => rep.id);
+
+  const { data: collectionRows, error: collectionsError } = await adminClient
+    .from("collections")
+    .select("collected_by, amount")
+    .in("collected_by", repIds)
+    .eq("status", "pending");
+
+  if (collectionsError) return { success: false, error: collectionsError.message };
+
+  const { data: expenseRows, error: expenseError } = await adminClient
+    .from("collection_expenses")
+    .select("sales_rep_id, amount")
+    .in("sales_rep_id", repIds)
+    .eq("status", "pending")
+    .returns<PendingExpenseAmountRow[]>();
+
+  if (expenseError) return { success: false, error: expenseError.message };
+
+  const collectionTotals = new Map<string, number>();
+  for (const row of collectionRows ?? []) {
+    const repId = (row as { collected_by: string }).collected_by;
+    const amount = Number((row as { amount: number }).amount);
+    collectionTotals.set(repId, (collectionTotals.get(repId) ?? 0) + amount);
   }
 
-  if (!["draft", "rejected"].includes(report.status)) {
-    return { success: false, error: "This report can no longer be edited" };
+  const expenseTotals = new Map<string, number>();
+  for (const row of expenseRows ?? []) {
+    expenseTotals.set(row.sales_rep_id, (expenseTotals.get(row.sales_rep_id) ?? 0) + Number(row.amount));
   }
 
-  const { error: deleteError } = await adminClient
-    .from("collection_report_expenses")
-    .delete()
-    .eq("id", expenseId)
-    .eq("report_id", reportId);
+  const summaries = repRows.map((rep) => {
+    const collectionsTotal = collectionTotals.get(rep.id) ?? 0;
+    const expensesTotal = expenseTotals.get(rep.id) ?? 0;
+    return {
+      sales_rep_id: rep.id,
+      sales_rep_name: rep.full_name,
+      pending_collections_total: collectionsTotal,
+      pending_expenses_total: expensesTotal,
+      cash_in_hand: collectionsTotal - expensesTotal
+    };
+  });
 
-  if (deleteError) return { success: false, error: deleteError.message };
-
-  revalidatePath("/collections/reports");
-  revalidatePath("/collections/reports/my");
-
-  return { success: true, message: "Expense removed" };
+  return { success: true, data: summaries };
 }
 
-export async function submitCollectionReport(reportId: string): Promise<ActionResult> {
+export async function getCollectionApprovalDetail(
+  salesRepId: string
+): Promise<{ success: boolean; data?: CollectionApprovalDetail; error?: string }> {
   const access = await getCurrentUserProfile();
   if ("error" in access) return { success: false, error: access.error };
 
-  if (!reportId) return { success: false, error: "Report id is required" };
-
-  const { data: report, error: reportError } = await adminClient
-    .from("collection_reports")
-    .select("id, sales_rep_id, status")
-    .eq("id", reportId)
-    .maybeSingle<CollectionReportRow>();
-
-  if (reportError || !report) {
-    return { success: false, error: reportError?.message || "Report not found" };
+  if (!canManageCollectionApprovals(access.profile)) {
+    return { success: false, error: "You do not have permission to view approvals" };
   }
 
-  if (report.sales_rep_id !== access.profile.id) {
-    return { success: false, error: "You do not have permission to submit this report" };
+  if (!salesRepId) return { success: false, error: "Sales rep is required" };
+
+  const { data: rep, error: repError } = await adminClient
+    .from("users_profile")
+    .select("id, full_name")
+    .eq("id", salesRepId)
+    .maybeSingle<CollectionApprovalSalesRepRow>();
+
+  if (repError || !rep) {
+    return { success: false, error: repError?.message || "Sales rep not found" };
   }
 
-  if (!["draft", "rejected"].includes(report.status)) {
-    return { success: false, error: "This report is already submitted" };
+  const collections = await fetchPendingCollections(salesRepId);
+  const expenses = await fetchPendingExpenses(salesRepId);
+
+  const collectionsTotal = collections.reduce((sum, row) => sum + row.amount, 0);
+  const expensesTotal = expenses.reduce((sum, row) => sum + row.amount, 0);
+
+  return {
+    success: true,
+    data: {
+      sales_rep_id: rep.id,
+      sales_rep_name: rep.full_name,
+      collections,
+      expenses,
+      totals: {
+        collections_total: collectionsTotal,
+        expenses_total: expensesTotal,
+        cash_in_hand: collectionsTotal - expensesTotal
+      }
+    }
+  };
+}
+
+export async function approveCollectionRep(salesRepId: string): Promise<ActionResult> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!canManageCollectionApprovals(access.profile)) {
+    return { success: false, error: "You do not have permission to approve collections" };
   }
 
-  const { error: updateError } = await adminClient
-    .from("collection_reports")
+  if (!salesRepId) return { success: false, error: "Sales rep is required" };
+
+  const { data: pendingCollections, error: collectionsError } = await adminClient
+    .from("collections")
+    .select(
+      "id, amount, invoice_id, customer_id, invoice:invoices(id, total_amount, customer_id, customer:customers(balance))"
+    )
+    .eq("collected_by", salesRepId)
+    .eq("status", "pending")
+    .returns<PendingCollectionApprovalRow[]>();
+
+  if (collectionsError) return { success: false, error: collectionsError.message };
+
+  const { error: collectionsUpdateError } = await adminClient
+    .from("collections")
     .update({
-      status: "submitted",
-      submitted_at: new Date().toISOString(),
-      approved_by: null,
-      approved_at: null,
-      rejected_by: null,
-      rejected_at: null
+      status: "validated",
+      validated_by: access.profile.id
     })
-    .eq("id", reportId);
+    .eq("collected_by", salesRepId)
+    .eq("status", "pending");
 
-  if (updateError) return { success: false, error: updateError.message };
+  if (collectionsUpdateError) return { success: false, error: collectionsUpdateError.message };
 
-  revalidatePath("/collections/reports");
-  revalidatePath("/collections/reports/my");
+  for (const row of pendingCollections ?? []) {
+    if (!row.invoice_id || !row.invoice) continue;
 
-  return { success: true, message: "Report submitted" };
-}
+    await adminClient
+      .from("invoices")
+      .update({
+        is_settled: true,
+        settled_at: new Date().toISOString(),
+        settled_by: access.profile.id,
+        status: "paid"
+      })
+      .eq("id", row.invoice_id);
 
-export async function approveCollectionReport(reportId: string): Promise<ActionResult> {
-  const access = await getCurrentUserProfile();
-  if ("error" in access) return { success: false, error: access.error };
-
-  if (!canManageCollectionReports(access.profile)) {
-    return { success: false, error: "You do not have permission to approve reports" };
+    const customerBalance = row.invoice.customer?.balance;
+    if (customerBalance != null) {
+      const nextBalance = Math.max(0, Number(customerBalance) - Number(row.amount));
+      await adminClient.from("customers").update({ balance: nextBalance }).eq("id", row.invoice.customer_id);
+    }
   }
 
-  if (!reportId) return { success: false, error: "Report id is required" };
-
-  const { data: report, error: reportError } = await adminClient
-    .from("collection_reports")
-    .select("id, status")
-    .eq("id", reportId)
-    .maybeSingle<CollectionReportRow>();
-
-  if (reportError || !report) {
-    return { success: false, error: reportError?.message || "Report not found" };
-  }
-
-  if (report.status !== "submitted") {
-    return { success: false, error: "Only submitted reports can be approved" };
-  }
-
-  const { error: updateError } = await adminClient
-    .from("collection_reports")
+  const { error: expenseUpdateError } = await adminClient
+    .from("collection_expenses")
     .update({
       status: "approved",
       approved_by: access.profile.id,
-      approved_at: new Date().toISOString(),
-      rejected_by: null,
-      rejected_at: null
+      approved_at: new Date().toISOString()
     })
-    .eq("id", reportId);
+    .eq("sales_rep_id", salesRepId)
+    .eq("status", "pending");
 
-  if (updateError) return { success: false, error: updateError.message };
+  if (expenseUpdateError) return { success: false, error: expenseUpdateError.message };
 
-  revalidatePath("/collections/reports");
-  revalidatePath("/collections/reports/my");
+  revalidatePath("/collections/approvals");
+  revalidatePath("/collections");
 
-  return { success: true, message: "Report approved" };
-}
-
-export async function rejectCollectionReport(reportId: string): Promise<ActionResult> {
-  const access = await getCurrentUserProfile();
-  if ("error" in access) return { success: false, error: access.error };
-
-  if (!canManageCollectionReports(access.profile)) {
-    return { success: false, error: "You do not have permission to reject reports" };
-  }
-
-  if (!reportId) return { success: false, error: "Report id is required" };
-
-  const { data: report, error: reportError } = await adminClient
-    .from("collection_reports")
-    .select("id, status")
-    .eq("id", reportId)
-    .maybeSingle<CollectionReportRow>();
-
-  if (reportError || !report) {
-    return { success: false, error: reportError?.message || "Report not found" };
-  }
-
-  if (report.status !== "submitted") {
-    return { success: false, error: "Only submitted reports can be rejected" };
-  }
-
-  const { error: updateError } = await adminClient
-    .from("collection_reports")
-    .update({
-      status: "rejected",
-      rejected_by: access.profile.id,
-      rejected_at: new Date().toISOString()
-    })
-    .eq("id", reportId);
-
-  if (updateError) return { success: false, error: updateError.message };
-
-  revalidatePath("/collections/reports");
-  revalidatePath("/collections/reports/my");
-
-  return { success: true, message: "Report rejected" };
+  return { success: true, message: "Collections approved" };
 }

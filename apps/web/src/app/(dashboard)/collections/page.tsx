@@ -154,12 +154,12 @@ export default function CollectionsPage() {
         <div className="flex flex-wrap items-center gap-2">
           {isManagerOrAdmin ? (
             <Button variant="outline" asChild>
-              <Link href="/collections/reports">Daily Reports</Link>
+              <Link href="/collections/approvals">Approve Collections</Link>
             </Button>
           ) : null}
           {canRecordCollections ? (
             <Button variant="outline" asChild>
-              <Link href="/collections/reports/my">My Report</Link>
+              <Link href="/collections/expenses">Expenses</Link>
             </Button>
           ) : null}
           {canRecordCollections ? (
