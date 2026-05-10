@@ -3,6 +3,7 @@ create extension if not exists pgcrypto;
 create type public.app_role as enum ('admin', 'manager', 'sales_rep', 'cashier', 'driver');
 create type public.order_status as enum ('pending', 'reviewing', 'approved', 'rejected', 'invoiced');
 create type public.collection_status as enum ('pending', 'validated', 'rejected');
+create type public.collection_report_status as enum ('draft', 'submitted', 'approved', 'rejected');
 create type public.invoice_status as enum ('draft', 'pending_approval', 'approved', 'rejected', 'issued', 'paid');
 
 create sequence if not exists public.order_number_seq start with 1000 increment by 1;
@@ -86,6 +87,31 @@ create table if not exists public.collections (
   validated_by uuid references public.users_profile (id),
   status public.collection_status not null default 'pending',
   notes text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.collection_reports (
+  id uuid primary key default gen_random_uuid(),
+  sales_rep_id uuid not null references public.users_profile (id),
+  report_date date not null,
+  status public.collection_report_status not null default 'draft',
+  submitted_at timestamptz,
+  approved_by uuid references public.users_profile (id),
+  approved_at timestamptz,
+  rejected_by uuid references public.users_profile (id),
+  rejected_at timestamptz,
+  notes text,
+  created_at timestamptz not null default now(),
+  unique (sales_rep_id, report_date)
+);
+
+create table if not exists public.collection_report_expenses (
+  id uuid primary key default gen_random_uuid(),
+  report_id uuid not null references public.collection_reports (id) on delete cascade,
+  expense_date date not null,
+  category text not null,
+  amount numeric(12, 2) not null check (amount > 0),
+  note text,
   created_at timestamptz not null default now()
 );
 
@@ -332,6 +358,8 @@ alter table public.products enable row level security;
 alter table public.orders enable row level security;
 alter table public.order_items enable row level security;
 alter table public.collections enable row level security;
+alter table public.collection_reports enable row level security;
+alter table public.collection_report_expenses enable row level security;
 alter table public.invoices enable row level security;
 alter table public.invoice_items enable row level security;
 alter table public.receive_notes enable row level security;
@@ -369,6 +397,16 @@ using (public.is_admin_or_manager())
 with check (public.is_admin_or_manager());
 
 create policy collections_admin_manager_all on public.collections
+for all
+using (public.is_admin_or_manager())
+with check (public.is_admin_or_manager());
+
+create policy collection_reports_admin_manager_all on public.collection_reports
+for all
+using (public.is_admin_or_manager())
+with check (public.is_admin_or_manager());
+
+create policy collection_report_expenses_admin_manager_all on public.collection_report_expenses
 for all
 using (public.is_admin_or_manager())
 with check (public.is_admin_or_manager());
@@ -462,6 +500,66 @@ using (public.current_user_role() = 'sales_rep' and collected_by = auth.uid());
 create policy collections_sales_rep_insert on public.collections
 for insert
 with check (public.current_user_role() = 'sales_rep' and collected_by = auth.uid());
+
+create policy collection_reports_sales_rep_select_own on public.collection_reports
+for select
+using (public.current_user_role() = 'sales_rep' and sales_rep_id = auth.uid());
+
+create policy collection_reports_sales_rep_insert on public.collection_reports
+for insert
+with check (public.current_user_role() = 'sales_rep' and sales_rep_id = auth.uid());
+
+create policy collection_reports_sales_rep_update_own on public.collection_reports
+for update
+using (public.current_user_role() = 'sales_rep' and sales_rep_id = auth.uid())
+with check (public.current_user_role() = 'sales_rep' and sales_rep_id = auth.uid());
+
+create policy collection_report_expenses_sales_rep_select_own on public.collection_report_expenses
+for select
+using (
+  public.current_user_role() = 'sales_rep'
+  and exists (
+    select 1 from public.collection_reports r
+    where r.id = report_id and r.sales_rep_id = auth.uid()
+  )
+);
+
+create policy collection_report_expenses_sales_rep_insert_own on public.collection_report_expenses
+for insert
+with check (
+  public.current_user_role() = 'sales_rep'
+  and exists (
+    select 1 from public.collection_reports r
+    where r.id = report_id and r.sales_rep_id = auth.uid()
+  )
+);
+
+create policy collection_report_expenses_sales_rep_update_own on public.collection_report_expenses
+for update
+using (
+  public.current_user_role() = 'sales_rep'
+  and exists (
+    select 1 from public.collection_reports r
+    where r.id = report_id and r.sales_rep_id = auth.uid()
+  )
+)
+with check (
+  public.current_user_role() = 'sales_rep'
+  and exists (
+    select 1 from public.collection_reports r
+    where r.id = report_id and r.sales_rep_id = auth.uid()
+  )
+);
+
+create policy collection_report_expenses_sales_rep_delete_own on public.collection_report_expenses
+for delete
+using (
+  public.current_user_role() = 'sales_rep'
+  and exists (
+    select 1 from public.collection_reports r
+    where r.id = report_id and r.sales_rep_id = auth.uid()
+  )
+);
 
 create policy orders_cashier_select_all on public.orders
 for select

@@ -123,6 +123,32 @@ export const collectionIncentiveSchema = z.object({
   created_at: z.string()
 });
 
+export const collectionReportStatusSchema = z.enum(["draft", "submitted", "approved", "rejected"]);
+
+export const collectionReportSchema = z.object({
+  id: z.string().uuid(),
+  sales_rep_id: z.string().uuid(),
+  report_date: z.string(),
+  status: collectionReportStatusSchema,
+  submitted_at: z.string().nullable(),
+  approved_by: z.string().uuid().nullable(),
+  approved_at: z.string().nullable(),
+  rejected_by: z.string().uuid().nullable(),
+  rejected_at: z.string().nullable(),
+  notes: z.string().nullable(),
+  created_at: z.string()
+});
+
+export const collectionReportExpenseSchema = z.object({
+  id: z.string().uuid(),
+  report_id: z.string().uuid(),
+  expense_date: z.string(),
+  category: z.string(),
+  amount: z.number(),
+  note: z.string().nullable(),
+  created_at: z.string()
+});
+
 export const invoiceStatusSchema = z.enum(["draft", "pending_approval", "approved", "rejected", "issued", "paid"]);
 
 export const invoiceSchema = z.object({

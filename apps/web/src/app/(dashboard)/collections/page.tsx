@@ -151,13 +151,25 @@ export default function CollectionsPage() {
           <h1 className="text-2xl font-bold">Collections</h1>
           <p className="text-sm text-muted-foreground">Track unsettled and settled invoices.</p>
         </div>
-        {canRecordCollections ? (
-          <Button asChild>
-            <Link href="/collections/new">
-              {isManagerOrAdmin ? "Record Collection" : "Record Outside Collection"}
-            </Link>
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {isManagerOrAdmin ? (
+            <Button variant="outline" asChild>
+              <Link href="/collections/reports">Daily Reports</Link>
+            </Button>
+          ) : null}
+          {canRecordCollections ? (
+            <Button variant="outline" asChild>
+              <Link href="/collections/reports/my">My Report</Link>
+            </Button>
+          ) : null}
+          {canRecordCollections ? (
+            <Button asChild>
+              <Link href="/collections/new">
+                {isManagerOrAdmin ? "Record Collection" : "Record Outside Collection"}
+              </Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 rounded-md border border-border bg-white p-4">

@@ -117,6 +117,30 @@ export interface CollectionIncentive {
   created_at: string;
 }
 
+export interface CollectionReport {
+  id: string;
+  sales_rep_id: string;
+  report_date: string;
+  status: "draft" | "submitted" | "approved" | "rejected";
+  submitted_at: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  rejected_by: string | null;
+  rejected_at: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface CollectionReportExpense {
+  id: string;
+  report_id: string;
+  expense_date: string;
+  category: string;
+  amount: number;
+  note: string | null;
+  created_at: string;
+}
+
 export interface Invoice {
   id: string;
   invoice_number: number;
