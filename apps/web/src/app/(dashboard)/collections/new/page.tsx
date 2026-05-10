@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 
 import { addCollectionExpense, recordCollection } from "@/app/actions/collections";
+import { getInvoiceDetail } from "@/app/actions/invoices";
 import { getCollectionRecipients } from "@/app/actions/customers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +32,18 @@ type ExpenseCategory = "Fuel" | "Food" | "Parking" | "Other";
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-LK", { style: "currency", currency: "LKR", maximumFractionDigits: 2 }).format(value);
 
+const getLineTotal = (item: {
+  qty: number;
+  unit_price: number;
+  discount_type: "percent" | "amount";
+  discount_value: number;
+}) => {
+  const discountPerUnit =
+    item.discount_type === "percent" ? (Number(item.unit_price) * Number(item.discount_value)) / 100 : Number(item.discount_value);
+  const effectiveUnitPrice = Math.max(0, Number(item.unit_price) - discountPerUnit);
+  return Number(item.qty) * effectiveUnitPrice;
+};
+
 export default function NewCollectionPage() {
   const { permissions, isLoading, user } = useCurrentUserPermissions();
   const { data: invoices, isLoading: isInvoicesLoading } = useCollectionInvoices();
@@ -52,6 +65,7 @@ export default function NewCollectionPage() {
   const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory>("Fuel");
   const [expenseNotes, setExpenseNotes] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
+  const [isInvoiceExpanded, setIsInvoiceExpanded] = useState(false);
 
   const recipientsQuery = useQuery({
     queryKey: ["collection-recipients"],
@@ -86,6 +100,16 @@ export default function NewCollectionPage() {
     [availableInvoices, selectedInvoiceId]
   );
 
+  const invoiceDetailQuery = useQuery({
+    queryKey: ["collection-invoice-detail", selectedInvoiceId],
+    queryFn: async () => {
+      const result = await getInvoiceDetail(selectedInvoiceId);
+      if (!result.success) throw new Error(result.error || "Failed to load invoice");
+      return result.data;
+    },
+    enabled: Boolean(selectedInvoiceId && isInvoiceExpanded)
+  });
+
   useEffect(() => {
     if (!selectedInvoice) return;
     setValue("amount", Number(selectedInvoice.remaining_amount));
@@ -95,6 +119,10 @@ export default function NewCollectionPage() {
       }
     }
   }, [selectedInvoice, isManagerOrAdmin, recipientRole, setValue]);
+
+  useEffect(() => {
+    setIsInvoiceExpanded(false);
+  }, [selectedInvoiceId]);
 
   const recipientOptions = useMemo(() => {
     if (!recipientsQuery.data || recipientsQuery.data.length === 0) {
@@ -178,8 +206,17 @@ export default function NewCollectionPage() {
       </header>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
           <CardTitle>Collection Details</CardTitle>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!selectedInvoiceId}
+            onClick={() => setIsInvoiceExpanded((prev) => !prev)}
+          >
+            {isInvoiceExpanded ? "Hide Invoice" : "View Invoice"}
+          </Button>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
@@ -270,6 +307,62 @@ export default function NewCollectionPage() {
           </form>
         </CardContent>
       </Card>
+
+      {selectedInvoice && isInvoiceExpanded ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Invoice #{selectedInvoice.invoice_number}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {invoiceDetailQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading invoice products...</p>
+            ) : invoiceDetailQuery.isError ? (
+              <p className="text-sm text-destructive">Unable to load invoice preview.</p>
+            ) : !invoiceDetailQuery.data ? (
+              <p className="text-sm text-muted-foreground">Invoice not found.</p>
+            ) : (
+              <>
+                <div className="rounded-md border border-border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2">Product</th>
+                        <th className="px-3 py-2">Qty</th>
+                        <th className="px-3 py-2">Unit Price</th>
+                        <th className="px-3 py-2">Discount</th>
+                        <th className="px-3 py-2 text-right">Line Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {invoiceDetailQuery.data.items.map((item) => (
+                        <tr key={item.id} className="border-t border-border">
+                          <td className="px-3 py-2">
+                            {item.product_name}
+                            {item.product_unit ? <span className="ml-1 text-xs text-muted-foreground">({item.product_unit})</span> : null}
+                          </td>
+                          <td className="px-3 py-2">{item.qty}</td>
+                          <td className="px-3 py-2">{formatCurrency(Number(item.unit_price))}</td>
+                          <td className="px-3 py-2">
+                            {item.discount_value > 0
+                              ? item.discount_type === "percent"
+                                ? `${item.discount_value}%`
+                                : formatCurrency(Number(item.discount_value))
+                              : "-"}
+                          </td>
+                          <td className="px-3 py-2 text-right">{formatCurrency(getLineTotal(item))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="text-right text-sm font-semibold">
+                  Invoice Total: {formatCurrency(Number(invoiceDetailQuery.data.total_amount))}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {isManagerOrAdmin ? (
         <Card>
