@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCollectionExpenses, COLLECTION_EXPENSES_QUERY_KEY } from "@/hooks/useCollectionExpenses";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
@@ -28,8 +29,7 @@ export default function CollectionExpensesPage() {
   const expensesQuery = useCollectionExpenses();
   const queryClient = useQueryClient();
 
-  const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState("Fuel");
   const [notes, setNotes] = useState("");
   const [amount, setAmount] = useState("");
 
@@ -37,10 +37,12 @@ export default function CollectionExpensesPage() {
 
   const addExpenseMutation = useMutation({
     mutationFn: async () => {
+      if (category === "Other" && !notes.trim()) {
+        throw new Error("Notes are required for Other category");
+      }
       const result = await addCollectionExpense({
-        title,
         category,
-        notes,
+        notes: notes.trim(),
         amount: Number(amount)
       });
       if (!result.success) throw new Error(result.error || "Failed to add expense");
@@ -48,8 +50,7 @@ export default function CollectionExpensesPage() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: COLLECTION_EXPENSES_QUERY_KEY });
-      setTitle("");
-      setCategory("");
+      setCategory("Fuel");
       setNotes("");
       setAmount("");
       toast({ title: "Expense added", variant: "success" });
@@ -95,19 +96,16 @@ export default function CollectionExpensesPage() {
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-sm font-medium">Title</label>
-              <Input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                placeholder="Fuel for route"
-              />
-            </div>
-            <div className="space-y-1">
               <label className="text-sm font-medium">Category</label>
-              <Input
+              <Select
                 value={category}
                 onChange={(event) => setCategory(event.target.value)}
-                placeholder="Fuel, meals, parking"
+                options={[
+                  { value: "Fuel", label: "Fuel" },
+                  { value: "Food", label: "Food" },
+                  { value: "Parking", label: "Parking" },
+                  { value: "Other", label: "Other" }
+                ]}
               />
             </div>
             <div className="space-y-1 md:col-span-2">
@@ -115,7 +113,7 @@ export default function CollectionExpensesPage() {
               <Input
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
-                placeholder="Optional details"
+                placeholder={category === "Other" ? "Required for Other" : "Optional details"}
               />
             </div>
             <div className="space-y-1">
@@ -164,7 +162,6 @@ export default function CollectionExpensesPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Title</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Notes</TableHead>
@@ -175,20 +172,19 @@ export default function CollectionExpensesPage() {
             <TableBody>
               {expensesQuery.isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-sm text-muted-foreground">
+                  <TableCell colSpan={5} className="text-sm text-muted-foreground">
                     Loading expenses...
                   </TableCell>
                 </TableRow>
               ) : (expensesQuery.data ?? []).length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-sm text-muted-foreground">
+                  <TableCell colSpan={5} className="text-sm text-muted-foreground">
                     No expenses recorded yet.
                   </TableCell>
                 </TableRow>
               ) : (
                 (expensesQuery.data ?? []).map((expense) => (
                   <TableRow key={expense.id}>
-                    <TableCell>{expense.title}</TableCell>
                     <TableCell>{expense.category}</TableCell>
                     <TableCell>{formatCurrency(expense.amount)}</TableCell>
                     <TableCell>{expense.notes || "-"}</TableCell>

@@ -15,6 +15,8 @@ export type CollectionInvoiceRow = {
   sales_rep_id: string | null;
   sales_rep_name: string | null;
   total_amount: number;
+  collected_total: number;
+  is_partially_settled: boolean;
   status: "approved" | "issued" | "paid";
   created_at: string;
   due_date: string;
@@ -247,6 +249,8 @@ export async function listCollectionInvoices(): Promise<{ success: boolean; data
     sales_rep_id: row.customer?.sales_rep_id ?? null,
     sales_rep_name: null,
     total_amount: Number(row.total_amount),
+    collected_total: 0,
+    is_partially_settled: false,
     status: row.status,
     created_at: row.created_at,
     due_date: buildDueDate(row.created_at),
@@ -273,6 +277,34 @@ export async function listCollectionInvoices(): Promise<{ success: boolean; data
       ...row,
       sales_rep_name: row.sales_rep_id ? repMap.get(row.sales_rep_id) ?? "Unknown" : null
     }));
+  }
+
+  const invoiceIds = rows.map((row) => row.id);
+  if (invoiceIds.length > 0) {
+    const { data: collectionRows, error: collectionError } = await adminClient
+      .from("collections")
+      .select("invoice_id, amount")
+      .in("invoice_id", invoiceIds)
+      .eq("status", "validated");
+
+    if (collectionError) return { success: false, error: collectionError.message };
+
+    const totals = new Map<string, number>();
+    for (const row of collectionRows ?? []) {
+      const invoiceId = (row as { invoice_id: string }).invoice_id;
+      const amount = Number((row as { amount: number }).amount);
+      totals.set(invoiceId, (totals.get(invoiceId) ?? 0) + amount);
+    }
+
+    rows = rows.map((row) => {
+      const collectedTotal = totals.get(row.id) ?? 0;
+      const halfTotal = row.total_amount > 0 ? row.total_amount / 2 : Number.POSITIVE_INFINITY;
+      return {
+        ...row,
+        collected_total: collectedTotal,
+        is_partially_settled: !row.is_settled && collectedTotal + 0.01 >= halfTotal
+      };
+    });
   }
 
   return { success: true, data: rows };
@@ -480,7 +512,6 @@ export async function listMyCollectionExpenses(): Promise<{
 }
 
 export async function addCollectionExpense(input: {
-  title: string;
   category: string;
   amount: number;
   notes?: string;
@@ -492,8 +523,15 @@ export async function addCollectionExpense(input: {
     return { success: false, error: "You do not have permission to add expenses" };
   }
 
-  if (!input.title.trim()) return { success: false, error: "Title is required" };
-  if (!input.category.trim()) return { success: false, error: "Category is required" };
+  const allowedCategories = ["Fuel", "Food", "Parking", "Other"] as const;
+  if (!allowedCategories.includes(input.category as (typeof allowedCategories)[number])) {
+    return { success: false, error: "Category must be Fuel, Food, Parking, or Other" };
+  }
+
+  const notes = input.notes?.trim() || "";
+  if (input.category === "Other" && !notes) {
+    return { success: false, error: "Notes are required for Other category" };
+  }
 
   const amount = Number(input.amount);
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -502,10 +540,10 @@ export async function addCollectionExpense(input: {
 
   const { error } = await adminClient.from("collection_expenses").insert({
     sales_rep_id: access.profile.id,
-    title: input.title.trim(),
-    category: input.category.trim(),
+    title: input.category,
+    category: input.category,
     amount,
-    notes: input.notes?.trim() || null
+    notes: notes || null
   });
 
   if (error) return { success: false, error: error.message };

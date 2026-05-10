@@ -157,7 +157,7 @@ export default function CollectionsPage() {
               <Link href="/collections/approvals">Approve Collections</Link>
             </Button>
           ) : null}
-          {canRecordCollections ? (
+          {canRecordCollections && !isManagerOrAdmin ? (
             <Button variant="outline" asChild>
               <Link href="/collections/expenses">Expenses</Link>
             </Button>
@@ -285,8 +285,12 @@ export default function CollectionsPage() {
                 <TableCell>{formatDate(row.due_date)}</TableCell>
                 <TableCell>{row.sales_rep_name || "Unassigned"}</TableCell>
                 <TableCell>
-                  <Badge variant={row.is_settled ? "success" : "warning"}>
-                    {row.is_settled ? "settled" : "unsettled"}
+                  <Badge
+                    variant={
+                      row.is_settled ? "success" : row.is_partially_settled ? "default" : "warning"
+                    }
+                  >
+                    {row.is_settled ? "settled" : row.is_partially_settled ? "partially settled" : "unsettled"}
                   </Badge>
                 </TableCell>
                 <TableCell>{row.settled_at ? formatDate(row.settled_at) : "-"}</TableCell>

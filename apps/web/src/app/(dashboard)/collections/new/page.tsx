@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 
-import { recordCollection } from "@/app/actions/collections";
+import { addCollectionExpense, recordCollection } from "@/app/actions/collections";
 import { getCollectionRecipients } from "@/app/actions/customers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Select } from "@/components/ui/select";
 import { useCollectionInvoices } from "@/hooks/useCollectionInvoices";
+import { COLLECTION_EXPENSES_QUERY_KEY } from "@/hooks/useCollectionExpenses";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
@@ -25,6 +26,7 @@ type NewCollectionForm = {
 };
 
 type RecipientRole = "sales_rep" | "driver";
+type ExpenseCategory = "Fuel" | "Food" | "Parking" | "Other";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-LK", { style: "currency", currency: "LKR", maximumFractionDigits: 2 }).format(value);
@@ -32,6 +34,7 @@ const formatCurrency = (value: number) =>
 export default function NewCollectionPage() {
   const { permissions, isLoading, user } = useCurrentUserPermissions();
   const { data: invoices, isLoading: isInvoicesLoading } = useCollectionInvoices();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const initialInvoiceId = searchParams.get("invoiceId") || "";
 
@@ -46,6 +49,9 @@ export default function NewCollectionPage() {
 
   const isManagerOrAdmin = user?.role === "admin" || user?.role === "manager";
   const [recipientRole, setRecipientRole] = useState<RecipientRole>("sales_rep");
+  const [expenseCategory, setExpenseCategory] = useState<ExpenseCategory>("Fuel");
+  const [expenseNotes, setExpenseNotes] = useState("");
+  const [expenseAmount, setExpenseAmount] = useState("");
 
   const recipientsQuery = useQuery({
     queryKey: ["collection-recipients"],
@@ -108,6 +114,32 @@ export default function NewCollectionPage() {
       meta: recipient.role
     }));
   }, [recipientsQuery.data, recipientRole, isManagerOrAdmin]);
+
+  const addExpenseMutation = useMutation({
+    mutationFn: async () => {
+      const notes = expenseNotes.trim();
+      if (expenseCategory === "Other" && !notes) {
+        throw new Error("Notes are required for Other category");
+      }
+      const result = await addCollectionExpense({
+        category: expenseCategory,
+        amount: Number(expenseAmount),
+        notes
+      });
+      if (!result.success) throw new Error(result.error || "Failed to add expense");
+      return result;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: COLLECTION_EXPENSES_QUERY_KEY });
+      setExpenseCategory("Fuel");
+      setExpenseNotes("");
+      setExpenseAmount("");
+      toast({ title: "Expense added", variant: "success" });
+    },
+    onError: (error) => {
+      toast({ title: "Failed to add expense", description: String(error), variant: "error" });
+    }
+  });
 
   const onSubmit = async (values: NewCollectionForm) => {
     const result = await recordCollection({
@@ -236,6 +268,55 @@ export default function NewCollectionPage() {
           </form>
         </CardContent>
       </Card>
+
+      {isManagerOrAdmin ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Record Expense</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Category</label>
+                <Select
+                  value={expenseCategory}
+                  options={[
+                    { value: "Fuel", label: "Fuel" },
+                    { value: "Food", label: "Food" },
+                    { value: "Parking", label: "Parking" },
+                    { value: "Other", label: "Other" }
+                  ]}
+                  onChange={(event) => setExpenseCategory(event.target.value as ExpenseCategory)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Amount</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={expenseAmount}
+                  onChange={(event) => setExpenseAmount(event.target.value)}
+                />
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-sm font-medium">Notes</label>
+                <Input
+                  value={expenseNotes}
+                  onChange={(event) => setExpenseNotes(event.target.value)}
+                  placeholder={expenseCategory === "Other" ? "Required for Other" : "Optional"}
+                />
+              </div>
+            </div>
+            <Button
+              type="button"
+              disabled={addExpenseMutation.isPending}
+              onClick={() => addExpenseMutation.mutate()}
+            >
+              Add Expense
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
     </section>
   );
 }
