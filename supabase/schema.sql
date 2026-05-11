@@ -913,3 +913,45 @@ with check (
       and i.issued_by = auth.uid()
   )
 );
+
+create sequence if not exists public.return_invoice_number_seq start with 8000 increment by 1;
+
+create table if not exists public.return_invoices (
+  id uuid primary key default gen_random_uuid(),
+  return_number bigint not null unique default nextval('public.return_invoice_number_seq'),
+  invoice_id uuid not null references public.invoices (id) on delete cascade,
+  customer_id uuid not null references public.customers (id) on delete restrict,
+  returned_by uuid not null references public.users_profile (id),
+  total_return_amount numeric(14, 2) not null default 0,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.return_invoice_items (
+  id uuid primary key default gen_random_uuid(),
+  return_invoice_id uuid not null references public.return_invoices (id) on delete cascade,
+  invoice_item_id uuid not null references public.invoice_items (id) on delete restrict,
+  product_id uuid not null references public.products (id) on delete restrict,
+  qty numeric(12, 2) not null check (qty > 0),
+  unit_price numeric(14, 2) not null check (unit_price >= 0),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_return_invoices_invoice_id on public.return_invoices (invoice_id);
+create index if not exists idx_return_invoices_customer_id on public.return_invoices (customer_id);
+create index if not exists idx_return_invoice_items_return_invoice_id on public.return_invoice_items (return_invoice_id);
+create index if not exists idx_return_invoice_items_invoice_item_id on public.return_invoice_items (invoice_item_id);
+
+alter table public.return_invoices enable row level security;
+alter table public.return_invoice_items enable row level security;
+
+drop policy if exists return_invoices_admin_manager_all on public.return_invoices;
+drop policy if exists return_invoice_items_admin_manager_all on public.return_invoice_items;
+
+create policy return_invoices_admin_manager_all on public.return_invoices
+using (public.is_admin_or_manager())
+with check (public.is_admin_or_manager());
+
+create policy return_invoice_items_admin_manager_all on public.return_invoice_items
+using (public.is_admin_or_manager())
+with check (public.is_admin_or_manager());

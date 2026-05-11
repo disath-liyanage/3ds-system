@@ -18,7 +18,7 @@ import { useInvoices } from "@/hooks/useInvoices";
 import { formatDate } from "@/lib/utils";
 
 export default function InvoicesPage() {
-  const { permissions, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
+  const { permissions, user, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
   const { data: invoices, isLoading: isInvoicesLoading, isError, error } = useInvoices();
   const router = useRouter();
 
@@ -32,15 +32,6 @@ export default function InvoicesPage() {
   const [maxTotal, setMaxTotal] = useState("");
   const [minInvoiceNo, setMinInvoiceNo] = useState("");
   const [maxInvoiceNo, setMaxInvoiceNo] = useState("");
-
-  const statusOrder: Record<string, number> = {
-    draft: 0,
-    pending_approval: 1,
-    rejected: 2,
-    approved: 3,
-    issued: 3,
-    paid: 4
-  };
 
   const getStatusLabel = (status: string) => {
     if (status === "pending_approval") return "Pending approval";
@@ -124,18 +115,9 @@ export default function InvoicesPage() {
     return result;
   }, [invoices, customerSearch, dateRange, statusFilter, minTotal, maxTotal, minInvoiceNo, maxInvoiceNo]);
 
-  const sortedInvoices = useMemo(() =>
-    filteredInvoices
-      .map((invoice, index) => ({ invoice, index }))
-      .sort((a, b) => {
-        if (a.invoice.status === b.invoice.status) return a.index - b.index;
-        const orderA = statusOrder[a.invoice.status] ?? 99;
-        const orderB = statusOrder[b.invoice.status] ?? 99;
-        if (orderA === orderB) return a.index - b.index;
-        return orderA - orderB;
-      })
-      .map(({ invoice }) => invoice),
-  [filteredInvoices]
+  const sortedInvoices = useMemo(
+    () => [...filteredInvoices].sort((a, b) => b.invoice_number - a.invoice_number),
+    [filteredInvoices]
   );
 
   const handleRowClick = (row: (typeof sortedInvoices)[number]) => {
@@ -200,9 +182,16 @@ export default function InvoicesPage() {
           <h1 className="text-2xl font-bold">Invoices</h1>
           <p className="text-sm text-muted-foreground">Track issuance, payment methods, and statuses.</p>
         </div>
-        <Button asChild>
-          <Link href="/invoices/new">New Invoice</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {user?.role === "admin" || user?.role === "manager" ? (
+            <Button asChild variant="outline">
+              <Link href="/invoices/return">Return Invoice</Link>
+            </Button>
+          ) : null}
+          <Button asChild>
+            <Link href="/invoices/new">New Invoice</Link>
+          </Button>
+        </div>
       </header>
 
       <div className="flex flex-col gap-3 rounded-md border border-border bg-white p-4">

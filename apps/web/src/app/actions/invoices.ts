@@ -13,6 +13,10 @@ type ActionResult = {
   message?: string;
 };
 
+type ReturnActionResult = ActionResult & {
+  return_invoice_id?: string;
+};
+
 type CustomRolePermissionSummary = {
   perm_create_invoices: boolean;
 };
@@ -54,6 +58,67 @@ export type InvoiceDetailRow = InvoiceListRow & {
     unit_price: number;
     discount_type: "percent" | "amount";
     discount_value: number;
+  }>;
+};
+
+export type ReturnableInvoiceRow = {
+  id: string;
+  invoice_number: number;
+  customer_id: string;
+  customer_name: string;
+  payment_method: "cash" | "credit";
+  created_at: string;
+  items: Array<{
+    invoice_item_id: string;
+    product_id: string;
+    product_name: string;
+    product_unit: string;
+    qty: number;
+    free_qty: number;
+    unit_price: number;
+    discount_type: "percent" | "amount";
+    discount_value: number;
+    already_returned_qty: number;
+    returnable_qty: number;
+  }>;
+};
+
+export type ReturnInvoiceDetailRow = {
+  id: string;
+  return_number: number;
+  created_at: string;
+  notes: string | null;
+  total_return_amount: number;
+  customer_name: string;
+  customer_phone: string;
+  customer_address: string;
+  source_invoice_id: string;
+  source_invoice_number: number;
+  returned_by_name: string;
+  items: Array<{
+    id: string;
+    product_name: string;
+    product_unit: string;
+    qty: number;
+    unit_price: number;
+    line_total: number;
+  }>;
+};
+
+export type CancelledInvoiceReportRow = {
+  invoice_id: string;
+  invoice_number: number;
+  cancelled_at: string;
+  cancelled_by_name: string;
+  items: Array<{
+    audit_id: string;
+    product_id: string;
+    product_name: string;
+    qty: number;
+    free_qty: number;
+    restored_qty: number;
+    stock_before: number;
+    stock_after: number;
   }>;
 };
 
@@ -101,6 +166,15 @@ export type UpdateInvoiceInput = {
     unit_cost: number;
     discount_type?: "percent" | "amount";
     discount_value?: number;
+  }>;
+};
+
+export type CreateReturnInvoiceInput = {
+  invoice_id: string;
+  notes?: string;
+  items: Array<{
+    invoice_item_id: string;
+    qty: number;
   }>;
 };
 
@@ -160,6 +234,12 @@ function canViewAllInvoices(profile: ProfilePermissionRow): boolean {
 
 function isAdminOrManager(profile: ProfilePermissionRow): boolean {
   return profile.role === "admin" || profile.role === "manager";
+}
+
+function getDiscountPerUnit(unitPrice: number, discountType: "percent" | "amount", discountValue: number): number {
+  if (!discountValue) return 0;
+  if (discountType === "percent") return (unitPrice * discountValue) / 100;
+  return discountValue;
 }
 
 async function notifyInvoiceApprovers(
@@ -1223,4 +1303,377 @@ export async function deleteInvoice(invoiceId: string): Promise<ActionResult> {
   revalidatePath("/customers");
 
   return { success: true, message: "Invoice deleted successfully" };
+}
+
+export async function listReturnableInvoices(): Promise<{ success: boolean; data?: ReturnableInvoiceRow[]; error?: string }> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!isAdminOrManager(access.profile)) {
+    return { success: false, error: "Only admins and managers can create return invoices" };
+  }
+
+  const { data: invoices, error } = await adminClient
+    .from("invoices")
+    .select(`
+      id, invoice_number, customer_id, payment_method, created_at,
+      customer:customers(name),
+      invoice_items(
+        id, product_id, qty, free_qty, unit_price, discount_type, discount_value,
+        product:products(name, unit)
+      )
+    `)
+    .in("status", ["approved", "issued", "paid"])
+    .order("created_at", { ascending: false })
+    .limit(250);
+
+  if (error) return { success: false, error: error.message };
+
+  const invoiceRows = (invoices ?? []) as any[];
+  const allInvoiceItemIds = invoiceRows.flatMap((inv) => (inv.invoice_items ?? []).map((item: any) => item.id));
+
+  let returnedByItem: Record<string, number> = {};
+  if (allInvoiceItemIds.length > 0) {
+    const { data: returnedRows, error: returnedError } = await adminClient
+      .from("return_invoice_items")
+      .select("invoice_item_id, qty")
+      .in("invoice_item_id", allInvoiceItemIds);
+
+    if (returnedError) return { success: false, error: returnedError.message };
+
+    returnedByItem = (returnedRows ?? []).reduce<Record<string, number>>((acc, row: any) => {
+      const key = String(row.invoice_item_id);
+      acc[key] = (acc[key] ?? 0) + (Number(row.qty) || 0);
+      return acc;
+    }, {});
+  }
+
+  const rows: ReturnableInvoiceRow[] = invoiceRows
+    .map((invoice): ReturnableInvoiceRow => {
+      const customer = Array.isArray(invoice.customer) ? invoice.customer[0] : invoice.customer;
+      const items = (invoice.invoice_items ?? []).map((item: any) => {
+        const soldQty = Number(item.qty) || 0;
+        const alreadyReturned = returnedByItem[item.id] ?? 0;
+        const returnableQty = Math.max(0, soldQty - alreadyReturned);
+        return {
+          invoice_item_id: item.id,
+          product_id: item.product_id,
+          product_name: item.product?.name ?? "Unknown Product",
+          product_unit: item.product?.unit ?? "",
+          qty: soldQty,
+          free_qty: Number(item.free_qty) || 0,
+          unit_price: Number(item.unit_price) || 0,
+          discount_type: item.discount_type === "percent" ? "percent" : "amount",
+          discount_value: Number(item.discount_value) || 0,
+          already_returned_qty: alreadyReturned,
+          returnable_qty: returnableQty
+        };
+      });
+
+      return {
+        id: invoice.id,
+        invoice_number: Number(invoice.invoice_number),
+        customer_id: invoice.customer_id,
+        customer_name: customer?.name ?? "Unknown Customer",
+        payment_method: (invoice.payment_method === "cash" ? "cash" : "credit") as "cash" | "credit",
+        created_at: invoice.created_at,
+        items
+      };
+    })
+    .filter((row) => row.items.some((item: ReturnableInvoiceRow["items"][number]) => item.returnable_qty > 0));
+
+  return { success: true, data: rows };
+}
+
+export async function createReturnInvoice(input: CreateReturnInvoiceInput): Promise<ReturnActionResult> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!isAdminOrManager(access.profile)) {
+    return { success: false, error: "Only admins and managers can create return invoices" };
+  }
+
+  if (!input.invoice_id) {
+    return { success: false, error: "Source invoice is required" };
+  }
+
+  const normalizedItems = (input.items ?? [])
+    .map((item) => ({ invoice_item_id: item.invoice_item_id, qty: Number(item.qty) }))
+    .filter((item) => item.invoice_item_id && Number.isFinite(item.qty) && item.qty > 0);
+
+  if (normalizedItems.length === 0) {
+    return { success: false, error: "Select at least one item quantity to return" };
+  }
+
+  const { data: sourceInvoice, error: sourceInvoiceError } = await adminClient
+    .from("invoices")
+    .select(`
+      id, invoice_number, customer_id, payment_method, status,
+      invoice_items(id, product_id, qty, unit_price, discount_type, discount_value)
+    `)
+    .eq("id", input.invoice_id)
+    .single();
+
+  if (sourceInvoiceError || !sourceInvoice) {
+    return { success: false, error: sourceInvoiceError?.message || "Source invoice not found" };
+  }
+
+  if (!["approved", "issued", "paid"].includes(sourceInvoice.status)) {
+    return { success: false, error: "Only approved/paid invoices can be returned" };
+  }
+
+  const sourceItems = ((sourceInvoice as any).invoice_items ?? []) as any[];
+  const sourceItemMap = new Map<string, any>(sourceItems.map((item: any) => [String(item.id), item]));
+  const requestedItemIds = normalizedItems.map((item) => item.invoice_item_id);
+
+  const { data: returnedRows, error: returnedError } = await adminClient
+    .from("return_invoice_items")
+    .select("invoice_item_id, qty")
+    .in("invoice_item_id", requestedItemIds);
+
+  if (returnedError) {
+    return { success: false, error: returnedError.message };
+  }
+
+  const returnedByItem = (returnedRows ?? []).reduce<Record<string, number>>((acc, row: any) => {
+    const key = String(row.invoice_item_id);
+    acc[key] = (acc[key] ?? 0) + (Number(row.qty) || 0);
+    return acc;
+  }, {});
+
+  let totalReturnAmount = 0;
+  const validatedItems = normalizedItems.map((item) => {
+    const sourceItem = sourceItemMap.get(item.invoice_item_id);
+    if (!sourceItem) {
+      throw new Error("One or more selected items are invalid");
+    }
+
+    const soldQty = Number(sourceItem.qty) || 0;
+    const alreadyReturned = returnedByItem[item.invoice_item_id] ?? 0;
+    const returnableQty = Math.max(0, soldQty - alreadyReturned);
+
+    if (item.qty > returnableQty) {
+      throw new Error("Return quantity exceeds available sold quantity");
+    }
+
+    const unitPrice = Number(sourceItem.unit_price) || 0;
+    const discountType = sourceItem.discount_type === "percent" ? "percent" : "amount";
+    const discountValue = Number(sourceItem.discount_value) || 0;
+    const effectiveUnitPrice = Math.max(0, unitPrice - getDiscountPerUnit(unitPrice, discountType, discountValue));
+    const lineTotal = item.qty * effectiveUnitPrice;
+    totalReturnAmount += lineTotal;
+
+    return {
+      invoice_item_id: item.invoice_item_id,
+      product_id: sourceItem.product_id,
+      qty: item.qty,
+      unit_price: effectiveUnitPrice
+    };
+  });
+
+  let insertedReturnInvoiceId = "";
+  try {
+    const { data: returnInvoice, error: insertReturnError } = await adminClient
+      .from("return_invoices")
+      .insert({
+        invoice_id: sourceInvoice.id,
+        customer_id: sourceInvoice.customer_id,
+        returned_by: access.profile.id,
+        total_return_amount: totalReturnAmount,
+        notes: input.notes?.trim() || null
+      })
+      .select("id")
+      .single();
+
+    if (insertReturnError || !returnInvoice) {
+      return { success: false, error: insertReturnError?.message || "Failed to create return invoice" };
+    }
+
+    insertedReturnInvoiceId = returnInvoice.id;
+
+    const returnItemsPayload = validatedItems.map((item) => ({
+      return_invoice_id: returnInvoice.id,
+      invoice_item_id: item.invoice_item_id,
+      product_id: item.product_id,
+      qty: item.qty,
+      unit_price: item.unit_price
+    }));
+
+    const { error: insertItemsError } = await adminClient.from("return_invoice_items").insert(returnItemsPayload);
+    if (insertItemsError) {
+      return { success: false, error: insertItemsError.message };
+    }
+
+    for (const item of validatedItems) {
+      const { data: product, error: productError } = await adminClient
+        .from("products")
+        .select("stock_qty")
+        .eq("id", item.product_id)
+        .single();
+
+      if (productError || !product) continue;
+      const newStock = (Number(product.stock_qty) || 0) + item.qty;
+      await adminClient.from("products").update({ stock_qty: newStock }).eq("id", item.product_id);
+    }
+
+    if (sourceInvoice.payment_method === "credit") {
+      const { data: customer, error: customerError } = await adminClient
+        .from("customers")
+        .select("balance")
+        .eq("id", sourceInvoice.customer_id)
+        .single();
+      if (!customerError && customer) {
+        const newBalance = Math.max(0, (Number(customer.balance) || 0) - totalReturnAmount);
+        await adminClient.from("customers").update({ balance: newBalance }).eq("id", sourceInvoice.customer_id);
+      }
+    }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Failed to create return invoice" };
+  }
+
+  revalidatePath("/invoices");
+  revalidatePath("/invoices/return");
+  revalidatePath("/products");
+  revalidatePath("/customers");
+
+  return {
+    success: true,
+    message: "Return invoice saved successfully",
+    return_invoice_id: insertedReturnInvoiceId
+  };
+}
+
+export async function getReturnInvoiceDetail(
+  returnInvoiceId: string
+): Promise<{ success: boolean; data?: ReturnInvoiceDetailRow | null; error?: string }> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!isAdminOrManager(access.profile)) {
+    return { success: false, error: "Only admins and managers can view return invoices" };
+  }
+
+  const { data, error } = await adminClient
+    .from("return_invoices")
+    .select(`
+      id, return_number, created_at, notes, total_return_amount, invoice_id,
+      source_invoice:invoices!return_invoices_invoice_id_fkey(invoice_number),
+      customer:customers(name, phone, address),
+      returned_by_user:users_profile!return_invoices_returned_by_fkey(full_name),
+      return_invoice_items(
+        id, qty, unit_price,
+        product:products(name, unit)
+      )
+    `)
+    .eq("id", returnInvoiceId)
+    .single();
+
+  if (error) return { success: false, error: error.message };
+  if (!data) return { success: true, data: null };
+
+  const sourceInvoice = Array.isArray((data as any).source_invoice)
+    ? (data as any).source_invoice[0]
+    : (data as any).source_invoice;
+  const customer = Array.isArray((data as any).customer) ? (data as any).customer[0] : (data as any).customer;
+  const returnedBy = Array.isArray((data as any).returned_by_user)
+    ? (data as any).returned_by_user[0]
+    : (data as any).returned_by_user;
+
+  const result: ReturnInvoiceDetailRow = {
+    id: (data as any).id,
+    return_number: Number((data as any).return_number),
+    created_at: (data as any).created_at,
+    notes: (data as any).notes ?? null,
+    total_return_amount: Number((data as any).total_return_amount) || 0,
+    customer_name: customer?.name ?? "Unknown Customer",
+    customer_phone: customer?.phone ?? "",
+    customer_address: customer?.address ?? "",
+    source_invoice_id: (data as any).invoice_id,
+    source_invoice_number: Number(sourceInvoice?.invoice_number) || 0,
+    returned_by_name: returnedBy?.full_name ?? "Unknown",
+    items: ((data as any).return_invoice_items ?? []).map((item: any) => {
+      const qty = Number(item.qty) || 0;
+      const unitPrice = Number(item.unit_price) || 0;
+      return {
+        id: item.id,
+        product_name: item.product?.name ?? "Unknown Product",
+        product_unit: item.product?.unit ?? "",
+        qty,
+        unit_price: unitPrice,
+        line_total: qty * unitPrice
+      };
+    })
+  };
+
+  return { success: true, data: result };
+}
+
+export async function getCancelledInvoiceReport(
+  invoiceId: string
+): Promise<{ success: boolean; data?: CancelledInvoiceReportRow | null; error?: string }> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!canCreateInvoices(access.profile)) {
+    return { success: false, error: "You do not have permission to view invoices" };
+  }
+
+  if (!invoiceId) {
+    return { success: false, error: "Invoice id is required" };
+  }
+
+  const { data: rows, error } = await adminClient
+    .from("audit_log")
+    .select(
+      "id, record_id, performed_by, created_at, old_data, new_data, performer:users_profile!audit_log_performed_by_fkey(full_name)"
+    )
+    .eq("table_name", "invoice_cancellations")
+    .contains("old_data", { invoice_id: invoiceId })
+    .order("created_at", { ascending: false });
+
+  if (error) return { success: false, error: error.message };
+  if (!rows || rows.length === 0) return { success: true, data: null };
+
+  const productIds = Array.from(new Set(rows.map((row: any) => String(row.record_id)).filter(Boolean)));
+  let productNamesById: Record<string, string> = {};
+  if (productIds.length > 0) {
+    const { data: products } = await adminClient.from("products").select("id, name").in("id", productIds);
+    productNamesById = (products ?? []).reduce<Record<string, string>>((acc, row: any) => {
+      acc[String(row.id)] = row.name ?? "Unknown Product";
+      return acc;
+    }, {});
+  }
+
+  const first = rows[0] as any;
+  const invoiceNumber = Number(first.old_data?.invoice_number) || 0;
+  const cancelledAt = String(first.created_at || "");
+  const performer = Array.isArray(first.performer) ? first.performer[0] : first.performer;
+
+  const items = (rows as any[]).map((row) => {
+    const qty = Number(row.old_data?.qty) || 0;
+    const freeQty = Number(row.old_data?.free_qty) || 0;
+    const stockBefore = Number(row.old_data?.stock_before) || 0;
+    const stockAfter = Number(row.new_data?.stock_after) || 0;
+    return {
+      audit_id: row.id,
+      product_id: String(row.record_id),
+      product_name: productNamesById[String(row.record_id)] ?? "Unknown Product",
+      qty,
+      free_qty: freeQty,
+      restored_qty: qty + freeQty,
+      stock_before: stockBefore,
+      stock_after: stockAfter
+    };
+  });
+
+  return {
+    success: true,
+    data: {
+      invoice_id: invoiceId,
+      invoice_number: invoiceNumber,
+      cancelled_at: cancelledAt,
+      cancelled_by_name: performer?.full_name ?? "Unknown",
+      items
+    }
+  };
 }

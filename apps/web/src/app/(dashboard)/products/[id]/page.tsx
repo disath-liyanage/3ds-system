@@ -233,7 +233,8 @@ export default function ProductStockDetailPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Invoice</TableHead>
+                    <TableHead>Reference</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>Restored Qty</TableHead>
                     <TableHead>Date</TableHead>
                   </TableRow>
@@ -241,7 +242,24 @@ export default function ProductStockDetailPage() {
                 <TableBody>
                   {transactions.cancelled.map((row) => (
                     <TableRow key={row.id}>
-                      <TableCell>{row.invoice_number > 0 ? `INV-${row.invoice_number}` : "-"}</TableCell>
+                      <TableCell>
+                        {row.source_type === "returned" ? (
+                          row.return_number && row.return_invoice_id ? (
+                            <Link href={`/invoices/return/${row.return_invoice_id}`} className="underline">
+                              {`RET-${row.return_number}`}
+                            </Link>
+                          ) : (
+                            "-"
+                          )
+                        ) : row.invoice_number > 0 && row.invoice_id ? (
+                          <Link href={`/invoices/cancelled/${row.invoice_id}`} className="underline">
+                            {`INV-${row.invoice_number}`}
+                          </Link>
+                        ) : (
+                          "-"
+                        )}
+                      </TableCell>
+                      <TableCell>{row.source_type === "returned" ? "Returned" : "Cancelled"}</TableCell>
                       <TableCell>{formatQuantity(row.qty + row.free_qty)}</TableCell>
                       <TableCell>{row.created_at ? formatDate(row.created_at) : "-"}</TableCell>
                     </TableRow>
@@ -249,7 +267,7 @@ export default function ProductStockDetailPage() {
                 </TableBody>
               </Table>
             ) : (
-              <p className="text-sm text-muted-foreground">No cancelled invoice entries yet.</p>
+              <p className="text-sm text-muted-foreground">No cancelled or returned invoice entries yet.</p>
             )}
           </CardContent>
         </Card>

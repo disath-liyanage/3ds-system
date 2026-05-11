@@ -26,6 +26,9 @@ export type ProductInvoicedEntry = {
   free_qty: number;
   unit_price: number;
   created_at: string;
+  source_type?: "cancelled" | "returned";
+  return_number?: number;
+  return_invoice_id?: string;
 };
 
 export type ProductTransactions = {
@@ -51,6 +54,7 @@ async function fetchProductTransactions(
     { data: receivedRows, error: receivedError },
     { data: invoicedRows, error: invoicedError },
     { data: cancelledRows, error: cancelledError },
+    { data: returnedRows, error: returnedError },
     { data: stockAdjustmentRows, error: stockAdjustmentError }
   ] =
     await Promise.all([
@@ -73,6 +77,13 @@ async function fetchProductTransactions(
         .eq("record_id", productId)
         .order("created_at", { ascending: false }),
       supabase
+        .from("return_invoice_items")
+        .select(
+          "id, qty, unit_price, created_at, return_invoice:return_invoices(id, return_number, invoice_id, created_at, source_invoice:invoices!return_invoices_invoice_id_fkey(invoice_number))"
+        )
+        .eq("product_id", productId)
+        .order("created_at", { ascending: false }),
+      supabase
         .from("audit_log")
         .select("id, created_at, old_data, new_data")
         .eq("table_name", "product_stock_adjustments")
@@ -83,6 +94,7 @@ async function fetchProductTransactions(
   if (receivedError) throw receivedError;
   if (invoicedError) throw invoicedError;
   if (cancelledError) throw cancelledError;
+  if (returnedError) throw returnedError;
   if (stockAdjustmentError) throw stockAdjustmentError;
 
   const received: ProductReceivedEntry[] = (receivedRows ?? []).map((row: any) => {
@@ -114,15 +126,38 @@ async function fetchProductTransactions(
     };
   });
 
-  const cancelled: ProductInvoicedEntry[] = (cancelledRows ?? []).map((row: any) => ({
+  const cancelledFromInvoiceCancellation: ProductInvoicedEntry[] = (cancelledRows ?? []).map((row: any) => ({
     id: row.id,
     invoice_id: String(row.old_data?.invoice_id || ""),
     invoice_number: Number(row.old_data?.invoice_number) || 0,
     qty: Number(row.old_data?.qty) || 0,
     free_qty: Number(row.old_data?.free_qty) || 0,
     unit_price: 0,
-    created_at: row.created_at ?? ""
+    created_at: row.created_at ?? "",
+    source_type: "cancelled"
   }));
+
+  const returned: ProductInvoicedEntry[] = (returnedRows ?? []).map((row: any) => {
+    const returnInvoice = Array.isArray(row.return_invoice) ? row.return_invoice[0] : row.return_invoice;
+    const sourceInvoice = Array.isArray(returnInvoice?.source_invoice)
+      ? returnInvoice?.source_invoice?.[0]
+      : returnInvoice?.source_invoice;
+
+    return {
+      id: row.id,
+      invoice_id: String(returnInvoice?.invoice_id || ""),
+      invoice_number: Number(sourceInvoice?.invoice_number) || 0,
+      qty: Number(row.qty) || 0,
+      free_qty: 0,
+      unit_price: Number(row.unit_price) || 0,
+      created_at: row.created_at ?? returnInvoice?.created_at ?? "",
+      source_type: "returned",
+      return_number: Number(returnInvoice?.return_number) || 0,
+      return_invoice_id: String(returnInvoice?.id || "")
+    };
+  });
+
+  const cancelled: ProductInvoicedEntry[] = [...cancelledFromInvoiceCancellation, ...returned];
 
   const stockAdjustments = (stockAdjustmentRows ?? []).map((row: any) => ({
     id: row.id,
