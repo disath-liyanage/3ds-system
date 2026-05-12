@@ -25,6 +25,7 @@ export type CollectionInvoiceRow = {
   due_date: string;
   is_settled: boolean;
   settled_at: string | null;
+  last_collection_at: string | null;
 };
 
 export type RecordCollectionInput = {
@@ -292,6 +293,8 @@ export async function listCollectionInvoices(): Promise<{ success: boolean; data
     due_date: buildDueDate(row.created_at),
     is_settled: Boolean(row.is_settled),
     settled_at: row.settled_at ?? null
+    ,
+    last_collection_at: null
   }));
 
   if (!canViewAllCollections(access.profile)) {
@@ -371,7 +374,7 @@ export async function listCollectionInvoices(): Promise<{ success: boolean; data
     rows = rows.map((row) => {
       const collectedTotal = recordedTotals.get(row.id) ?? 0;
       const remainingAmount = Math.max(0, row.total_amount - collectedTotal);
-      const isPartiallySettled = !row.is_settled && collectedTotal > 0 && remainingAmount > 0;
+      const isPartiallySettled = collectedTotal > 0 && remainingAmount > 0;
       const paymentStatus: CollectionInvoiceRow["payment_status"] =
         remainingAmount <= 0 ? "paid" : isPartiallySettled ? "partially_paid" : "unpaid";
       const latestEntry = latestByInvoice.get(row.id);
@@ -384,7 +387,8 @@ export async function listCollectionInvoices(): Promise<{ success: boolean; data
         remaining_amount: remainingAmount,
         is_partially_settled: isPartiallySettled,
         payment_status: paymentStatus,
-        last_recorded_by_name: lastRecordedByName
+        last_recorded_by_name: lastRecordedByName,
+        last_collection_at: latestEntry?.created_at ?? null
       };
     });
   }

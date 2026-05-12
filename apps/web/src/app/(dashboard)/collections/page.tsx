@@ -326,9 +326,15 @@ export default function CollectionsPage() {
                         : "Unpaid"}
                   </Badge>
                 </TableCell>
-                <TableCell>{row.settled_at ? formatDate(row.settled_at) : "-"}</TableCell>
                 <TableCell>
-                  {!row.is_settled && canRecordCollections ? (
+                  {row.payment_status === "paid"
+                    ? formatDate(row.settled_at || row.last_collection_at || row.created_at)
+                    : row.settled_at
+                      ? formatDate(row.settled_at)
+                      : "-"}
+                </TableCell>
+                <TableCell>
+                  {row.payment_status !== "paid" && canRecordCollections ? (
                     <Button asChild size="sm">
                       <Link href={`/collections/new?invoiceId=${row.id}`}>Record</Link>
                     </Button>
