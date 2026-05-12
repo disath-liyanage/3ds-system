@@ -115,6 +115,8 @@ export const collectionSchema = z.object({
   collected_by: z.string().uuid(),
   sales_rep_id: z.string().uuid().nullable().optional(),
   amount: z.number(),
+  payment_type: z.enum(["cash", "cheque"]).optional(),
+  cheque_deposit_date: z.string().nullable().optional(),
   incentive_total: z.number().optional(),
   validated_by: z.string().uuid().nullable(),
   status: collectionStatusSchema,

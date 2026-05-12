@@ -30,6 +30,8 @@ export type CollectionInvoiceRow = {
 export type RecordCollectionInput = {
   invoice_id: string;
   amount: number;
+  payment_type?: "cash" | "cheque";
+  cheque_deposit_date?: string;
   notes?: string;
   incentive_recipient_id?: string;
 };
@@ -414,6 +416,15 @@ export async function recordCollection(input: RecordCollectionInput): Promise<Ac
     return { success: false, error: "Amount must be greater than 0" };
   }
 
+  const paymentType = input.payment_type === "cheque" ? "cheque" : "cash";
+  const chequeDepositDate =
+    paymentType === "cheque" ? (input.cheque_deposit_date ? new Date(input.cheque_deposit_date) : null) : null;
+  if (paymentType === "cheque") {
+    if (!chequeDepositDate || Number.isNaN(chequeDepositDate.getTime())) {
+      return { success: false, error: "Cheque deposit date is required" };
+    }
+  }
+
   const totalAmount = Number(invoice.total_amount);
   if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
     return { success: false, error: "Invoice total is invalid" };
@@ -440,6 +451,8 @@ export async function recordCollection(input: RecordCollectionInput): Promise<Ac
       collected_by: access.profile.id,
       sales_rep_id: incentiveRecipientId,
       amount,
+      payment_type: paymentType,
+      cheque_deposit_date: chequeDepositDate ? chequeDepositDate.toISOString() : null,
       notes: input.notes?.trim() || null
     })
     .select("id")
@@ -495,8 +508,39 @@ export async function recordCollection(input: RecordCollectionInput): Promise<Ac
     .update({ incentive_total: incentiveTotal })
     .eq("id", collection.id);
 
+  if (paymentType === "cheque" && chequeDepositDate) {
+    const { data: managers, error: managerError } = await adminClient
+      .from("users_profile")
+      .select("id")
+      .in("role", ["admin", "manager"]);
+
+    if (managerError) {
+      return { success: false, error: managerError.message };
+    }
+
+    const customerName = customer?.name ?? "Unknown customer";
+
+    if (managers && managers.length > 0) {
+      const depositDateLabel = chequeDepositDate.toLocaleDateString("en-CA");
+      const notifications = managers.map((manager) => ({
+        recipient_id: manager.id,
+        title: "Cheque deposit reminder",
+        message: `Cheque collection for invoice #${invoice.invoice_number} (${customerName ?? "Unknown customer"}) is due for deposit on ${depositDateLabel}.`,
+        type: "cheque_deposit_reminder",
+        invoice_id: invoice.id,
+        created_by: access.profile.id
+      }));
+
+      const { error: notificationError } = await adminClient.from("notifications").insert(notifications);
+      if (notificationError) {
+        return { success: false, error: notificationError.message };
+      }
+    }
+  }
+
   revalidatePath("/collections");
   revalidatePath("/collections/approvals");
+  revalidatePath("/notifications");
 
   return { success: true, message: "Collection recorded and pending approval." };
 }

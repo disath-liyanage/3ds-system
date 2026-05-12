@@ -109,6 +109,8 @@ export interface Collection {
   collected_by: string;
   sales_rep_id?: string | null;
   amount: number;
+  payment_type?: "cash" | "cheque";
+  cheque_deposit_date?: string | null;
   incentive_total?: number;
   validated_by: string | null;
   status: "pending" | "validated" | "rejected";

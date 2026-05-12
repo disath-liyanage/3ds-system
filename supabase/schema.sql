@@ -86,6 +86,8 @@ create table if not exists public.collections (
   collected_by uuid not null references public.users_profile (id),
   sales_rep_id uuid references public.users_profile (id),
   amount numeric(12, 2) not null check (amount > 0),
+  payment_type text not null default 'cash' check (payment_type in ('cash', 'cheque')),
+  cheque_deposit_date date,
   incentive_total numeric(12, 2),
   validated_by uuid references public.users_profile (id),
   status public.collection_status not null default 'pending',
@@ -301,6 +303,8 @@ alter table if exists public.invoices
 alter table if exists public.collections
   add column if not exists invoice_id uuid references public.invoices (id),
   add column if not exists sales_rep_id uuid references public.users_profile (id),
+  add column if not exists payment_type text not null default 'cash' check (payment_type in ('cash', 'cheque')),
+  add column if not exists cheque_deposit_date date,
   add column if not exists incentive_total numeric(12, 2) not null default 0 check (incentive_total >= 0);
 
 create table if not exists public.collection_incentives (

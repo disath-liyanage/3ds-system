@@ -22,6 +22,8 @@ import { formatDate } from "@/lib/utils";
 type NewCollectionForm = {
   invoice_id: string;
   amount: number;
+  payment_type: "cash" | "cheque";
+  cheque_deposit_date: string;
   notes: string;
   incentive_recipient_id: string;
 };
@@ -55,6 +57,8 @@ export default function NewCollectionPage() {
     defaultValues: {
       invoice_id: initialInvoiceId,
       amount: 0,
+      payment_type: "cash",
+      cheque_deposit_date: "",
       notes: "",
       incentive_recipient_id: ""
     }
@@ -95,6 +99,7 @@ export default function NewCollectionPage() {
   );
 
   const selectedInvoiceId = watch("invoice_id");
+  const paymentType = watch("payment_type");
   const selectedInvoice = useMemo(
     () => availableInvoices.find((row) => row.id === selectedInvoiceId) || null,
     [availableInvoices, selectedInvoiceId]
@@ -170,9 +175,16 @@ export default function NewCollectionPage() {
   });
 
   const onSubmit = async (values: NewCollectionForm) => {
+    if (values.payment_type === "cheque" && !values.cheque_deposit_date) {
+      toast({ title: "Deposit date required", description: "Select the cheque deposit date.", variant: "error" });
+      return;
+    }
+
     const result = await recordCollection({
       invoice_id: values.invoice_id,
       amount: values.amount,
+      payment_type: values.payment_type,
+      cheque_deposit_date: values.payment_type === "cheque" ? values.cheque_deposit_date : undefined,
       notes: values.notes,
       incentive_recipient_id: isManagerOrAdmin ? values.incentive_recipient_id : user?.id
     });
@@ -185,6 +197,8 @@ export default function NewCollectionPage() {
     toast({ title: "Collection recorded", description: result.message, variant: "success" });
     setValue("invoice_id", "");
     setValue("amount", 0);
+    setValue("payment_type", "cash");
+    setValue("cheque_deposit_date", "");
     setValue("notes", "");
     setValue("incentive_recipient_id", "");
   };
@@ -231,12 +245,33 @@ export default function NewCollectionPage() {
             </div>
             {selectedInvoice ? (
               <div className="rounded-md border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                Assigned rep: {selectedInvoice.sales_rep_name || "Unassigned"} · Due {formatDate(selectedInvoice.due_date)}
+                Assigned Sales Rep: {selectedInvoice.sales_rep_name || "Unassigned"} · Due {formatDate(selectedInvoice.due_date)}
               </div>
             ) : null}
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Type</label>
+                <Select
+                  options={[
+                    { value: "cash", label: "Cash" },
+                    { value: "cheque", label: "Cheque" }
+                  ]}
+                  value={paymentType}
+                  onChange={(event) => {
+                    const nextType = event.target.value as "cash" | "cheque";
+                    setValue("payment_type", nextType);
+                    if (nextType === "cash") {
+                      setValue("cheque_deposit_date", "");
+                    }
+                  }}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Amount</label>
+                <Input type="number" step="0.01" {...register("amount", { valueAsNumber: true })} />
+              </div>
+            </div>
             <div className="space-y-1">
-              <label className="text-sm font-medium">Amount</label>
-              <Input type="number" step="0.01" {...register("amount", { valueAsNumber: true })} />
               {selectedInvoice ? (
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span>
@@ -260,11 +295,18 @@ export default function NewCollectionPage() {
                   </Button>
                 </div>
               ) : null}
-              <p className="text-xs text-muted-foreground">Partial or over payments are allowed.</p>
+
             </div>
             {isManagerOrAdmin ? (
-              <div className="flex items-center gap-3">
-                <div className="w-48">
+              <div className="grid gap-3 md:grid-cols-3">
+                {paymentType === "cheque" ? (
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Deposit Date</label>
+                    <Input type="date" {...register("cheque_deposit_date")} />
+                  </div>
+                ) : null}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Recipient Type</label>
                   <Select
                     options={[
                       { value: "sales_rep", label: "Sales rep" },
@@ -278,7 +320,8 @@ export default function NewCollectionPage() {
                     }}
                   />
                 </div>
-                <div className="flex-1">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Sales Rep</label>
                   <SearchableSelect
                     value={watch("incentive_recipient_id")}
                     options={recipientOptions}
@@ -286,8 +329,8 @@ export default function NewCollectionPage() {
                       recipientsQuery.isLoading
                         ? "Loading..."
                         : recipientRole === "driver"
-                          ? "Select driver"
-                          : "Select sales rep"
+                          ? "Select Driver"
+                          : "Select Sales Rep"
                     }
                     onChange={(value) => setValue("incentive_recipient_id", value)}
                   />
@@ -297,6 +340,12 @@ export default function NewCollectionPage() {
                     </p>
                   ) : null}
                 </div>
+              </div>
+            ) : null}
+            {!isManagerOrAdmin && paymentType === "cheque" ? (
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Deposit Date</label>
+                <Input type="date" {...register("cheque_deposit_date")} />
               </div>
             ) : null}
             <div className="space-y-1">
