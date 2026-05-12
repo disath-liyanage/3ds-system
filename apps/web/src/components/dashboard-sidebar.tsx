@@ -31,7 +31,6 @@ type DashboardSidebarProps = {
 
 const baseNavItems: SidebarItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
-  { href: "/orders", label: "Orders", icon: ClipboardList },
   { href: "/collections", label: "Collections", icon: HandCoins },
   { href: "/invoices", label: "Invoices", icon: FileText },
   { href: "/receive-notes", label: "GRN", icon: ReceiptText },
