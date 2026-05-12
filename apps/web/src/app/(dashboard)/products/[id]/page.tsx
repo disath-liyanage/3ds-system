@@ -141,6 +141,44 @@ export default function ProductStockDetailPage() {
         </div>
       )}
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Stock by selling price</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isStockError ? (
+            <p className="text-sm text-red-600">Failed to load price-level stock.</p>
+          ) : stockByPrice && stockByPrice.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Selling Price</TableHead>
+                  <TableHead>Received Qty</TableHead>
+                  <TableHead>Free Qty</TableHead>
+                  <TableHead>Total Qty</TableHead>
+                  <TableHead>Last Received</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stockByPrice.map((row) => (
+                  <TableRow key={`${row.selling_price}`}>
+                    <TableCell>{formatCurrencyLKR(row.selling_price)}</TableCell>
+                    <TableCell>{formatQuantity(row.received_qty)}</TableCell>
+                    <TableCell>{formatQuantity(row.free_qty)}</TableCell>
+                    <TableCell className="font-medium">{formatQuantity(row.total_qty)}</TableCell>
+                    <TableCell>
+                      {row.last_received_at ? formatDate(row.last_received_at) : "-"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-sm text-muted-foreground">No GRN stock entries yet.</p>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -304,44 +342,6 @@ export default function ProductStockDetailPage() {
           </CardContent>
         </Card>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Stock by selling price</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isStockError ? (
-            <p className="text-sm text-red-600">Failed to load price-level stock.</p>
-          ) : stockByPrice && stockByPrice.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Selling Price</TableHead>
-                  <TableHead>Received Qty</TableHead>
-                  <TableHead>Free Qty</TableHead>
-                  <TableHead>Total Qty</TableHead>
-                  <TableHead>Last Received</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {stockByPrice.map((row) => (
-                  <TableRow key={`${row.selling_price}`}>
-                    <TableCell>{formatCurrencyLKR(row.selling_price)}</TableCell>
-                    <TableCell>{formatQuantity(row.received_qty)}</TableCell>
-                    <TableCell>{formatQuantity(row.free_qty)}</TableCell>
-                    <TableCell className="font-medium">{formatQuantity(row.total_qty)}</TableCell>
-                    <TableCell>
-                      {row.last_received_at ? formatDate(row.last_received_at) : "-"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          ) : (
-            <p className="text-sm text-muted-foreground">No GRN stock entries yet.</p>
-          )}
-        </CardContent>
-      </Card>
     </section>
   );
 }
