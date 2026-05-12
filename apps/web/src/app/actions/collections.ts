@@ -297,7 +297,7 @@ export async function listCollectionInvoices(): Promise<{ success: boolean; data
 
     if (collectionError) return { success: false, error: collectionError.message };
 
-    const validatedTotals = new Map<string, number>();
+    const recordedTotals = new Map<string, number>();
     const latestByInvoice = new Map<
       string,
       { collected_by: string | null; created_at: string }
@@ -314,10 +314,8 @@ export async function listCollectionInvoices(): Promise<{ success: boolean; data
       };
       const invoiceId = typedRow.invoice_id;
 
-      if (typedRow.status === "validated") {
-        const amount = Number(typedRow.amount);
-        validatedTotals.set(invoiceId, (validatedTotals.get(invoiceId) ?? 0) + amount);
-      }
+      const amount = Number(typedRow.amount);
+      recordedTotals.set(invoiceId, (recordedTotals.get(invoiceId) ?? 0) + amount);
 
       const prevLatest = latestByInvoice.get(invoiceId);
       if (!prevLatest || new Date(typedRow.created_at).getTime() > new Date(prevLatest.created_at).getTime()) {
@@ -343,14 +341,11 @@ export async function listCollectionInvoices(): Promise<{ success: boolean; data
     }
 
     rows = rows.map((row) => {
-      const collectedTotal = validatedTotals.get(row.id) ?? 0;
+      const collectedTotal = recordedTotals.get(row.id) ?? 0;
       const remainingAmount = Math.max(0, row.total_amount - collectedTotal);
       const isPartiallySettled = !row.is_settled && collectedTotal > 0 && remainingAmount > 0;
-      const paymentStatus: CollectionInvoiceRow["payment_status"] = row.is_settled
-        ? "paid"
-        : isPartiallySettled
-          ? "partially_paid"
-          : "unpaid";
+      const paymentStatus: CollectionInvoiceRow["payment_status"] =
+        remainingAmount <= 0 ? "paid" : isPartiallySettled ? "partially_paid" : "unpaid";
       const latestEntry = latestByInvoice.get(row.id);
       const lastRecordedByName =
         latestEntry?.collected_by ? (collectorMap.get(latestEntry.collected_by) ?? "Unknown") : null;
@@ -528,7 +523,8 @@ export async function recordCollection(input: RecordCollectionInput): Promise<Ac
         message: `Cheque collection for invoice #${invoice.invoice_number} (${customerName ?? "Unknown customer"}) is due for deposit on ${depositDateLabel}.`,
         type: "cheque_deposit_reminder",
         invoice_id: invoice.id,
-        created_by: access.profile.id
+        created_by: access.profile.id,
+        created_at: chequeDepositDate.toISOString()
       }));
 
       const { error: notificationError } = await adminClient.from("notifications").insert(notifications);

@@ -72,6 +72,7 @@ export default function NotificationsPage() {
           "id, title, message, type, is_read, customer_id, invoice_id, created_at, customer:customers(id, name, phone, address, area, credit_limit, status), invoice:invoices(id, invoice_number, status, customer:customers(name))"
         )
         .eq("recipient_id", user.id)
+        .lte("created_at", new Date().toISOString())
         .order("created_at", { ascending: false });
 
       if (error) throw new Error(error.message);

@@ -69,7 +69,8 @@ export function DashboardSidebar({ isAdmin, user }: DashboardSidebarProps) {
         .from("notifications")
         .select("*", { count: "exact", head: true })
         .eq("recipient_id", authUser.id)
-        .eq("is_read", false);
+        .eq("is_read", false)
+        .lte("created_at", new Date().toISOString());
 
       if (error) return 0;
       return count ?? 0;
@@ -148,36 +149,6 @@ export function DashboardSidebar({ isAdmin, user }: DashboardSidebarProps) {
             filter: `recipient_id=eq.${authUser.id}`
           },
           async (payload) => {
-            const eventType = payload.eventType;
-            const newRow = (payload as { new?: { is_read?: boolean } }).new;
-            const oldRow = (payload as { old?: { is_read?: boolean } }).old;
-
-            if (eventType === "INSERT" && newRow?.is_read === false) {
-              queryClient.setQueryData<number>(["notifications-unread-count"], (current) => (current ?? 0) + 1);
-              return;
-            }
-
-            if (eventType === "UPDATE") {
-              if (oldRow?.is_read === false && newRow?.is_read === true) {
-                queryClient.setQueryData<number>(["notifications-unread-count"], (current) =>
-                  Math.max(0, (current ?? 0) - 1)
-                );
-                return;
-              }
-
-              if (oldRow?.is_read === true && newRow?.is_read === false) {
-                queryClient.setQueryData<number>(["notifications-unread-count"], (current) => (current ?? 0) + 1);
-                return;
-              }
-            }
-
-            if (eventType === "DELETE" && oldRow?.is_read === false) {
-              queryClient.setQueryData<number>(["notifications-unread-count"], (current) =>
-                Math.max(0, (current ?? 0) - 1)
-              );
-              return;
-            }
-
             await queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
           }
         )
