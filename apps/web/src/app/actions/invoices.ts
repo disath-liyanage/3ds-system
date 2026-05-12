@@ -105,6 +105,16 @@ export type ReturnInvoiceDetailRow = {
   }>;
 };
 
+export type ReturnInvoiceListRow = {
+  id: string;
+  return_number: number;
+  created_at: string;
+  total_return_amount: number;
+  customer_name: string;
+  source_invoice_number: number;
+  returned_by_name: string;
+};
+
 export type CancelledInvoiceReportRow = {
   invoice_id: string;
   invoice_number: number;
@@ -1606,6 +1616,44 @@ export async function getReturnInvoiceDetail(
   };
 
   return { success: true, data: result };
+}
+
+export async function listReturnInvoices(): Promise<{ success: boolean; data?: ReturnInvoiceListRow[]; error?: string }> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!isAdminOrManager(access.profile)) {
+    return { success: false, error: "Only admins and managers can view return invoices" };
+  }
+
+  const { data, error } = await adminClient
+    .from("return_invoices")
+    .select(`
+      id, return_number, created_at, total_return_amount,
+      source_invoice:invoices!return_invoices_invoice_id_fkey(invoice_number),
+      customer:customers(name),
+      returned_by_user:users_profile!return_invoices_returned_by_fkey(full_name)
+    `)
+    .order("return_number", { ascending: false });
+
+  if (error) return { success: false, error: error.message };
+
+  const rows: ReturnInvoiceListRow[] = (data ?? []).map((row: any) => {
+    const sourceInvoice = Array.isArray(row.source_invoice) ? row.source_invoice[0] : row.source_invoice;
+    const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
+    const returnedBy = Array.isArray(row.returned_by_user) ? row.returned_by_user[0] : row.returned_by_user;
+    return {
+      id: String(row.id),
+      return_number: Number(row.return_number) || 0,
+      created_at: String(row.created_at),
+      total_return_amount: Number(row.total_return_amount) || 0,
+      customer_name: customer?.name ?? "Unknown Customer",
+      source_invoice_number: Number(sourceInvoice?.invoice_number) || 0,
+      returned_by_name: returnedBy?.full_name ?? "Unknown"
+    };
+  });
+
+  return { success: true, data: rows };
 }
 
 export async function getCancelledInvoiceReport(

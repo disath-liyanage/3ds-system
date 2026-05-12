@@ -139,9 +139,14 @@ export default function ReturnInvoicePage() {
           <h1 className="text-2xl font-bold">Return Invoices</h1>
           <p className="text-sm text-muted-foreground">Select sold items and subtract quantities to create a return.</p>
         </div>
-        <Button asChild variant="outline">
-          <Link href="/invoices">Back to Invoices</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <Link href="/invoices/return/list">View Returned Invoices</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/invoices">Back to Invoices</Link>
+          </Button>
+        </div>
       </header>
 
       <Card>
