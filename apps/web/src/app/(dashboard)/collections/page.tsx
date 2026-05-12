@@ -358,10 +358,47 @@ export default function CollectionsPage() {
             </TableRow>
           ) : (
             filteredInvoices.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell>{row.invoice_number}</TableCell>
-                <TableCell>{row.customer_name}</TableCell>
-                <TableCell>
+              <TableRow
+                key={row.id}
+                className={row.payment_status === "partially_paid" ? "hover:bg-muted/30" : undefined}
+              >
+                <TableCell
+                  className={row.payment_status === "partially_paid" ? "cursor-pointer" : undefined}
+                  onClick={
+                    row.payment_status === "partially_paid"
+                      ? () => {
+                          setHistoryInvoiceId(row.id);
+                          setHistoryInvoiceNumber(row.invoice_number);
+                        }
+                      : undefined
+                  }
+                >
+                  {row.invoice_number}
+                </TableCell>
+                <TableCell
+                  className={row.payment_status === "partially_paid" ? "cursor-pointer" : undefined}
+                  onClick={
+                    row.payment_status === "partially_paid"
+                      ? () => {
+                          setHistoryInvoiceId(row.id);
+                          setHistoryInvoiceNumber(row.invoice_number);
+                        }
+                      : undefined
+                  }
+                >
+                  {row.customer_name}
+                </TableCell>
+                <TableCell
+                  className={row.payment_status === "partially_paid" ? "cursor-pointer" : undefined}
+                  onClick={
+                    row.payment_status === "partially_paid"
+                      ? () => {
+                          setHistoryInvoiceId(row.id);
+                          setHistoryInvoiceNumber(row.invoice_number);
+                        }
+                      : undefined
+                  }
+                >
                   <div className="flex flex-col">
                     <span>{formatCurrency(row.remaining_amount)}</span>
                     {row.payment_status === "partially_paid" ? (
@@ -371,7 +408,19 @@ export default function CollectionsPage() {
                     ) : null}
                   </div>
                 </TableCell>
-                <TableCell>{formatDate(row.due_date)}</TableCell>
+                <TableCell
+                  className={row.payment_status === "partially_paid" ? "cursor-pointer" : undefined}
+                  onClick={
+                    row.payment_status === "partially_paid"
+                      ? () => {
+                          setHistoryInvoiceId(row.id);
+                          setHistoryInvoiceNumber(row.invoice_number);
+                        }
+                      : undefined
+                  }
+                >
+                  {formatDate(row.due_date)}
+                </TableCell>
                 <TableCell>{row.sales_rep_name || "Unassigned"}</TableCell>
                 <TableCell>
                   <Badge
@@ -399,14 +448,15 @@ export default function CollectionsPage() {
                 </TableCell>
                 <TableCell>
                   {row.payment_status !== "paid" && canRecordCollections ? (
-                    <Button asChild size="sm">
+                    <Button asChild size="sm" onClick={(event) => event.stopPropagation()}>
                       <Link href={`/collections/new?invoiceId=${row.id}`}>Record</Link>
                     </Button>
                   ) : row.payment_status === "paid" || row.payment_status === "partially_paid" ? (
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => {
+                      onClick={(event) => {
+                        event.stopPropagation();
                         setHistoryInvoiceId(row.id);
                         setHistoryInvoiceNumber(row.invoice_number);
                       }}
