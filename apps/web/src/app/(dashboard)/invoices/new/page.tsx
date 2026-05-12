@@ -53,6 +53,12 @@ const emptyDraft = {
   discount_value: undefined
 };
 
+function toPriceKey(value: number | string | null | undefined): string {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "";
+  return amount.toFixed(2);
+}
+
 export default function NewInvoicePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -93,7 +99,6 @@ export default function NewInvoicePage() {
   const watchedPaymentMethod = useWatch({ control, name: "payment_method" });
   const watchedDraft = useWatch({ control, name: "draft" });
   const draftErrors = formState.errors?.draft;
-
   const isAdminOrManager = user?.role === "admin" || user?.role === "manager";
 
   const { data: stockByPrice, isLoading: isStockLoading } = useProductStockByPrice(watchedDraft?.product_id);
@@ -104,28 +109,30 @@ export default function NewInvoicePage() {
 
   const availableQty = useMemo(() => {
     if (!watchedDraft?.product_id) return null;
-    if (isAdminOrManager) return Number(selectedProduct?.stock_qty) || 0;
-    if (isStockLoading || !stockByPrice || stockByPrice.length === 0) return 0;
+    if (isStockLoading) return 0;
 
-    const selectedPrice = Number(watchedDraft.unit_price);
-    const hasSelectedPrice = watchedDraft.unit_price !== undefined && Number.isFinite(selectedPrice);
-    const samePrice = (a: number, b: number) => Math.abs(a - b) < 0.0001;
+    const priceBuckets = stockByPrice ?? [];
+    if (priceBuckets.length === 0) return Number(selectedProduct?.stock_qty) || 0;
+
+    const selectedPriceKey = toPriceKey(watchedDraft.unit_price);
+    const hasSelectedPrice = selectedPriceKey.length > 0;
+    const bucketByPriceKey = new Map(priceBuckets.map((bucket) => [toPriceKey(bucket.selling_price), bucket]));
 
     if (hasSelectedPrice) {
-      const bucket = stockByPrice.find((b) => samePrice(Number(b.selling_price), selectedPrice));
-      const bucketTotal = bucket ? Number(bucket.total_qty) || 0 : 0;
+      const bucket = bucketByPriceKey.get(selectedPriceKey);
+      const bucketTotal = bucket ? Number(bucket.received_qty) || 0 : 0;
 
       const allocatedToSameBucket = (watchedItems ?? []).reduce((sum, item, index) => {
         if (editingIndex !== null && index === editingIndex) return sum;
         if (item.product_id !== watchedDraft.product_id) return sum;
-        if (!samePrice(Number(item.unit_price), selectedPrice)) return sum;
+        if (toPriceKey(item.unit_price) !== selectedPriceKey) return sum;
         return sum + (Number(item.qty) || 0) + (Number(item.free_qty) || 0);
       }, 0);
 
       return Math.max(0, bucketTotal - allocatedToSameBucket);
     }
 
-    const totalByProduct = stockByPrice.reduce((sum, b) => sum + (Number(b.total_qty) || 0), 0);
+    const totalByProduct = priceBuckets.reduce((sum, b) => sum + (Number(b.received_qty) || 0), 0);
     const allocatedToProduct = (watchedItems ?? []).reduce((sum, item, index) => {
       if (editingIndex !== null && index === editingIndex) return sum;
       if (item.product_id !== watchedDraft.product_id) return sum;
@@ -135,7 +142,6 @@ export default function NewInvoicePage() {
     return Math.max(0, totalByProduct - allocatedToProduct);
   }, [
     editingIndex,
-    isAdminOrManager,
     isStockLoading,
     selectedProduct?.stock_qty,
     stockByPrice,
@@ -886,7 +892,7 @@ export default function NewInvoicePage() {
                             className="flex flex-col items-start px-4 py-3 border rounded-lg bg-muted/20 hover:bg-muted/60 transition text-left"
                           >
                             <span className="font-semibold text-primary text-base">LKR {bucket.selling_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                            <span className="text-xs text-muted-foreground mt-1">Stock Received: {bucket.total_qty}</span>
+                            <span className="text-xs text-muted-foreground mt-1">Stock Available: {bucket.received_qty}</span>
                           </button>
                         ))}
                       </div>
