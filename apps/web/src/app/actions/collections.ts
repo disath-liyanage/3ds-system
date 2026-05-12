@@ -507,6 +507,7 @@ export async function recordCollection(input: RecordCollectionInput): Promise<Ac
 
   const customer = Array.isArray(invoice.customer) ? invoice.customer[0] : invoice.customer;
   const invoiceItems = (invoice.invoice_items ?? []) as InvoiceItemRow[];
+  const isAutoValidated = access.profile.role === "admin" || access.profile.role === "manager";
 
   const defaultRecipientId = customer?.sales_rep_id ?? null;
   const incentiveRecipientId =
@@ -528,6 +529,8 @@ export async function recordCollection(input: RecordCollectionInput): Promise<Ac
       amount,
       payment_type: paymentType,
       cheque_deposit_date: chequeDepositDate ? chequeDepositDate.toISOString() : null,
+      status: isAutoValidated ? "validated" : "pending",
+      validated_by: isAutoValidated ? access.profile.id : null,
       notes: input.notes?.trim() || null
     })
     .select("id")
@@ -583,6 +586,51 @@ export async function recordCollection(input: RecordCollectionInput): Promise<Ac
     .update({ incentive_total: incentiveTotal })
     .eq("id", collection.id);
 
+  if (isAutoValidated) {
+    const { data: validatedRows, error: validatedError } = await adminClient
+      .from("collections")
+      .select("amount")
+      .eq("invoice_id", invoice.id)
+      .eq("status", "validated");
+
+    if (validatedError) {
+      return { success: false, error: validatedError.message };
+    }
+
+    const validatedTotal = (validatedRows ?? []).reduce(
+      (sum, row) => sum + Number((row as { amount: number }).amount),
+      0
+    );
+
+    if (validatedTotal + 0.01 >= totalAmount) {
+      const { error: invoiceUpdateError } = await adminClient
+        .from("invoices")
+        .update({
+          is_settled: true,
+          settled_at: new Date().toISOString(),
+          settled_by: access.profile.id,
+          status: "paid"
+        })
+        .eq("id", invoice.id);
+
+      if (invoiceUpdateError) {
+        return { success: false, error: invoiceUpdateError.message };
+      }
+    }
+
+    if (customer?.balance != null) {
+      const nextBalance = Math.max(0, Number(customer.balance) - amount);
+      const { error: customerUpdateError } = await adminClient
+        .from("customers")
+        .update({ balance: nextBalance })
+        .eq("id", invoice.customer_id);
+
+      if (customerUpdateError) {
+        return { success: false, error: customerUpdateError.message };
+      }
+    }
+  }
+
   if (paymentType === "cheque" && chequeDepositDate) {
     const { data: managers, error: managerError } = await adminClient
       .from("users_profile")
@@ -618,7 +666,10 @@ export async function recordCollection(input: RecordCollectionInput): Promise<Ac
   revalidatePath("/collections/approvals");
   revalidatePath("/notifications");
 
-  return { success: true, message: "Collection recorded and pending approval." };
+  return {
+    success: true,
+    message: isAutoValidated ? "Collection recorded and validated." : "Collection recorded and pending approval."
+  };
 }
 
 async function fetchPendingCollections(salesRepId: string): Promise<PendingCollectionRow[]> {
