@@ -78,6 +78,20 @@ export type CollectionApprovalDetail = {
   };
 };
 
+export type InvoiceCollectionHistoryRow = {
+  id: string;
+  collection_number: number;
+  amount: number;
+  payment_type: "cash" | "cheque";
+  cheque_deposit_date: string | null;
+  status: "pending" | "validated" | "rejected";
+  notes: string | null;
+  created_at: string;
+  collected_by_name: string | null;
+  sales_rep_name: string | null;
+  validated_by_name: string | null;
+};
+
 type ActionResult = {
   success: boolean;
   error?: string;
@@ -155,6 +169,20 @@ type PendingCollectionApprovalRow = {
 type PendingExpenseAmountRow = {
   sales_rep_id: string;
   amount: number;
+};
+
+type InvoiceCollectionHistoryQueryRow = {
+  id: string;
+  collection_number: number;
+  amount: number;
+  payment_type: "cash" | "cheque" | null;
+  cheque_deposit_date: string | null;
+  status: "pending" | "validated" | "rejected";
+  notes: string | null;
+  created_at: string;
+  collected_by_user: { full_name: string | null } | { full_name: string | null }[] | null;
+  sales_rep_user: { full_name: string | null } | { full_name: string | null }[] | null;
+  validated_by_user: { full_name: string | null } | { full_name: string | null }[] | null;
 };
 
 async function getCurrentUserProfile() {
@@ -360,6 +388,54 @@ export async function listCollectionInvoices(): Promise<{ success: boolean; data
       };
     });
   }
+
+  return { success: true, data: rows };
+}
+
+export async function getInvoiceCollectionHistory(
+  invoiceId: string
+): Promise<{ success: boolean; data?: InvoiceCollectionHistoryRow[]; error?: string }> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!canRecordCollections(access.profile) && !canManageCollectionApprovals(access.profile)) {
+    return { success: false, error: "You do not have permission to view collection history" };
+  }
+
+  if (!invoiceId) {
+    return { success: false, error: "Invoice id is required" };
+  }
+
+  const { data, error } = await adminClient
+    .from("collections")
+    .select(
+      "id, collection_number, amount, payment_type, cheque_deposit_date, status, notes, created_at, collected_by_user:users_profile!collections_collected_by_fkey(full_name), sales_rep_user:users_profile!collections_sales_rep_id_fkey(full_name), validated_by_user:users_profile!collections_validated_by_fkey(full_name)"
+    )
+    .eq("invoice_id", invoiceId)
+    .order("created_at", { ascending: false })
+    .returns<InvoiceCollectionHistoryQueryRow[]>();
+
+  if (error) return { success: false, error: error.message };
+
+  const rows = (data ?? []).map((row) => {
+    const collectedBy = Array.isArray(row.collected_by_user) ? row.collected_by_user[0] : row.collected_by_user;
+    const salesRep = Array.isArray(row.sales_rep_user) ? row.sales_rep_user[0] : row.sales_rep_user;
+    const validatedBy = Array.isArray(row.validated_by_user) ? row.validated_by_user[0] : row.validated_by_user;
+
+    return {
+      id: row.id,
+      collection_number: Number(row.collection_number),
+      amount: Number(row.amount),
+      payment_type: row.payment_type === "cheque" ? "cheque" : "cash",
+      cheque_deposit_date: row.cheque_deposit_date ?? null,
+      status: row.status,
+      notes: row.notes ?? null,
+      created_at: row.created_at,
+      collected_by_name: collectedBy?.full_name ?? null,
+      sales_rep_name: salesRep?.full_name ?? null,
+      validated_by_name: validatedBy?.full_name ?? null
+    } satisfies InvoiceCollectionHistoryRow;
+  });
 
   return { success: true, data: rows };
 }

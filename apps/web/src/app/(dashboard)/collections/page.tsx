@@ -9,9 +9,11 @@ import { DayPicker, type DateRange } from "react-day-picker";
 
 import "react-day-picker/dist/style.css";
 
+import { getInvoiceCollectionHistory, type InvoiceCollectionHistoryRow } from "@/app/actions/collections";
 import { getSalesReps } from "@/app/actions/customers";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -43,6 +45,8 @@ export default function CollectionsPage() {
   const [customerSearch, setCustomerSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("open");
   const [salesRepFilter, setSalesRepFilter] = useState("all");
+  const [historyInvoiceId, setHistoryInvoiceId] = useState<string | null>(null);
+  const [historyInvoiceNumber, setHistoryInvoiceNumber] = useState<number | null>(null);
 
   const canRecordCollections = permissions?.canRecordCollections ?? false;
   const canViewCollections = permissions
@@ -66,6 +70,17 @@ export default function CollectionsPage() {
     ],
     [salesRepsQuery.data]
   );
+
+  const historyQuery = useQuery<InvoiceCollectionHistoryRow[]>({
+    queryKey: ["invoice-collection-history", historyInvoiceId],
+    queryFn: async () => {
+      if (!historyInvoiceId) return [];
+      const result = await getInvoiceCollectionHistory(historyInvoiceId);
+      if (!result.success) throw new Error(result.error || "Failed to load collection history");
+      return result.data ?? [];
+    },
+    enabled: Boolean(historyInvoiceId)
+  });
 
   const filteredInvoices = useMemo(() => {
     let rows = invoices ?? [];
@@ -317,6 +332,17 @@ export default function CollectionsPage() {
                     <Button asChild size="sm">
                       <Link href={`/collections/new?invoiceId=${row.id}`}>Record</Link>
                     </Button>
+                  ) : row.payment_status === "paid" || row.payment_status === "partially_paid" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setHistoryInvoiceId(row.id);
+                        setHistoryInvoiceNumber(row.invoice_number);
+                      }}
+                    >
+                      History
+                    </Button>
                   ) : (
                     <span className="text-xs text-muted-foreground">-</span>
                   )}
@@ -326,6 +352,53 @@ export default function CollectionsPage() {
           )}
         </TableBody>
       </Table>
+
+      <Dialog
+        open={Boolean(historyInvoiceId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setHistoryInvoiceId(null);
+            setHistoryInvoiceNumber(null);
+          }
+        }}
+        title={historyInvoiceNumber ? `Collection History · Invoice #${historyInvoiceNumber}` : "Collection History"}
+        description="View how this invoice was collected."
+      >
+        {historyQuery.isLoading ? (
+          <p className="text-sm text-muted-foreground">Loading history...</p>
+        ) : historyQuery.isError ? (
+          <p className="text-sm text-destructive">Failed to load history.</p>
+        ) : historyQuery.data && historyQuery.data.length > 0 ? (
+          <div className="max-h-[60vh] space-y-3 overflow-auto pr-1">
+            {historyQuery.data.map((entry) => (
+              <div key={entry.id} className="rounded-md border border-border p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">Collection #{entry.collection_number}</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(entry.created_at)}</p>
+                  </div>
+                  <Badge variant={entry.status === "validated" ? "success" : entry.status === "rejected" ? "danger" : "warning"}>
+                    {entry.status}
+                  </Badge>
+                </div>
+                <div className="mt-2 grid grid-cols-1 gap-1 text-xs text-muted-foreground">
+                  <p>Amount: {formatCurrency(entry.amount)}</p>
+                  <p>Type: {entry.payment_type === "cheque" ? "Cheque" : "Cash"}</p>
+                  <p>Collected By: {entry.collected_by_name || "-"}</p>
+                  <p>Sales Rep: {entry.sales_rep_name || "-"}</p>
+                  {entry.payment_type === "cheque" ? (
+                    <p>Deposit Date: {entry.cheque_deposit_date ? formatDate(entry.cheque_deposit_date) : "-"}</p>
+                  ) : null}
+                  <p>Validated By: {entry.validated_by_name || "-"}</p>
+                  <p>Notes: {entry.notes || "-"}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No collection history found for this invoice.</p>
+        )}
+      </Dialog>
     </section>
   );
 }
