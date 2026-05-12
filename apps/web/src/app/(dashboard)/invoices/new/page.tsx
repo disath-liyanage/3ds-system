@@ -169,6 +169,20 @@ export default function NewInvoicePage() {
   }, []);
 
   const shouldValidateDraft = () => addAttempted || Boolean(getValues("draft.product_id"));
+  const focusQtyField = useCallback(() => {
+    setTimeout(() => {
+      const qtyInput = document.querySelector('input[name="draft.qty"]') as HTMLInputElement | null;
+      qtyInput?.focus();
+    }, 0);
+  }, []);
+
+  const handleDraftProductChange = useCallback((productId: string) => {
+    setValue("draft.product_id", productId, { shouldDirty: true, shouldValidate: true });
+    setValue("draft.unit_price", undefined, { shouldDirty: true, shouldValidate: true });
+    setValue("draft.unit_cost", undefined, { shouldDirty: true });
+    setIsPriceModalOpen(false);
+    focusQtyField();
+  }, [setValue, focusQtyField]);
 
   const productOptions = useMemo<SearchableSelectOption[]>(
     () =>
@@ -317,19 +331,12 @@ export default function NewInvoicePage() {
         setValue("draft.unit_price", bucket.selling_price, { shouldValidate: true, shouldDirty: true });
         setValue("draft.unit_cost", bucket.unit_cost);
         setIsPriceModalOpen(false);
-
-        // Focus Qty field
-        setTimeout(() => {
-          const qtyInput = document.querySelector('input[name="draft.qty"]') as HTMLInputElement;
-          if (qtyInput) {
-            qtyInput.focus();
-          }
-        }, 0);
+        focusQtyField();
       } else if (stockByPrice) {
         setIsPriceModalOpen(true);
       }
     }
-  }, [watchedDraft?.product_id, watchedDraft?.unit_price, isStockLoading, stockByPrice, setValue]);
+  }, [watchedDraft?.product_id, watchedDraft?.unit_price, isStockLoading, stockByPrice, setValue, focusQtyField]);
 
   const hasDraftData = (draft: InvoiceForm["draft"]) =>
     Boolean(
@@ -761,7 +768,7 @@ export default function NewInvoicePage() {
                         ? "border-red-400 focus:ring-red-400/40"
                         : ""
                     )}
-                    onChange={(value) => setValue("draft.product_id", value, { shouldDirty: true })}
+                    onChange={handleDraftProductChange}
                   />
                   <input
                     type="hidden"
@@ -880,14 +887,7 @@ export default function NewInvoicePage() {
                               setValue("draft.unit_price", bucket.selling_price, { shouldValidate: true, shouldDirty: true });
                               setValue("draft.unit_cost", bucket.unit_cost);
                               setIsPriceModalOpen(false);
-
-                              // Focus Qty field
-                              setTimeout(() => {
-                                const qtyInput = document.querySelector('input[name="draft.qty"]') as HTMLInputElement;
-                                if (qtyInput) {
-                                  qtyInput.focus();
-                                }
-                              }, 0);
+                              focusQtyField();
                             }}
                             className="flex flex-col items-start px-4 py-3 border rounded-lg bg-muted/20 hover:bg-muted/60 transition text-left"
                           >
