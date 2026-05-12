@@ -88,6 +88,7 @@ export type InvoiceCollectionHistoryRow = {
   status: "pending" | "validated" | "rejected";
   notes: string | null;
   created_at: string;
+  collected_by_id: string;
   collected_by_name: string | null;
   sales_rep_name: string | null;
   validated_by_name: string | null;
@@ -181,6 +182,7 @@ type InvoiceCollectionHistoryQueryRow = {
   status: "pending" | "validated" | "rejected";
   notes: string | null;
   created_at: string;
+  collected_by: string;
   collected_by_user: { full_name: string | null } | { full_name: string | null }[] | null;
   sales_rep_user: { full_name: string | null } | { full_name: string | null }[] | null;
   validated_by_user: { full_name: string | null } | { full_name: string | null }[] | null;
@@ -413,7 +415,7 @@ export async function getInvoiceCollectionHistory(
   const { data, error } = await adminClient
     .from("collections")
     .select(
-      "id, collection_number, amount, payment_type, cheque_deposit_date, status, notes, created_at, collected_by_user:users_profile!collections_collected_by_fkey(full_name), sales_rep_user:users_profile!collections_sales_rep_id_fkey(full_name), validated_by_user:users_profile!collections_validated_by_fkey(full_name)"
+      "id, collection_number, amount, payment_type, cheque_deposit_date, status, notes, created_at, collected_by, collected_by_user:users_profile!collections_collected_by_fkey(full_name), sales_rep_user:users_profile!collections_sales_rep_id_fkey(full_name), validated_by_user:users_profile!collections_validated_by_fkey(full_name)"
     )
     .eq("invoice_id", invoiceId)
     .order("created_at", { ascending: false })
@@ -435,6 +437,7 @@ export async function getInvoiceCollectionHistory(
       status: row.status,
       notes: row.notes ?? null,
       created_at: row.created_at,
+      collected_by_id: row.collected_by,
       collected_by_name: collectedBy?.full_name ?? null,
       sales_rep_name: salesRep?.full_name ?? null,
       validated_by_name: validatedBy?.full_name ?? null
@@ -442,6 +445,94 @@ export async function getInvoiceCollectionHistory(
   });
 
   return { success: true, data: rows };
+}
+
+export async function updateCollectionEntry(input: {
+  collection_id: string;
+  amount: number;
+  payment_type: "cash" | "cheque";
+  cheque_deposit_date?: string;
+  notes?: string;
+}): Promise<ActionResult> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!input.collection_id) return { success: false, error: "Collection id is required" };
+  const amount = Number(input.amount);
+  if (!Number.isFinite(amount) || amount <= 0) return { success: false, error: "Amount must be greater than 0" };
+
+  const paymentType = input.payment_type === "cheque" ? "cheque" : "cash";
+  const chequeDepositDate =
+    paymentType === "cheque" ? (input.cheque_deposit_date ? new Date(input.cheque_deposit_date) : null) : null;
+  if (paymentType === "cheque" && (!chequeDepositDate || Number.isNaN(chequeDepositDate.getTime()))) {
+    return { success: false, error: "Cheque deposit date is required" };
+  }
+
+  const { data: collection, error: collectionError } = await adminClient
+    .from("collections")
+    .select("id, collected_by, status")
+    .eq("id", input.collection_id)
+    .maybeSingle<{ id: string; collected_by: string; status: "pending" | "validated" | "rejected" }>();
+
+  if (collectionError || !collection) {
+    return { success: false, error: collectionError?.message || "Collection not found" };
+  }
+
+  const isManagerOrAdmin = access.profile.role === "admin" || access.profile.role === "manager";
+  const isOwnerPending =
+    access.profile.role === "sales_rep" && collection.collected_by === access.profile.id && collection.status === "pending";
+  if (!isManagerOrAdmin && !isOwnerPending) {
+    return { success: false, error: "You do not have permission to edit this collection" };
+  }
+
+  const { error: updateError } = await adminClient
+    .from("collections")
+    .update({
+      amount,
+      payment_type: paymentType,
+      cheque_deposit_date: chequeDepositDate ? chequeDepositDate.toISOString() : null,
+      notes: input.notes?.trim() || null
+    })
+    .eq("id", input.collection_id);
+
+  if (updateError) return { success: false, error: updateError.message };
+
+  revalidatePath("/collections");
+  revalidatePath("/collections/approvals");
+
+  return { success: true, message: "Collection updated" };
+}
+
+export async function deleteCollectionEntry(collectionId: string): Promise<ActionResult> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!collectionId) return { success: false, error: "Collection id is required" };
+
+  const { data: collection, error: collectionError } = await adminClient
+    .from("collections")
+    .select("id, collected_by, status")
+    .eq("id", collectionId)
+    .maybeSingle<{ id: string; collected_by: string; status: "pending" | "validated" | "rejected" }>();
+
+  if (collectionError || !collection) {
+    return { success: false, error: collectionError?.message || "Collection not found" };
+  }
+
+  const isManagerOrAdmin = access.profile.role === "admin" || access.profile.role === "manager";
+  const isOwnerPending =
+    access.profile.role === "sales_rep" && collection.collected_by === access.profile.id && collection.status === "pending";
+  if (!isManagerOrAdmin && !isOwnerPending) {
+    return { success: false, error: "You do not have permission to delete this collection" };
+  }
+
+  const { error: deleteError } = await adminClient.from("collections").delete().eq("id", collectionId);
+  if (deleteError) return { success: false, error: deleteError.message };
+
+  revalidatePath("/collections");
+  revalidatePath("/collections/approvals");
+
+  return { success: true, message: "Collection deleted" };
 }
 
 function pickLatestRates(rows: ReceiveNoteRateRow[]): Map<string, number> {

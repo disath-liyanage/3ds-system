@@ -2,14 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ChevronRight } from "lucide-react";
 import { DayPicker, type DateRange } from "react-day-picker";
 
 import "react-day-picker/dist/style.css";
 
-import { getInvoiceCollectionHistory, type InvoiceCollectionHistoryRow } from "@/app/actions/collections";
+import {
+  deleteCollectionEntry,
+  getInvoiceCollectionHistory,
+  type InvoiceCollectionHistoryRow,
+  updateCollectionEntry
+} from "@/app/actions/collections";
 import { getSalesReps } from "@/app/actions/customers";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +24,7 @@ import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCollectionInvoices } from "@/hooks/useCollectionInvoices";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
+import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
 
 type StatusFilter = "open" | "unpaid" | "partially_paid" | "paid" | "all";
@@ -37,6 +43,7 @@ const formatCurrency = (value: number) =>
 export default function CollectionsPage() {
   const { permissions, isLoading, user } = useCurrentUserPermissions();
   const { data: invoices, isLoading: isInvoicesLoading, error } = useCollectionInvoices();
+  const queryClient = useQueryClient();
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -47,6 +54,11 @@ export default function CollectionsPage() {
   const [salesRepFilter, setSalesRepFilter] = useState("all");
   const [historyInvoiceId, setHistoryInvoiceId] = useState<string | null>(null);
   const [historyInvoiceNumber, setHistoryInvoiceNumber] = useState<number | null>(null);
+  const [editingEntry, setEditingEntry] = useState<InvoiceCollectionHistoryRow | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editType, setEditType] = useState<"cash" | "cheque">("cash");
+  const [editDepositDate, setEditDepositDate] = useState("");
+  const [editNotes, setEditNotes] = useState("");
 
   const canRecordCollections = permissions?.canRecordCollections ?? false;
   const canViewCollections = permissions
@@ -82,6 +94,50 @@ export default function CollectionsPage() {
     enabled: Boolean(historyInvoiceId)
   });
 
+  const updateEntryMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingEntry) throw new Error("No collection selected");
+      const result = await updateCollectionEntry({
+        collection_id: editingEntry.id,
+        amount: Number(editAmount),
+        payment_type: editType,
+        cheque_deposit_date: editType === "cheque" ? editDepositDate : undefined,
+        notes: editNotes
+      });
+      if (!result.success) throw new Error(result.error || "Failed to update collection");
+      return result;
+    },
+    onSuccess: async () => {
+      toast({ title: "Collection updated", variant: "success" });
+      setEditingEntry(null);
+      await queryClient.invalidateQueries({ queryKey: ["invoice-collection-history", historyInvoiceId] });
+      await queryClient.invalidateQueries({ queryKey: ["collection-invoices"] });
+      await queryClient.invalidateQueries({ queryKey: ["collection-approval-summaries"] });
+      await queryClient.invalidateQueries({ queryKey: ["collection-approval-detail"] });
+    },
+    onError: (error) => {
+      toast({ title: "Update failed", description: String(error), variant: "error" });
+    }
+  });
+
+  const deleteEntryMutation = useMutation({
+    mutationFn: async (collectionId: string) => {
+      const result = await deleteCollectionEntry(collectionId);
+      if (!result.success) throw new Error(result.error || "Failed to delete collection");
+      return result;
+    },
+    onSuccess: async () => {
+      toast({ title: "Collection deleted", variant: "success" });
+      await queryClient.invalidateQueries({ queryKey: ["invoice-collection-history", historyInvoiceId] });
+      await queryClient.invalidateQueries({ queryKey: ["collection-invoices"] });
+      await queryClient.invalidateQueries({ queryKey: ["collection-approval-summaries"] });
+      await queryClient.invalidateQueries({ queryKey: ["collection-approval-detail"] });
+    },
+    onError: (error) => {
+      toast({ title: "Delete failed", description: String(error), variant: "error" });
+    }
+  });
+
   const filteredInvoices = useMemo(() => {
     let rows = invoices ?? [];
 
@@ -111,6 +167,14 @@ export default function CollectionsPage() {
       const end = new Date(dateRange.to);
       end.setHours(23, 59, 59, 999);
       rows = rows.filter((row) => new Date(row.created_at).getTime() <= end.getTime());
+    }
+
+    if (statusFilter === "paid") {
+      rows = [...rows].sort((a, b) => {
+        const aTime = new Date(a.settled_at || a.last_collection_at || a.created_at).getTime();
+        const bTime = new Date(b.settled_at || b.last_collection_at || b.created_at).getTime();
+        return bTime - aTime;
+      });
     }
 
     return rows;
@@ -398,12 +462,88 @@ export default function CollectionsPage() {
                   <p>Validated By: {entry.validated_by_name || "-"}</p>
                   <p>Notes: {entry.notes || "-"}</p>
                 </div>
+                {(() => {
+                  const isManagerOrAdmin = user?.role === "admin" || user?.role === "manager";
+                  const isSalesRepOwnPending =
+                    user?.role === "sales_rep" && entry.collected_by_id === user?.id && entry.status === "pending";
+                  const canEditDelete = isManagerOrAdmin || isSalesRepOwnPending;
+                  if (!canEditDelete) return null;
+
+                  return (
+                    <div className="mt-3 flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditingEntry(entry);
+                          setEditAmount(String(entry.amount));
+                          setEditType(entry.payment_type);
+                          setEditDepositDate(
+                            entry.cheque_deposit_date ? entry.cheque_deposit_date.slice(0, 10) : ""
+                          );
+                          setEditNotes(entry.notes ?? "");
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={deleteEntryMutation.isPending}
+                        onClick={() => deleteEntryMutation.mutate(entry.id)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  );
+                })()}
               </div>
             ))}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No collection history found for this invoice.</p>
         )}
+      </Dialog>
+
+      <Dialog
+        open={Boolean(editingEntry)}
+        onOpenChange={(open) => {
+          if (!open) setEditingEntry(null);
+        }}
+        title={editingEntry ? `Edit Collection #${editingEntry.collection_number}` : "Edit Collection"}
+      >
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Amount</label>
+            <Input type="number" step="0.01" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Type</label>
+            <Select
+              value={editType}
+              options={[
+                { value: "cash", label: "Cash" },
+                { value: "cheque", label: "Cheque" }
+              ]}
+              onChange={(event) => setEditType(event.target.value as "cash" | "cheque")}
+            />
+          </div>
+          {editType === "cheque" ? (
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Deposit Date</label>
+              <Input type="date" value={editDepositDate} onChange={(e) => setEditDepositDate(e.target.value)} />
+            </div>
+          ) : null}
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Notes</label>
+            <Input value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
+          </div>
+          <div className="flex justify-end">
+            <Button disabled={updateEntryMutation.isPending} onClick={() => updateEntryMutation.mutate()}>
+              Save Changes
+            </Button>
+          </div>
+        </div>
       </Dialog>
     </section>
   );
