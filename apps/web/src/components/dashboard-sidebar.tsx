@@ -3,6 +3,7 @@
 import {
   BarChart3,
   Bell,
+  CalendarCheck2,
   ClipboardList,
   FileText,
   HandCoins,
@@ -76,13 +77,16 @@ export function DashboardSidebar({ isAdmin, user }: DashboardSidebarProps) {
     }
   });
 
-  const navItems = useMemo(
-    () =>
-      baseNavItems.map((item) =>
-        item.href === "/notifications" ? { ...item, badgeCount: unreadNotificationsQuery.data ?? 0 } : item
-      ),
-    [unreadNotificationsQuery.data]
-  );
+  const navItems = useMemo(() => {
+    const withAttendance =
+      user.role === "admin" || user.role === "manager"
+        ? [...baseNavItems, { href: "/attendance", label: "Attendance", icon: CalendarCheck2 }]
+        : baseNavItems;
+
+    return withAttendance.map((item) =>
+      item.href === "/notifications" ? { ...item, badgeCount: unreadNotificationsQuery.data ?? 0 } : item
+    );
+  }, [unreadNotificationsQuery.data, user.role]);
 
   const playNotificationSound = () => {
     if (typeof window === "undefined") return;
