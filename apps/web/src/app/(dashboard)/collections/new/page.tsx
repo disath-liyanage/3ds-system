@@ -70,6 +70,7 @@ export default function NewCollectionPage() {
   const [expenseNotes, setExpenseNotes] = useState("");
   const [expenseAmount, setExpenseAmount] = useState("");
   const [isInvoiceExpanded, setIsInvoiceExpanded] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const recipientsQuery = useQuery({
     queryKey: ["collection-recipients"],
@@ -175,32 +176,39 @@ export default function NewCollectionPage() {
   });
 
   const onSubmit = async (values: NewCollectionForm) => {
+    if (isSubmitting) return;
+
     if (values.payment_type === "cheque" && !values.cheque_deposit_date) {
       toast({ title: "Deposit date required", description: "Select the cheque deposit date.", variant: "error" });
       return;
     }
 
-    const result = await recordCollection({
-      invoice_id: values.invoice_id,
-      amount: values.amount,
-      payment_type: values.payment_type,
-      cheque_deposit_date: values.payment_type === "cheque" ? values.cheque_deposit_date : undefined,
-      notes: values.notes,
-      incentive_recipient_id: isManagerOrAdmin ? values.incentive_recipient_id : user?.id
-    });
+    setIsSubmitting(true);
+    try {
+      const result = await recordCollection({
+        invoice_id: values.invoice_id,
+        amount: values.amount,
+        payment_type: values.payment_type,
+        cheque_deposit_date: values.payment_type === "cheque" ? values.cheque_deposit_date : undefined,
+        notes: values.notes,
+        incentive_recipient_id: isManagerOrAdmin ? values.incentive_recipient_id : user?.id
+      });
 
-    if (!result.success) {
-      toast({ title: "Collection failed", description: result.error, variant: "error" });
-      return;
+      if (!result.success) {
+        toast({ title: "Collection failed", description: result.error, variant: "error" });
+        return;
+      }
+
+      toast({ title: "Collection recorded", description: result.message, variant: "success" });
+      setValue("invoice_id", "");
+      setValue("amount", 0);
+      setValue("payment_type", "cash");
+      setValue("cheque_deposit_date", "");
+      setValue("notes", "");
+      setValue("incentive_recipient_id", "");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    toast({ title: "Collection recorded", description: result.message, variant: "success" });
-    setValue("invoice_id", "");
-    setValue("amount", 0);
-    setValue("payment_type", "cash");
-    setValue("cheque_deposit_date", "");
-    setValue("notes", "");
-    setValue("incentive_recipient_id", "");
   };
 
   if (!isLoading && !permissions?.canRecordCollections) {
@@ -352,7 +360,9 @@ export default function NewCollectionPage() {
               <label className="text-sm font-medium">Notes</label>
               <Input placeholder="Payment reference" {...register("notes")} />
             </div>
-            <Button type="submit" disabled={!selectedInvoiceId}>Save Collection</Button>
+            <Button type="submit" disabled={!selectedInvoiceId || isSubmitting}>
+              {isSubmitting ? "Saving..." : "Save Collection"}
+            </Button>
           </form>
         </CardContent>
       </Card>
