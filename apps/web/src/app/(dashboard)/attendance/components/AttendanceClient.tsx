@@ -61,7 +61,6 @@ export function AttendanceClient({
 }: AttendanceClientProps) {
   const [year, setYear] = useState(initialYear);
   const [month, setMonth] = useState(initialMonth);
-  const [selectedWorkerId, setSelectedWorkerId] = useState(workers[0]?.id ?? "");
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceStatus>>(() => {
     const entries = initialAttendance.map((row) => [`${row.worker_id}:${row.attendance_date}`, row.status] as const);
@@ -79,11 +78,6 @@ export function AttendanceClient({
   );
 
   const selectedDateKey = selectedDay ? toDateKey(year, month, selectedDay) : null;
-  const selectedAttendanceKey = selectedWorkerId && selectedDateKey ? `${selectedWorkerId}:${selectedDateKey}` : "";
-
-  const selectedStatus = selectedAttendanceKey ? attendanceMap[selectedAttendanceKey] ?? "" : "";
-
-  const selectedWorker = workers.find((worker) => worker.id === selectedWorkerId);
 
   const monthLabel = new Intl.DateTimeFormat("en-GB", {
     month: "long",
@@ -91,12 +85,52 @@ export function AttendanceClient({
     timeZone: "Asia/Colombo"
   }).format(new Date(year, month, 1));
 
-  const onSave = (status: AttendanceStatus) => {
-    if (!selectedWorkerId || !selectedDay || !selectedDateKey) return;
+  const markAllAsHoliday = () => {
+    if (!selectedDateKey || workers.length === 0) return;
+
+    startTransition(async () => {
+      const results = await Promise.all(
+        workers.map((worker) =>
+          markWorkerAttendance({
+            workerId: worker.id,
+            attendanceDate: selectedDateKey,
+            status: "holiday"
+          })
+        )
+      );
+
+      const failed = results.find((result) => !result.success);
+      if (failed) {
+        toast({
+          title: "Bulk update failed",
+          description: failed.error ?? "Could not mark all workers as holiday",
+          variant: "error"
+        });
+        return;
+      }
+
+      setAttendanceMap((prev) => {
+        const updated = { ...prev };
+        for (const worker of workers) {
+          updated[`${worker.id}:${selectedDateKey}`] = "holiday";
+        }
+        return updated;
+      });
+
+      toast({
+        title: "Holiday marked",
+        description: `All workers were marked as holiday for ${selectedDateKey}.`,
+        variant: "success"
+      });
+    });
+  };
+
+  const onSave = (workerId: string, status: AttendanceStatus) => {
+    if (!selectedDay || !selectedDateKey) return;
 
     startTransition(async () => {
       const result = await markWorkerAttendance({
-        workerId: selectedWorkerId,
+        workerId,
         attendanceDate: selectedDateKey,
         status
       });
@@ -108,10 +142,11 @@ export function AttendanceClient({
 
       setAttendanceMap((prev) => ({
         ...prev,
-        [`${selectedWorkerId}:${selectedDateKey}`]: status
+        [`${workerId}:${selectedDateKey}`]: status
       }));
 
-      toast({ title: "Attendance saved", description: `${selectedWorker?.name ?? "Worker"} marked as ${status}.`, variant: "success" });
+      const workerName = workers.find((worker) => worker.id === workerId)?.name ?? "Worker";
+      toast({ title: "Attendance saved", description: `${workerName} marked as ${status}.`, variant: "success" });
     });
   };
 
@@ -158,7 +193,7 @@ export function AttendanceClient({
                 />
               </div>
             </div>
-            <CardDescription>Pick a date, then mark status for the selected worker.</CardDescription>
+            <CardDescription>Pick a date, then mark status for each worker.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-7 gap-2 text-center text-xs font-medium text-muted-foreground">
@@ -173,9 +208,20 @@ export function AttendanceClient({
               {Array.from({ length: daysInMonth }).map((_, index) => {
                 const day = index + 1;
                 const dateKey = toDateKey(year, month, day);
+                const weekDay = new Date(year, month, day).getDay();
+                const isSunday = weekDay === 0;
+                const isSaturday = weekDay === 6;
                 const isHoliday = Boolean(holidayMap[dateKey]);
-                const key = selectedWorkerId ? `${selectedWorkerId}:${dateKey}` : "";
-                const status = key ? attendanceMap[key] : undefined;
+                const markedCount = workers.reduce((count, worker) => {
+                  const workerStatus = attendanceMap[`${worker.id}:${dateKey}`];
+                  return workerStatus ? count + 1 : count;
+                }, 0);
+                const holidayMarkedCount = workers.reduce((count, worker) => {
+                  const workerStatus = attendanceMap[`${worker.id}:${dateKey}`];
+                  return workerStatus === "holiday" ? count + 1 : count;
+                }, 0);
+                const isFullyMarkedAsHoliday = workers.length > 0 && holidayMarkedCount === workers.length;
+                const shouldUseHolidayShade = isHoliday || isFullyMarkedAsHoliday;
 
                 return (
                   <button
@@ -186,13 +232,20 @@ export function AttendanceClient({
                       "rounded-md border px-2 py-2 text-left text-xs transition",
                       selectedDay === day ? "border-primary bg-primary/5" : "border-border hover:bg-muted",
                       dateKey === todayDateKey ? "ring-2 ring-blue-400 ring-offset-1" : "",
-                      isHoliday ? "bg-amber-50" : ""
+                      isSunday ? "bg-rose-50" : "",
+                      isSaturday ? "bg-sky-50" : "",
+                      shouldUseHolidayShade ? "bg-amber-100 border-amber-300" : ""
                     )}
                   >
                     <div className="font-semibold">{day}</div>
                     {dateKey === todayDateKey ? <div className="mt-1 text-[10px] text-blue-700">Today</div> : null}
+                    {isSunday ? <div className="mt-1 text-[10px] text-rose-700">Sunday</div> : null}
+                    {isSaturday ? <div className="mt-1 text-[10px] text-sky-700">Saturday</div> : null}
                     {isHoliday ? <div className="mt-1 text-[10px] text-amber-700">Holiday</div> : null}
-                    {status ? <div className="mt-1 text-[10px] text-slate-600">{status.replace("_", " ")}</div> : null}
+                    {!isHoliday && isFullyMarkedAsHoliday ? (
+                      <div className="mt-1 text-[10px] text-amber-700">All marked holiday</div>
+                    ) : null}
+                    <div className="mt-1 text-[10px] text-slate-600">{markedCount}/{workers.length} marked</div>
                   </button>
                 );
               })}
@@ -202,47 +255,60 @@ export function AttendanceClient({
 
         <Card>
           <CardHeader>
-            <CardTitle>Mark Attendance</CardTitle>
-            <CardDescription>Choose worker and attendance status.</CardDescription>
+            <CardTitle>Daily Attendance</CardTitle>
+            <CardDescription>
+              {selectedDateKey ? `Status on ${selectedDateKey}` : "Select a date from the calendar"}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Worker</p>
-              <Select
-                value={selectedWorkerId}
-                options={workers.map((worker) => ({ value: worker.id, label: worker.name }))}
-                placeholder="Select worker"
-                onChange={(event) => setSelectedWorkerId(event.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Date</p>
-              <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm">
-                {selectedDateKey ?? "Select a date from calendar"}
-              </p>
-            </div>
-
             {selectedDateKey && holidayMap[selectedDateKey] ? (
               <Badge className="bg-amber-100 text-amber-700">{holidayMap[selectedDateKey]}</Badge>
             ) : null}
 
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Status</p>
-              <div className="grid grid-cols-2 gap-2">
-                {statusOptions.map((option) => (
-                  <Button
-                    key={option.value}
-                    type="button"
-                    variant={selectedStatus === option.value ? "default" : "outline"}
-                    onClick={() => onSave(option.value as AttendanceStatus)}
-                    disabled={isPending || !selectedWorkerId || !selectedDateKey}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={markAllAsHoliday}
+              disabled={!selectedDateKey || isPending || workers.length === 0}
+              className="w-full border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+            >
+              Mark Whole Day as Holiday (All Workers)
+            </Button>
+
+            {!selectedDateKey ? (
+              <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                Click a date to view all workers and mark attendance.
+              </p>
+            ) : (
+              <div className="max-h-[65vh] space-y-3 overflow-y-auto pr-1">
+                {workers.map((worker) => {
+                  const status = attendanceMap[`${worker.id}:${selectedDateKey}`];
+                  return (
+                    <div key={worker.id} className="rounded-md border border-border p-3">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium">{worker.name}</p>
+                        <Badge className={status ? "bg-slate-200 text-slate-700" : "bg-orange-100 text-orange-700"}>
+                          {status ? status.replace("_", " ") : "not marked"}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {statusOptions.map((option) => (
+                          <Button
+                            key={`${worker.id}-${option.value}`}
+                            type="button"
+                            variant={status === option.value ? "default" : "outline"}
+                            onClick={() => onSave(worker.id, option.value as AttendanceStatus)}
+                            disabled={isPending}
+                          >
+                            {option.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
