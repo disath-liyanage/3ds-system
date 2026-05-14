@@ -44,6 +44,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [reportMode, setReportMode] = useState<"detail" | "summary">("detail");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [reportUser, setReportUser] = useState("ALL");
   const previewFrameRef = useRef<HTMLIFrameElement>(null);
 
   const reportTitle = report?.title ?? "Report";
@@ -86,6 +87,27 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDatePickerOpen]);
 
+  useEffect(() => {
+    let mounted = true;
+    const loadCurrentUser = async () => {
+      try {
+        const response = await fetch("/api/current-user-profile", { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const name = payload?.user?.full_name || payload?.user?.email;
+        if (mounted && typeof name === "string" && name.trim().length > 0) {
+          setReportUser(name.trim());
+        }
+      } catch {
+        // Keep fallback when user lookup fails.
+      }
+    };
+    void loadCurrentUser();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const runReport = () => {
     if (!section || !report) {
       setError("Invalid report");
@@ -118,9 +140,11 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     if (!activeResult || !section || !report) return null;
     return pdf(
       <ReportPdfTemplate
-        sectionTitle={section.title}
         reportTitle={report.title}
-        dateRangeLabel={dateRangeLabel}
+        fromDate={dateRange?.from ? ymd(dateRange.from as Date) : ""}
+        toDate={dateRange?.to ? ymd(dateRange.to as Date) : ""}
+        reportDate={format(new Date(), "dd-MM-yyyy")}
+        userName={reportUser}
         mode={reportMode}
         result={activeResult}
       />
