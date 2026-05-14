@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { format } from "date-fns";
+import { Download, Printer } from "lucide-react";
 import { DayPicker, type DateRange } from "react-day-picker";
 import { pdf } from "@react-pdf/renderer";
 import "react-day-picker/dist/style.css";
@@ -182,6 +183,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     if (!activeResult) return new Set<string>();
     const out = new Set<string>();
     for (const col of activeResult.columns) {
+      if (/invoice\s*(no|number)/i.test(col)) continue;
       const isNumeric = activeResult.rows.every((row) => typeof row[col] === "number");
       if (isNumeric) out.add(col);
     }
@@ -229,7 +231,25 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Filters</CardTitle>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle>Filters</CardTitle>
+            <div className="ml-auto flex items-center gap-3">
+              <Button
+                type="button"
+                variant={reportMode === "detail" ? "default" : "outline"}
+                onClick={() => setReportMode("detail")}
+              >
+                Detail
+              </Button>
+              <Button
+                type="button"
+                variant={reportMode === "summary" ? "default" : "outline"}
+                onClick={() => setReportMode("summary")}
+              >
+                Summary
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-1" ref={datePickerRef}>
@@ -259,27 +279,15 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button
-              type="button"
-              variant={reportMode === "detail" ? "default" : "outline"}
-              onClick={() => setReportMode("detail")}
-            >
-              Detail
-            </Button>
-            <Button
-              type="button"
-              variant={reportMode === "summary" ? "default" : "outline"}
-              onClick={() => setReportMode("summary")}
-            >
-              Summary
-            </Button>
             <Button type="button" onClick={runReport} disabled={isPending}>
               {isPending ? "Running..." : "Run Report"}
             </Button>
             <Button type="button" variant="outline" onClick={downloadPdf} disabled={!activeResult || isExportingPdf}>
+              <Download className="mr-2 h-4 w-4" />
               {isExportingPdf ? "Exporting PDF..." : "Export PDF"}
             </Button>
             <Button type="button" variant="outline" onClick={printPdf} disabled={!previewUrl}>
+              <Printer className="mr-2 h-4 w-4" />
               Print PDF
             </Button>
             <Link href="/reports" className="text-sm underline-offset-2 hover:underline">
@@ -318,11 +326,25 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                       {activeResult.columns.map((column) => {
                         const value = row[column];
                         const isNumeric = numericColumns.has(column);
+                        const hasInvoiceLink = /invoice\s*(no|number)/i.test(column) && typeof row.__invoiceId === "string" && row.__invoiceId.length > 0;
                         return (
                           <td key={column} className={`px-3 py-2 ${isNumeric ? "text-right" : "text-left"}`}>
-                            {typeof value === "number"
-                              ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
-                              : String(value ?? "")}
+                            {hasInvoiceLink ? (
+                              <Link
+                                href={`/invoices/${row.__invoiceId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-primary underline-offset-2 hover:underline"
+                              >
+                                {typeof value === "number"
+                                  ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                  : String(value ?? "")}
+                              </Link>
+                            ) : typeof value === "number" ? (
+                              value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                            ) : (
+                              String(value ?? "")
+                            )}
                           </td>
                         );
                       })}

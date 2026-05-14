@@ -43,7 +43,32 @@ const styles = StyleSheet.create({
 });
 
 export function ReportPdfTemplate({ reportTitle, fromDate, toDate, reportDate, userName, mode, result }: ReportPdfTemplateProps) {
-  const colWidth = `${100 / Math.max(result.columns.length, 1)}%`;
+  const formatPdfDate = (value: unknown) => {
+    const raw = String(value ?? "");
+    const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return raw;
+    const [, year, month, day] = match;
+    return `${year.slice(-2)}/${Number(month)}/${Number(day)}`;
+  };
+
+  const getColumnWidth = (column: string) => {
+    const columns = result.columns;
+    const normalized = column.trim().toLowerCase();
+    const hasInvoiceLayout = columns.some((c) => c.toLowerCase() === "invoice no") && columns.some((c) => c.toLowerCase() === "customer");
+    if (!hasInvoiceLayout) {
+      return `${100 / Math.max(columns.length, 1)}%`;
+    }
+
+    if (normalized === "invoice no") return "8%";
+    if (normalized === "date") return "8%";
+    if (normalized === "customer") return "44%";
+    if (normalized === "payment method" || normalized === "p. method") return "9%";
+    if (normalized === "status") return "8%";
+    if (normalized === "amount") return "10%";
+    if (normalized === "route") return "13%";
+
+    return `${100 / Math.max(columns.length, 1)}%`;
+  };
 
   return (
     <Document>
@@ -75,7 +100,7 @@ export function ReportPdfTemplate({ reportTitle, fromDate, toDate, reportDate, u
 
         <View style={styles.tableHeader}>
           {result.columns.map((column) => (
-            <Text key={column} style={{ ...styles.cell, width: colWidth }}>
+            <Text key={column} style={{ ...styles.cell, width: getColumnWidth(column) }}>
               {column}
             </Text>
           ))}
@@ -85,9 +110,12 @@ export function ReportPdfTemplate({ reportTitle, fromDate, toDate, reportDate, u
           <View key={`r-${index}`} style={styles.tableRow}>
             {result.columns.map((column) => {
               const value = row[column];
+              const displayValue = column.trim().toLowerCase() === "date" ? formatPdfDate(value) : value;
               return (
-                <Text key={`${index}-${column}`} style={{ ...styles.cell, width: colWidth }}>
-                  {typeof value === "number" ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(value ?? "")}
+                <Text key={`${index}-${column}`} style={{ ...styles.cell, width: getColumnWidth(column) }}>
+                  {typeof displayValue === "number"
+                    ? displayValue.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                    : String(displayValue ?? "")}
                 </Text>
               );
             })}

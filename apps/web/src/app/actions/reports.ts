@@ -116,7 +116,7 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
     case "sales/invoice-wise-sales-report": {
       const { data, error } = await adminClient
         .from("invoices")
-        .select("invoice_number, created_at, total_amount, payment_method, status, customer:customers(name)")
+        .select("id, invoice_number, created_at, total_amount, payment_method, status, customer:customers(name)")
         .in("status", ["approved", "issued", "paid"])
         .gte("created_at", fromIso)
         .lte("created_at", toIso)
@@ -125,12 +125,13 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
       return {
         success: true,
         data: {
-          columns: ["Invoice No", "Date", "Customer", "Payment Method", "Status", "Amount"],
+          columns: ["Invoice No", "Date", "Customer", "P. Method", "Status", "Amount"],
           rows: (data ?? []).map((r: any) => ({
+            __invoiceId: r.id ?? "",
             "Invoice No": Number(r.invoice_number) || 0,
             Date: String(r.created_at).slice(0, 10),
             Customer: r.customer?.name ?? "Unknown",
-            "Payment Method": r.payment_method ?? "",
+            "P. Method": r.payment_method ?? "",
             Status: r.status ?? "",
             Amount: Number(r.total_amount) || 0
           }))
@@ -250,7 +251,7 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
     case "sales/route-wise-invoice-payment-details": {
       const { data, error } = await adminClient
         .from("invoices")
-        .select("invoice_number, total_amount, payment_method, created_at, customer:customers(name, area)")
+        .select("id, invoice_number, total_amount, payment_method, created_at, customer:customers(name, area)")
         .in("status", ["approved", "issued", "paid"])
         .gte("created_at", fromIso)
         .lte("created_at", toIso)
@@ -259,12 +260,13 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
       return {
         success: true,
         data: {
-          columns: ["Route", "Invoice No", "Customer", "Payment Method", "Amount"],
+          columns: ["Route", "Invoice No", "Customer", "P. Method", "Amount"],
           rows: (data ?? []).map((r: any) => ({
+            __invoiceId: r.id ?? "",
             Route: r.customer?.area || "Unassigned",
             "Invoice No": Number(r.invoice_number) || 0,
             Customer: r.customer?.name || "Unknown",
-            "Payment Method": r.payment_method || "",
+            "P. Method": r.payment_method || "",
             Amount: Number(r.total_amount) || 0
           }))
         }
