@@ -597,6 +597,22 @@ create table if not exists public.worker_attendance (
   unique(worker_id, attendance_date)
 );
 
+create or replace function public.set_worker_attendance_updated_at()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_worker_attendance_set_updated_at on public.worker_attendance;
+create trigger trg_worker_attendance_set_updated_at
+before update on public.worker_attendance
+for each row
+execute function public.set_worker_attendance_updated_at();
+
 alter table public.users_profile
   add column if not exists custom_role_id uuid references public.custom_roles (id),
   add column if not exists worker_id uuid references public.workers (id),

@@ -1,7 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-
 import { adminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
@@ -14,6 +12,13 @@ type ActionResult = {
 
 type MarkAttendanceInput = {
   workerId: string;
+  attendanceDate: string;
+  status: AttendanceStatus;
+  note?: string;
+};
+
+type BulkMarkAttendanceInput = {
+  workerIds: string[];
   attendanceDate: string;
   status: AttendanceStatus;
   note?: string;
@@ -69,13 +74,15 @@ export async function markWorkerAttendance(input: MarkAttendanceInput): Promise<
     return { success: false, error: "Worker, date, and status are required" };
   }
 
+  const updatedAt = new Date().toISOString();
   const { error } = await auth.supabase.from("worker_attendance").upsert(
     {
       worker_id: input.workerId,
       attendance_date: input.attendanceDate,
       status: input.status,
       note: input.note?.trim() || null,
-      marked_by: auth.userId
+      marked_by: auth.userId,
+      updated_at: updatedAt
     },
     { onConflict: "worker_id,attendance_date" }
   );
@@ -83,7 +90,33 @@ export async function markWorkerAttendance(input: MarkAttendanceInput): Promise<
   if (error) {
     return { success: false, error: error.message };
   }
+  return { success: true };
+}
 
-  revalidatePath("/attendance");
+export async function markWorkersAttendance(input: BulkMarkAttendanceInput): Promise<ActionResult> {
+  const auth = await requireAdminOrManager();
+  if ("error" in auth) return { success: false, error: auth.error };
+
+  if (!input.workerIds.length || !input.attendanceDate || !input.status) {
+    return { success: false, error: "Worker list, date, and status are required" };
+  }
+
+  const updatedAt = new Date().toISOString();
+  const rows = input.workerIds.map((workerId) => ({
+    worker_id: workerId,
+    attendance_date: input.attendanceDate,
+    status: input.status,
+    note: input.note?.trim() || null,
+    marked_by: auth.userId,
+    updated_at: updatedAt
+  }));
+
+  const { error } = await auth.supabase.from("worker_attendance").upsert(rows, {
+    onConflict: "worker_id,attendance_date"
+  });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
   return { success: true };
 }

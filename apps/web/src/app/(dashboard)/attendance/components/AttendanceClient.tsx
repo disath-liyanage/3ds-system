@@ -1,9 +1,10 @@
 "use client";
 
 import type { Worker } from "@paintdist/shared";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
-import { markWorkerAttendance } from "@/app/actions/attendance";
+import { markWorkerAttendance, markWorkersAttendance } from "@/app/actions/attendance";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,21 +54,45 @@ function getTodayDateKey(): string {
   return formatter.format(new Date());
 }
 
+function getDefaultSelectedDay(year: number, month: number, todayDateKey: string): number | null {
+  const [todayYear, todayMonth, todayDay] = todayDateKey.split("-").map(Number);
+  if (todayYear === year && todayMonth === month + 1) {
+    return todayDay;
+  }
+  return null;
+}
+
 export function AttendanceClient({
   workers,
   initialAttendance,
   initialYear,
   initialMonth
 }: AttendanceClientProps) {
+  const router = useRouter();
+  const todayDateKey = getTodayDateKey();
   const [year, setYear] = useState(initialYear);
   const [month, setMonth] = useState(initialMonth);
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [selectedDay, setSelectedDay] = useState<number | null>(
+    getDefaultSelectedDay(initialYear, initialMonth, todayDateKey)
+  );
   const [attendanceMap, setAttendanceMap] = useState<Record<string, AttendanceStatus>>(() => {
     const entries = initialAttendance.map((row) => [`${row.worker_id}:${row.attendance_date}`, row.status] as const);
     return Object.fromEntries(entries);
   });
   const [isPending, startTransition] = useTransition();
-  const todayDateKey = getTodayDateKey();
+
+  useEffect(() => {
+    setYear(initialYear);
+    setMonth(initialMonth);
+    setSelectedDay((current) => {
+      if (current) return current;
+      return getDefaultSelectedDay(initialYear, initialMonth, todayDateKey);
+    });
+    setAttendanceMap(() => {
+      const entries = initialAttendance.map((row) => [`${row.worker_id}:${row.attendance_date}`, row.status] as const);
+      return Object.fromEntries(entries);
+    });
+  }, [initialAttendance, initialMonth, initialYear, todayDateKey]);
 
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstWeekDay = new Date(year, month, 1).getDay();
@@ -89,21 +114,16 @@ export function AttendanceClient({
     if (!selectedDateKey || workers.length === 0) return;
 
     startTransition(async () => {
-      const results = await Promise.all(
-        workers.map((worker) =>
-          markWorkerAttendance({
-            workerId: worker.id,
-            attendanceDate: selectedDateKey,
-            status: "holiday"
-          })
-        )
-      );
+      const result = await markWorkersAttendance({
+        workerIds: workers.map((worker) => worker.id),
+        attendanceDate: selectedDateKey,
+        status: "holiday"
+      });
 
-      const failed = results.find((result) => !result.success);
-      if (failed) {
+      if (!result.success) {
         toast({
           title: "Bulk update failed",
-          description: failed.error ?? "Could not mark all workers as holiday",
+          description: result.error ?? "Could not mark all workers as holiday",
           variant: "error"
         });
         return;
@@ -179,16 +199,20 @@ export function AttendanceClient({
                   value={String(month)}
                   options={monthOptions}
                   onChange={(event) => {
-                    setMonth(Number(event.target.value));
-                    setSelectedDay(null);
+                    const nextMonth = Number(event.target.value);
+                    setMonth(nextMonth);
+                    setSelectedDay(getDefaultSelectedDay(year, nextMonth, todayDateKey));
+                    router.push(`/attendance?year=${year}&month=${nextMonth}`);
                   }}
                 />
                 <Select
                   value={String(year)}
                   options={yearOptions}
                   onChange={(event) => {
-                    setYear(Number(event.target.value));
-                    setSelectedDay(null);
+                    const nextYear = Number(event.target.value);
+                    setYear(nextYear);
+                    setSelectedDay(getDefaultSelectedDay(nextYear, month, todayDateKey));
+                    router.push(`/attendance?year=${nextYear}&month=${month}`);
                   }}
                 />
               </div>

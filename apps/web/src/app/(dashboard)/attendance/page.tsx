@@ -13,7 +13,12 @@ type AttendanceRow = {
   note: string | null;
 };
 
-export default async function AttendancePage() {
+export default async function AttendancePage({
+  searchParams
+}: {
+  searchParams?: { year?: string; month?: string };
+}) {
+  const timeZone = "Asia/Colombo";
   const supabase = createClient();
   const {
     data: { user }
@@ -45,9 +50,23 @@ export default async function AttendancePage() {
     redirect("/dashboard");
   }
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
+  const nowParts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date());
+  const yearPart = nowParts.find((part) => part.type === "year")?.value;
+  const monthPart = nowParts.find((part) => part.type === "month")?.value;
+  const defaultYear = yearPart ? Number(yearPart) : new Date().getFullYear();
+  const defaultMonth = monthPart ? Number(monthPart) - 1 : new Date().getMonth();
+
+  const requestedYear = Number(searchParams?.year);
+  const requestedMonth = Number(searchParams?.month);
+  const year = Number.isFinite(requestedYear) ? requestedYear : defaultYear;
+  const month = Number.isFinite(requestedMonth) && requestedMonth >= 0 && requestedMonth <= 11
+    ? requestedMonth
+    : defaultMonth;
   const monthText = String(month + 1).padStart(2, "0");
   const from = `${year}-${monthText}-01`;
   const to = `${year}-${monthText}-${String(new Date(year, month + 1, 0).getDate()).padStart(2, "0")}`;
