@@ -1,72 +1,37 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useMemo, useState } from "react";
-
-type ReportSection = {
-  title: string;
-  reports: string[];
-};
+import { ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { REPORT_SECTIONS } from "./reports-data";
 
 export default function ReportsPage() {
   const { permissions, isLoading } = useCurrentUserPermissions();
   const [query, setQuery] = useState("");
-
-  const sections: ReportSection[] = useMemo(
-    () => [
-      {
-        title: "Sales",
-        reports: [
-          "Date wise Sales report",
-          "Invoice wise sales report",
-          "Route wise Sales report",
-          "Return Invoice report",
-          "Delete invoice report",
-          "Department wise sales invoice",
-          "Customer wise sales and quantity summary",
-          "Route wise invoice payment details",
-          "Fast moving products report",
-          "Product wise sales qty reports"
-        ]
-      },
-      {
-        title: "Customer",
-        reports: [
-          "Customer outstanding reports",
-          "Daily revenue report",
-          "Available credit invoices",
-          "Cacel customer payments",
-          "Customer payment details",
-          "Date Wise Cheque Payment Details",
-          "CUSTOMER DETAILS"
-        ]
-      },
-      {
-        title: "Stock",
-        reports: ["Product Stock Summary", "Categorization Wise Stock Reports", "Return Stock Details"]
-      },
-      {
-        title: "GRN",
-        reports: ["Goods Received Note Reports"]
-      }
-    ],
-    []
-  );
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    sales: true,
+    customer: false,
+    stock: false,
+    grn: false
+  });
 
   const normalizedQuery = query.trim().toLowerCase();
   const visibleSections = useMemo(() => {
-    if (!normalizedQuery) return sections;
-    return sections
-      .map((section) => ({
+    if (!normalizedQuery) return REPORT_SECTIONS;
+    return REPORT_SECTIONS.map((section) => ({
         ...section,
-        reports: section.reports.filter((report) => report.toLowerCase().includes(normalizedQuery))
-      }))
-      .filter((section) => section.reports.length > 0);
-  }, [normalizedQuery, sections]);
+        reports: section.reports.filter((report) => report.title.toLowerCase().includes(normalizedQuery))
+      }));
+  }, [normalizedQuery]);
 
   const totalVisibleReports = visibleSections.reduce((acc, section) => acc + section.reports.length, 0);
+  const toggleSection = (key: string) => {
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   if (!isLoading && !permissions?.canViewReports) {
     return (
@@ -103,24 +68,51 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
 
-      {visibleSections.length === 0 ? (
+      {totalVisibleReports === 0 ? (
         <Card>
           <CardContent className="pt-6 text-sm text-muted-foreground">No reports found for your search.</CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-4">
           {visibleSections.map((section) => (
-            <Card key={section.title}>
+            <Card key={section.key}>
               <CardHeader>
-                <CardTitle className="text-base">{section.title}</CardTitle>
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-base">{section.title}</CardTitle>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => toggleSection(section.key)}>
+                    <span className="flex items-center gap-2">
+                      <ChevronRight
+                        className={
+                          normalizedQuery || openSections[section.key]
+                            ? "h-4 w-4 rotate-90 transition-transform"
+                            : "h-4 w-4 rotate-0 transition-transform"
+                        }
+                      />
+                      {normalizedQuery || openSections[section.key] ? "Hide" : "Show"}
+                    </span>
+                  </Button>
+                </div>
               </CardHeader>
-              <CardContent>
-                <ul className="list-disc space-y-2 pl-5 text-sm">
-                  {section.reports.map((report) => (
-                    <li key={report}>{report}</li>
-                  ))}
-                </ul>
-              </CardContent>
+              {normalizedQuery || openSections[section.key] ? (
+                <CardContent>
+                  {section.reports.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No matching sub reports in this section.</p>
+                  ) : (
+                    <ul className="space-y-2 text-sm">
+                      {section.reports.map((report) => (
+                        <li key={report.key}>
+                          <Link
+                            href={`/reports/${section.key}/${report.key}`}
+                            className="block rounded-md border border-border px-3 py-2 text-foreground transition hover:bg-muted/40"
+                          >
+                            {report.title}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </CardContent>
+              ) : null}
             </Card>
           ))}
         </div>
