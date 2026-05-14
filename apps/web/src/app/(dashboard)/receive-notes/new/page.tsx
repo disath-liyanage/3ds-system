@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select";
-import { createReceiveNote } from "@/app/actions/receive-notes";
+import { Select } from "@/components/ui/select";
+import { createReceiveNote, getLatestReceiveNoteProductDefaults } from "@/app/actions/receive-notes";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useProducts } from "@/hooks/useProducts";
 import { useSuppliers } from "@/hooks/useSuppliers";
@@ -26,6 +27,7 @@ type ReceiveNoteForm = {
     product_cost?: number;
     selling_price?: number;
     item_discount_percent?: number;
+    item_discount_amount?: number;
     rep_sales_discount?: number;
     rep_collection?: number;
   };
@@ -47,21 +49,11 @@ export default function NewReceiveNotePage() {
   const { data: products, isLoading: isProductsLoading } = useProducts();
   const { data: suppliers, isLoading: isSuppliersLoading } = useSuppliers();
   const costInputRef = useRef<HTMLInputElement | null>(null);
+  const preloadRequestRef = useRef(0);
   const lastDiscountRef = useRef<number>(0);
-  const productDefaultsRef = useRef(
-    new Map<
-      string,
-      {
-        sellingPrice?: number;
-        cost?: number;
-        discountPercent?: number;
-        repSalesDiscount?: number;
-        repCollection?: number;
-      }
-    >()
-  );
   const [addAttempted, setAddAttempted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [discountInputMode, setDiscountInputMode] = useState<"percent" | "amount">("percent");
   const { control, register, handleSubmit, setValue, trigger, getValues, resetField, formState } =
     useForm<ReceiveNoteForm>({
     defaultValues: {
@@ -75,6 +67,7 @@ export default function NewReceiveNotePage() {
         product_cost: undefined,
         selling_price: undefined,
         item_discount_percent: undefined,
+        item_discount_amount: undefined,
         rep_sales_discount: undefined,
         rep_collection: undefined
       },
@@ -124,6 +117,7 @@ export default function NewReceiveNotePage() {
         draft.product_cost ||
         draft.selling_price ||
         draft.item_discount_percent ||
+        draft.item_discount_amount ||
         draft.rep_sales_discount ||
         draft.rep_collection
     );
@@ -166,6 +160,45 @@ export default function NewReceiveNotePage() {
     return Number.isFinite(parsed) ? parsed : 0;
   };
 
+  const applyProductDefaults = async (productId: string) => {
+    const requestId = ++preloadRequestRef.current;
+    const result = await getLatestReceiveNoteProductDefaults(productId);
+    if (requestId !== preloadRequestRef.current) return;
+
+    if (!result.success) {
+      toast({
+        title: "Failed to load latest GRN values",
+        description: result.error || "Please try again.",
+        variant: "error"
+      });
+      return;
+    }
+
+    if (!result.data) {
+      setValue("draft.product_cost", undefined, { shouldDirty: true });
+      setValue("draft.selling_price", undefined, { shouldDirty: true });
+      setValue("draft.item_discount_percent", undefined, { shouldDirty: true });
+      setValue("draft.item_discount_amount", undefined, { shouldDirty: true });
+      setValue("draft.rep_sales_discount", undefined, { shouldDirty: true });
+      setValue("draft.rep_collection", undefined, { shouldDirty: true });
+      return;
+    }
+
+    setValue("draft.product_cost", result.data.product_cost || undefined, { shouldDirty: true });
+    setValue("draft.selling_price", result.data.selling_price || undefined, { shouldDirty: true });
+    setValue("draft.item_discount_percent", result.data.item_discount_percent || undefined, { shouldDirty: true });
+    setValue("draft.rep_sales_discount", result.data.rep_sales_discount || undefined, { shouldDirty: true });
+    setValue("draft.rep_collection", result.data.rep_collection || undefined, { shouldDirty: true });
+
+    if (discountInputMode === "amount") {
+      const sellingPrice = result.data.selling_price || 0;
+      const discountPercent = result.data.item_discount_percent || 0;
+      const discountAmount =
+        sellingPrice > 0 ? Number(((sellingPrice * discountPercent) / 100).toFixed(2)) : undefined;
+      setValue("draft.item_discount_amount", discountAmount, { shouldDirty: true });
+    }
+  };
+
   useEffect(() => {
     const sellingPrice = normalizeNumber(watchedDraft?.selling_price);
     const discountPercent = normalizeNumber(watchedDraft?.item_discount_percent);
@@ -181,28 +214,13 @@ export default function NewReceiveNotePage() {
   }, [setValue, watchedDraft?.item_discount_percent, watchedDraft?.selling_price]);
 
   useEffect(() => {
-    const productId = watchedDraft?.product_id;
-    if (!productId) return;
-
-    const cached = productDefaultsRef.current.get(productId);
-    if (!cached) return;
-
-    if (cached.sellingPrice !== undefined) {
-      setValue("draft.selling_price", cached.sellingPrice, { shouldDirty: true });
-    }
-    if (cached.cost !== undefined) {
-      setValue("draft.product_cost", cached.cost, { shouldDirty: true });
-    }
-    if (cached.discountPercent !== undefined) {
-      setValue("draft.item_discount_percent", cached.discountPercent, { shouldDirty: true });
-    }
-    if (cached.repSalesDiscount !== undefined) {
-      setValue("draft.rep_sales_discount", cached.repSalesDiscount, { shouldDirty: true });
-    }
-    if (cached.repCollection !== undefined) {
-      setValue("draft.rep_collection", cached.repCollection, { shouldDirty: true });
-    }
-  }, [setValue, watchedDraft?.product_id]);
+    if (discountInputMode !== "amount") return;
+    const sellingPrice = normalizeNumber(watchedDraft?.selling_price);
+    const discountAmount = normalizeNumber(watchedDraft?.item_discount_amount);
+    const discountPercent =
+      sellingPrice > 0 ? Number(((discountAmount / sellingPrice) * 100).toFixed(4)) : 0;
+    setValue("draft.item_discount_percent", discountPercent, { shouldDirty: true });
+  }, [discountInputMode, watchedDraft?.item_discount_amount, watchedDraft?.selling_price, setValue]);
 
   const itemSummaries = useMemo(
     () =>
@@ -241,23 +259,23 @@ export default function NewReceiveNotePage() {
 
     if (!draft.product_id) return;
 
+    const sellingPrice = normalizeNumber(draft.selling_price);
+    const discountPercent =
+      discountInputMode === "amount"
+        ? sellingPrice > 0
+          ? Number(((normalizeNumber(draft.item_discount_amount) / sellingPrice) * 100).toFixed(4))
+          : 0
+        : normalizeNumber(draft.item_discount_percent);
+
     append({
       product_id: draft.product_id,
       qty: normalizeNumber(draft.qty) || 0,
       free_qty: normalizeNumber(draft.free_qty) || 0,
       product_cost: normalizeNumber(draft.product_cost) || 0,
       selling_price: normalizeNumber(draft.selling_price) || 0,
-      item_discount_percent: normalizeNumber(draft.item_discount_percent) || 0,
+      item_discount_percent: discountPercent || 0,
       rep_sales_discount: normalizeNumber(draft.rep_sales_discount) || 0,
       rep_collection: normalizeNumber(draft.rep_collection) || 0
-    });
-
-    productDefaultsRef.current.set(draft.product_id, {
-      sellingPrice: normalizeNumber(draft.selling_price) || undefined,
-      cost: normalizeNumber(draft.product_cost) || undefined,
-      discountPercent: normalizeNumber(draft.item_discount_percent) || undefined,
-      repSalesDiscount: normalizeNumber(draft.rep_sales_discount) || undefined,
-      repCollection: normalizeNumber(draft.rep_collection) || undefined
     });
 
     resetField("draft", {
@@ -268,10 +286,29 @@ export default function NewReceiveNotePage() {
         product_cost: undefined,
         selling_price: undefined,
         item_discount_percent: undefined,
+        item_discount_amount: undefined,
         rep_sales_discount: undefined,
         rep_collection: undefined
       }
     });
+    setAddAttempted(false);
+  };
+
+  const handleResetDraft = () => {
+    resetField("draft", {
+      defaultValue: {
+        product_id: "",
+        qty: undefined,
+        free_qty: undefined,
+        product_cost: undefined,
+        selling_price: undefined,
+        item_discount_percent: undefined,
+        item_discount_amount: undefined,
+        rep_sales_discount: undefined,
+        rep_collection: undefined
+      }
+    });
+    setDiscountInputMode("percent");
     setAddAttempted(false);
   };
 
@@ -357,7 +394,12 @@ export default function NewReceiveNotePage() {
                         ? "border-red-400 focus:ring-red-400/40"
                         : ""
                     )}
-                    onChange={(value) => setValue("draft.product_id", value, { shouldDirty: true })}
+                    onChange={(value) => {
+                      setValue("draft.product_id", value, { shouldDirty: true });
+                      if (value) {
+                        void applyProductDefaults(value);
+                      }
+                    }}
                   />
                   <input
                     type="hidden"
@@ -369,92 +411,154 @@ export default function NewReceiveNotePage() {
                 </div>
 
                 <div className="grid gap-2 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground">Qty</label>
+                    <Input
+                      type="number"
+                      step="1"
+                      placeholder="Qty"
+                      {...register("draft.qty", {
+                        validate: (value) =>
+                          shouldValidateDraft() && value === undefined ? "Qty is required" : true,
+                        setValueAs: (value) => (value === "" ? undefined : Number(value))
+                      })}
+                      className={cn(
+                        addAttempted && draftErrors?.qty ? "border-red-400 focus:ring-red-400/40" : ""
+                      )}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground">Free Qty</label>
+                    <Input
+                      type="number"
+                      step="1"
+                      placeholder="Free qty"
+                      {...register("draft.free_qty", {
+                        setValueAs: (value) => (value === "" ? undefined : Number(value))
+                      })}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground">Cost</label>
                   <Input
                     type="number"
-                    step="1"
-                    placeholder="Qty"
-                    {...register("draft.qty", {
+                    step="0.01"
+                    placeholder="Cost"
+                    {...costField}
+                    ref={(node) => {
+                      costField.ref(node);
+                      costInputRef.current = node;
+                    }}
+                    className={cn(
+                      addAttempted && draftErrors?.product_cost ? "border-red-400 focus:ring-red-400/40" : ""
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground">Selling Price</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    placeholder="Selling price"
+                    {...register("draft.selling_price", {
                       validate: (value) =>
-                        shouldValidateDraft() && value === undefined ? "Qty is required" : true,
+                        shouldValidateDraft() && value === undefined
+                          ? "Selling price is required"
+                          : true,
                       setValueAs: (value) => (value === "" ? undefined : Number(value))
                     })}
                     className={cn(
-                      addAttempted && draftErrors?.qty ? "border-red-400 focus:ring-red-400/40" : ""
+                      addAttempted && draftErrors?.selling_price ? "border-red-400 focus:ring-red-400/40" : ""
                     )}
                   />
-                  <Input
-                    type="number"
-                    step="1"
-                    placeholder="Free qty"
-                    {...register("draft.free_qty", {
-                      setValueAs: (value) => (value === "" ? undefined : Number(value))
-                    })}
-                  />
                 </div>
-
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="Cost"
-                  {...costField}
-                  ref={(node) => {
-                    costField.ref(node);
-                    costInputRef.current = node;
-                  }}
-                  className={cn(
-                    addAttempted && draftErrors?.product_cost ? "border-red-400 focus:ring-red-400/40" : ""
-                  )}
-                />
-
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="Selling price"
-                  {...register("draft.selling_price", {
-                    validate: (value) =>
-                      shouldValidateDraft() && value === undefined
-                        ? "Selling price is required"
-                        : true,
-                    setValueAs: (value) => (value === "" ? undefined : Number(value))
-                  })}
-                  className={cn(
-                    addAttempted && draftErrors?.selling_price ? "border-red-400 focus:ring-red-400/40" : ""
-                  )}
-                />
 
                 <div className="border-t border-dashed border-border" />
 
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder="Discount (%)"
-                  {...register("draft.item_discount_percent", {
-                    setValueAs: (value) => (value === "" ? undefined : Number(value))
-                  })}
-                />
-
                 <div className="grid gap-2 md:grid-cols-2">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="Sales rep discount"
-                    {...register("draft.rep_sales_discount", {
-                      setValueAs: (value) => (value === "" ? undefined : Number(value))
-                    })}
-                  />
-                  <Input
-                    type="number"
-                    step="0.01"
-                    placeholder="Sales rep collection discount"
-                    {...register("draft.rep_collection", {
-                      setValueAs: (value) => (value === "" ? undefined : Number(value))
-                    })}
-                  />
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground">Discount Type</label>
+                    <Select
+                      value={discountInputMode}
+                      options={[
+                        { value: "percent", label: "Percentage (%)" },
+                        { value: "amount", label: "Amount" }
+                      ]}
+                      onChange={(event) => {
+                        const nextMode = event.target.value as "percent" | "amount";
+                        if (nextMode === "amount") {
+                          const sellingPrice = normalizeNumber(getValues("draft.selling_price"));
+                          const discountPercent = normalizeNumber(getValues("draft.item_discount_percent"));
+                          const discountAmount =
+                            sellingPrice > 0 ? Number(((sellingPrice * discountPercent) / 100).toFixed(2)) : undefined;
+                          setValue("draft.item_discount_amount", discountAmount, { shouldDirty: true });
+                        }
+                        setDiscountInputMode(nextMode);
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground">
+                      Discount {discountInputMode === "percent" ? "(%)" : "Amount"}
+                    </label>
+                    {discountInputMode === "percent" ? (
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Discount (%)"
+                        {...register("draft.item_discount_percent", {
+                          setValueAs: (value) => (value === "" ? undefined : Number(value))
+                        })}
+                      />
+                    ) : (
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="Discount amount"
+                        {...register("draft.item_discount_amount", {
+                          setValueAs: (value) => (value === "" ? undefined : Number(value))
+                        })}
+                      />
+                    )}
+                  </div>
                 </div>
 
-                <Button type="button" variant="outline" onClick={handleAddItem}>
-                  Add Item
-                </Button>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground">Sales Rep Discount</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Sales rep discount"
+                      {...register("draft.rep_sales_discount", {
+                        setValueAs: (value) => (value === "" ? undefined : Number(value))
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground">Rep Collection Discount</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Sales rep collection discount"
+                      {...register("draft.rep_collection", {
+                        setValueAs: (value) => (value === "" ? undefined : Number(value))
+                      })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-2 md:grid-cols-2">
+                  <Button type="button" variant="outline" onClick={handleAddItem}>
+                    Add Item
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={handleResetDraft}>
+                    Reset
+                  </Button>
+                </div>
               </div>
             </div>
 

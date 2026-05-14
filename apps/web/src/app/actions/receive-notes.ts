@@ -13,6 +13,18 @@ type ActionResult = {
   message?: string;
 };
 
+type ProductDefaultsResult = {
+  success: boolean;
+  data?: {
+    product_cost: number;
+    selling_price: number;
+    item_discount_percent: number;
+    rep_sales_discount: number;
+    rep_collection: number;
+  };
+  error?: string;
+};
+
 type CustomRolePermissionSummary = {
   perm_manage_receive_notes: boolean;
 };
@@ -400,4 +412,40 @@ export async function deleteReceiveNote(id: string): Promise<ActionResult> {
   revalidatePath("/receive-notes");
   revalidatePath("/products");
   return { success: true, message: "GRN deleted successfully" };
+}
+
+export async function getLatestReceiveNoteProductDefaults(productId: string): Promise<ProductDefaultsResult> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!productId) {
+    return { success: false, error: "Product id is required" };
+  }
+
+  const { data, error } = await adminClient
+    .from("receive_note_items")
+    .select("unit_cost, selling_price, item_discount_percent, rep_sales_discount, rep_collection, created_at")
+    .eq("product_id", productId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  if (!data) {
+    return { success: true };
+  }
+
+  return {
+    success: true,
+    data: {
+      product_cost: Number(data.unit_cost) || 0,
+      selling_price: Number(data.selling_price) || 0,
+      item_discount_percent: Number(data.item_discount_percent) || 0,
+      rep_sales_discount: Number(data.rep_sales_discount) || 0,
+      rep_collection: Number(data.rep_collection) || 0
+    }
+  };
 }
