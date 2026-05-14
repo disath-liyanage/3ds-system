@@ -48,7 +48,6 @@ export default function NewReceiveNotePage() {
   const { permissions, isLoading } = useCurrentUserPermissions();
   const { data: products, isLoading: isProductsLoading } = useProducts();
   const { data: suppliers, isLoading: isSuppliersLoading } = useSuppliers();
-  const costInputRef = useRef<HTMLInputElement | null>(null);
   const preloadRequestRef = useRef(0);
   const lastDiscountRef = useRef<number>(0);
   const [addAttempted, setAddAttempted] = useState(false);
@@ -207,7 +206,8 @@ export default function NewReceiveNotePage() {
     if (isDiscountApplied && discountPercent !== lastDiscountRef.current) {
       const calculatedCost = sellingPrice - (sellingPrice * discountPercent) / 100;
       setValue("draft.product_cost", Number(calculatedCost.toFixed(2)), { shouldDirty: true });
-      costInputRef.current?.focus();
+    } else if (sellingPrice > 0 && discountPercent === 0) {
+      setValue("draft.product_cost", Number(sellingPrice.toFixed(2)), { shouldDirty: true });
     }
 
     lastDiscountRef.current = discountPercent;
@@ -216,11 +216,11 @@ export default function NewReceiveNotePage() {
   useEffect(() => {
     if (discountInputMode !== "amount") return;
     const sellingPrice = normalizeNumber(watchedDraft?.selling_price);
-    const discountAmount = normalizeNumber(watchedDraft?.item_discount_amount);
+    const discountAmount = normalizeNumber(getValues("draft.item_discount_amount"));
     const discountPercent =
       sellingPrice > 0 ? Number(((discountAmount / sellingPrice) * 100).toFixed(4)) : 0;
     setValue("draft.item_discount_percent", discountPercent, { shouldDirty: true });
-  }, [discountInputMode, watchedDraft?.item_discount_amount, watchedDraft?.selling_price, setValue]);
+  }, [discountInputMode, watchedDraft?.selling_price, getValues, setValue]);
 
   const itemSummaries = useMemo(
     () =>
@@ -447,10 +447,6 @@ export default function NewReceiveNotePage() {
                     step="0.01"
                     placeholder="Cost"
                     {...costField}
-                    ref={(node) => {
-                      costField.ref(node);
-                      costInputRef.current = node;
-                    }}
                     className={cn(
                       addAttempted && draftErrors?.product_cost ? "border-red-400 focus:ring-red-400/40" : ""
                     )}
@@ -515,12 +511,22 @@ export default function NewReceiveNotePage() {
                       />
                     ) : (
                       <Input
-                        type="number"
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         placeholder="Discount amount"
-                        {...register("draft.item_discount_amount", {
-                          setValueAs: (value) => (value === "" ? undefined : Number(value))
-                        })}
+                        value={watchedDraft?.item_discount_amount ?? ""}
+                        onChange={(event) => {
+                          const amountText = event.target.value;
+                          const parsedAmount = amountText === "" ? undefined : Number(amountText);
+                          setValue("draft.item_discount_amount", parsedAmount, { shouldDirty: true });
+
+                          const sellingPrice = normalizeNumber(getValues("draft.selling_price"));
+                          const discountAmount =
+                            parsedAmount !== undefined && Number.isFinite(parsedAmount) ? parsedAmount : 0;
+                          const discountPercent =
+                            sellingPrice > 0 ? Number(((discountAmount / sellingPrice) * 100).toFixed(4)) : 0;
+                          setValue("draft.item_discount_percent", discountPercent, { shouldDirty: true });
+                        }}
                       />
                     )}
                   </div>
