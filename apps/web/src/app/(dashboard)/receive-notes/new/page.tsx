@@ -61,6 +61,7 @@ export default function NewReceiveNotePage() {
     >()
   );
   const [addAttempted, setAddAttempted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { control, register, handleSubmit, setValue, trigger, getValues, resetField, formState } =
     useForm<ReceiveNoteForm>({
     defaultValues: {
@@ -128,29 +129,36 @@ export default function NewReceiveNotePage() {
     );
 
   const onSubmit = async (values: ReceiveNoteForm) => {
+    if (isSubmitting) return;
+
     if (hasDraftData(values.draft)) {
       setAddAttempted(true);
       window.alert("Please add the item or reset the fields before submitting.");
       return;
     }
-    const result = await createReceiveNote({
-      invoice_number: values.invoice_number,
-      supplier_name: values.supplier_name,
-      notes: values.notes,
-      items: values.items
-    });
-    if (!result.success) {
-      console.error("Failed to create GRN", result.error);
-      toast({
-        title: "Failed to add GRN",
-        description: result.error || "Please try again.",
-        variant: "error"
+    setIsSubmitting(true);
+    try {
+      const result = await createReceiveNote({
+        invoice_number: values.invoice_number,
+        supplier_name: values.supplier_name,
+        notes: values.notes,
+        items: values.items
       });
-      return;
-    }
+      if (!result.success) {
+        console.error("Failed to create GRN", result.error);
+        toast({
+          title: "Failed to add GRN",
+          description: result.error || "Please try again.",
+          variant: "error"
+        });
+        return;
+      }
 
-    toast({ title: "GRN added successfully", variant: "success" });
-    router.push("/receive-notes");
+      toast({ title: "GRN added successfully", variant: "success" });
+      router.push("/receive-notes");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const normalizeNumber = (value: unknown) => {
@@ -482,7 +490,9 @@ export default function NewReceiveNotePage() {
           </CardContent>
         </Card>
 
-        <Button type="submit">Add GRN</Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? "Saving..." : "Add GRN"}
+        </Button>
       </form>
     </section>
   );
