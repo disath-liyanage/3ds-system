@@ -8,9 +8,16 @@ import { DayPicker, type DateRange } from "react-day-picker";
 import { pdf } from "@react-pdf/renderer";
 import "react-day-picker/dist/style.css";
 
-import { getReportData, type ReportResult } from "@/app/actions/reports";
+import {
+  getReportData,
+  getSalesDepartmentSubcategoryOptions,
+  getSalesDepartmentOptions,
+  getSalesRouteOptions,
+  type ReportResult
+} from "@/app/actions/reports";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 import { ReportPdfTemplate } from "@/lib/pdf/report-template";
 import { getReportItem, getReportSection } from "../../reports-data";
 
@@ -28,6 +35,13 @@ function todayDate() {
 
 function ymd(date: Date) {
   return format(date, "yyyy-MM-dd");
+}
+
+function getMonthRange(monthsBack: number): DateRange {
+  const now = new Date();
+  const firstDay = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
+  const lastDay = new Date(now.getFullYear(), now.getMonth() - monthsBack + 1, 0);
+  return { from: firstDay, to: lastDay };
 }
 
 const DETAIL_ONLY_REPORT_KEYS = new Set([
@@ -62,8 +76,22 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const reportTitle = report?.title ?? "Report";
   const sectionTitle = section?.title ?? "Reports";
   const reportKey = section && report ? `${section.key}/${report.key}` : "";
+  const isRouteWiseSalesReport = reportKey === "sales/route-wise-sales-report";
+  const isDepartmentWiseSalesReport = reportKey === "sales/department-wise-sales-invoice";
   const isDetailOnlyReport = DETAIL_ONLY_REPORT_KEYS.has(reportKey);
   const totalRows = result?.rows.length ?? 0;
+  const [routeFilter, setRouteFilter] = useState("ALL");
+  const [routeOptions, setRouteOptions] = useState<Array<{ value: string; label: string }>>([
+    { value: "ALL", label: "All routes" }
+  ]);
+  const [departmentFilter, setDepartmentFilter] = useState("ALL");
+  const [departmentOptions, setDepartmentOptions] = useState<Array<{ value: string; label: string }>>([
+    { value: "ALL", label: "All departments" }
+  ]);
+  const [subcategoryFilter, setSubcategoryFilter] = useState("ALL");
+  const [departmentSubcategoryPairs, setDepartmentSubcategoryPairs] = useState<
+    Array<{ department: string; subcategory: string }>
+  >([]);
 
   const summaryResult = useMemo<ReportResult | null>(() => {
     if (!result) return null;
@@ -86,6 +114,67 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       setReportMode("detail");
     }
   }, [isDetailOnlyReport, reportMode]);
+
+  useEffect(() => {
+    if (!isRouteWiseSalesReport) return;
+    let active = true;
+
+    const loadRoutes = async () => {
+      const response = await getSalesRouteOptions();
+      if (!active || !response.success || !response.routes) return;
+
+      const options = response.routes.map((route) => ({
+        value: route,
+        label: route === "ALL" ? "All routes" : route
+      }));
+      setRouteOptions(options);
+    };
+
+    void loadRoutes();
+    return () => {
+      active = false;
+    };
+  }, [isRouteWiseSalesReport]);
+
+  useEffect(() => {
+    if (!isDepartmentWiseSalesReport) return;
+    let active = true;
+
+    const loadDepartments = async () => {
+      const response = await getSalesDepartmentOptions();
+      if (!active || !response.success || !response.departments) return;
+
+      const options = response.departments.map((department) => ({
+        value: department,
+        label: department === "ALL" ? "All departments" : department
+      }));
+      setDepartmentOptions(options);
+
+      const pairsResponse = await getSalesDepartmentSubcategoryOptions();
+      if (!active || !pairsResponse.success || !pairsResponse.pairs) return;
+      setDepartmentSubcategoryPairs(pairsResponse.pairs);
+    };
+
+    void loadDepartments();
+    return () => {
+      active = false;
+    };
+  }, [isDepartmentWiseSalesReport]);
+
+  const subcategoryOptions = useMemo(() => {
+    const filtered = departmentSubcategoryPairs.filter(
+      (pair) => departmentFilter === "ALL" || pair.department === departmentFilter
+    );
+    const names = Array.from(new Set(filtered.map((pair) => pair.subcategory)));
+    return [{ value: "ALL", label: "All subcategories" }, ...names.map((name) => ({ value: name, label: name }))];
+  }, [departmentFilter, departmentSubcategoryPairs]);
+
+  useEffect(() => {
+    if (!isDepartmentWiseSalesReport) return;
+    if (!subcategoryOptions.some((option) => option.value === subcategoryFilter)) {
+      setSubcategoryFilter("ALL");
+    }
+  }, [isDepartmentWiseSalesReport, subcategoryFilter, subcategoryOptions]);
 
   const dateRangeLabel = useMemo(() => {
     if (dateRange?.from && dateRange?.to) {
@@ -146,7 +235,10 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
         section: section.key,
         report: report.key,
         from: ymd(dateRange.from as Date),
-        to: ymd(dateRange.to as Date)
+        to: ymd(dateRange.to as Date),
+        route: isRouteWiseSalesReport ? routeFilter : undefined,
+        department: isDepartmentWiseSalesReport ? departmentFilter : undefined,
+        subcategory: isDepartmentWiseSalesReport ? subcategoryFilter : undefined
       });
       if (!response.success || !response.data) {
         setResult(null);
@@ -166,7 +258,6 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
         toDate={dateRange?.to ? ymd(dateRange.to as Date) : ""}
         reportDate={format(new Date(), "dd-MM-yyyy")}
         userName={reportUser}
-        mode={reportMode}
         mode={activeMode}
         result={activeResult}
       />
@@ -288,16 +379,56 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
+          {isRouteWiseSalesReport ? (
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Route</label>
+              <Select
+                value={routeFilter}
+                options={routeOptions}
+                onChange={(event) => setRouteFilter(event.target.value)}
+              />
+            </div>
+          ) : null}
+
+          {isDepartmentWiseSalesReport ? (
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Department</label>
+              <div className="grid gap-2 md:grid-cols-2">
+                <Select
+                  value={departmentFilter}
+                  options={departmentOptions}
+                  onChange={(event) => setDepartmentFilter(event.target.value)}
+                />
+                <Select
+                  value={subcategoryFilter}
+                  options={subcategoryOptions}
+                  onChange={(event) => setSubcategoryFilter(event.target.value)}
+                />
+              </div>
+            </div>
+          ) : null}
+
           <div className="space-y-1" ref={datePickerRef}>
             <label className="text-sm font-medium">Date Range</label>
-            <button
-              type="button"
-              onClick={() => setIsDatePickerOpen((prev) => !prev)}
-              className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 text-sm text-foreground transition focus:outline-none focus:ring-2 focus:ring-primary/40"
-            >
-              <span className={dateRange?.from ? "text-foreground" : "text-muted-foreground"}>{dateRangeLabel}</span>
-              <span className="text-xs text-muted-foreground">Pick</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDatePickerOpen((prev) => !prev)}
+                className="flex h-10 min-w-[260px] flex-1 items-center justify-between rounded-md border border-input bg-background px-3 text-sm text-foreground transition focus:outline-none focus:ring-2 focus:ring-primary/40"
+              >
+                <span className={dateRange?.from ? "text-foreground" : "text-muted-foreground"}>{dateRangeLabel}</span>
+                <span className="text-xs text-muted-foreground">Pick</span>
+              </button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setDateRange(getMonthRange(0))}>
+                This Month
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setDateRange(getMonthRange(1))}>
+                Last Month
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => setDateRange(getMonthRange(2))}>
+                Month Before Last
+              </Button>
+            </div>
             {isDatePickerOpen ? (
               <div className="relative">
                 <div className="absolute z-20 mt-2 rounded-md border border-border bg-white p-3 shadow-lg">

@@ -33,6 +33,27 @@ export type ReportQueryInput = {
   report: string;
   from: string;
   to: string;
+  route?: string;
+  department?: string;
+  subcategory?: string;
+};
+
+export type SalesRouteOptionsResponse = {
+  success: boolean;
+  error?: string;
+  routes?: string[];
+};
+
+export type SalesDepartmentOptionsResponse = {
+  success: boolean;
+  error?: string;
+  departments?: string[];
+};
+
+export type SalesDepartmentSubcategoryOptionsResponse = {
+  success: boolean;
+  error?: string;
+  pairs?: Array<{ department: string; subcategory: string }>;
 };
 
 function one<T>(value: T | T[] | null | undefined): T | null {
@@ -80,6 +101,25 @@ function buildDateTimeRange(from: string, to: string) {
   const fromIso = new Date(`${from}T00:00:00.000Z`).toISOString();
   const toIso = new Date(`${to}T23:59:59.999Z`).toISOString();
   return { fromIso, toIso };
+}
+
+function splitDepartmentCategory(rawCategory: string | null | undefined): { department: string; subcategory: string } {
+  const text = String(rawCategory || "").trim();
+  if (!text) return { department: "Uncategorized", subcategory: "General" };
+
+  const delimiters = [" / ", " > ", "/", ">"];
+  for (const delimiter of delimiters) {
+    if (!text.includes(delimiter)) continue;
+    const [head, ...tail] = text.split(delimiter).map((part) => part.trim()).filter(Boolean);
+    if (!head) break;
+    const sub = tail.join(" / ").trim();
+    return {
+      department: head,
+      subcategory: sub || "General"
+    };
+  }
+
+  return { department: text, subcategory: "General" };
 }
 
 export async function getReportData(input: ReportQueryInput): Promise<ReportResponse> {
@@ -152,6 +192,7 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
       for (const row of data ?? []) {
         const customer = one((row as any).customer);
         const route = customer?.area || "Unassigned";
+        if (input.route && input.route !== "ALL" && route !== input.route) continue;
         map.set(route, (map.get(route) || 0) + (Number(row.total_amount) || 0));
       }
       const rows = Array.from(map.entries()).map(([Route, amount]) => ({ Route, "Sales Amount": amount }));
@@ -217,14 +258,16 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         const product = one((row as any).product);
         const status = invoice?.status;
         if (!["approved", "issued", "paid"].includes(String(status))) continue;
-        const category = product?.category || "Uncategorized";
+        const categoryParts = splitDepartmentCategory(product?.category);
+        if (input.department && input.department !== "ALL" && categoryParts.department !== input.department) continue;
+        if (input.subcategory && input.subcategory !== "ALL" && categoryParts.subcategory !== input.subcategory) continue;
         const qty = Number(row.qty) || 0;
         const unitPrice = Number(row.unit_price) || 0;
         const discountValue = Number(row.discount_value) || 0;
         const discountType = row.discount_type === "percent" ? "percent" : "amount";
         const perUnitDiscount = discountType === "percent" ? (unitPrice * discountValue) / 100 : discountValue;
         const line = Math.max(0, (unitPrice - perUnitDiscount) * qty);
-        map.set(category, (map.get(category) || 0) + line);
+        map.set(categoryParts.department, (map.get(categoryParts.department) || 0) + line);
       }
       return { success: true, data: { columns: ["Department", "Sales Amount"], rows: Array.from(map.entries()).map(([Department, amount]) => ({ Department, "Sales Amount": amount })) } };
     }
@@ -536,4 +579,71 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
     default:
       return { success: false, error: "Unsupported report key" };
   }
+}
+
+export async function getSalesRouteOptions(): Promise<SalesRouteOptionsResponse> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+  if (!canViewReports(access.profile)) return { success: false, error: "You do not have permission to view reports" };
+
+  const { data, error } = await adminClient.from("customers").select("area").order("area", { ascending: true });
+  if (error) return { success: false, error: error.message };
+
+  const routeSet = new Set<string>();
+  for (const row of data ?? []) {
+    const route = String(row.area || "").trim();
+    if (!route) continue;
+    routeSet.add(route);
+  }
+
+  const routes = ["ALL", ...Array.from(routeSet)];
+  return { success: true, routes };
+}
+
+export async function getSalesDepartmentOptions(): Promise<SalesDepartmentOptionsResponse> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+  if (!canViewReports(access.profile)) return { success: false, error: "You do not have permission to view reports" };
+
+  const { data, error } = await adminClient.from("products").select("category").order("category", { ascending: true });
+  if (error) return { success: false, error: error.message };
+
+  const departmentSet = new Set<string>();
+  for (const row of data ?? []) {
+    const categoryParts = splitDepartmentCategory(row.category);
+    const department = categoryParts.department;
+    if (!department) continue;
+    departmentSet.add(department);
+  }
+
+  const departments = ["ALL", ...Array.from(departmentSet)];
+  return { success: true, departments };
+}
+
+export async function getSalesDepartmentSubcategoryOptions(): Promise<SalesDepartmentSubcategoryOptionsResponse> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+  if (!canViewReports(access.profile)) return { success: false, error: "You do not have permission to view reports" };
+
+  const { data, error } = await adminClient
+    .from("products")
+    .select("category, name")
+    .order("category", { ascending: true })
+    .order("name", { ascending: true });
+  if (error) return { success: false, error: error.message };
+
+  const pairs: Array<{ department: string; subcategory: string }> = [];
+  const seen = new Set<string>();
+  for (const row of data ?? []) {
+    const categoryParts = splitDepartmentCategory(row.category);
+    const department = categoryParts.department;
+    const subcategory = categoryParts.subcategory;
+    if (!department || !subcategory) continue;
+    const key = `${department}::${subcategory}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    pairs.push({ department, subcategory });
+  }
+
+  return { success: true, pairs };
 }
