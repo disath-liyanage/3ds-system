@@ -108,9 +108,11 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         const d = String(row.created_at).slice(0, 10);
         map.set(d, (map.get(d) || 0) + (Number(row.total_amount) || 0));
       }
+      const rows = Array.from(map.entries()).map(([Date, amount]) => ({ Date, "Sales Amount": amount }));
+      const totalSalesAmount = rows.reduce((sum, row) => sum + (Number(row["Sales Amount"]) || 0), 0);
       return {
         success: true,
-        data: { columns: ["Date", "Sales Amount"], rows: Array.from(map.entries()).map(([Date, amount]) => ({ Date, "Sales Amount": amount })) }
+        data: { columns: ["Date", "Sales Amount"], rows: [...rows, { Date: "Total", "Sales Amount": totalSalesAmount }] }
       };
     }
     case "sales/invoice-wise-sales-report": {
@@ -152,7 +154,9 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         const route = customer?.area || "Unassigned";
         map.set(route, (map.get(route) || 0) + (Number(row.total_amount) || 0));
       }
-      return { success: true, data: { columns: ["Route", "Sales Amount"], rows: Array.from(map.entries()).map(([Route, amount]) => ({ Route, "Sales Amount": amount })) } };
+      const rows = Array.from(map.entries()).map(([Route, amount]) => ({ Route, "Sales Amount": amount }));
+      const totalSalesAmount = rows.reduce((sum, row) => sum + (Number(row["Sales Amount"]) || 0), 0);
+      return { success: true, data: { columns: ["Route", "Sales Amount"], rows: [...rows, { Route: "Total", "Sales Amount": totalSalesAmount }] } };
     }
     case "sales/return-invoice-report": {
       const { data, error } = await adminClient
