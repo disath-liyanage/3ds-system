@@ -503,21 +503,30 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         .select("created_at, old_data")
         .eq("table_name", "collections")
         .eq("action", "delete")
-        .gte("created_at", fromIso)
-        .lte("created_at", toIso)
         .order("created_at", { ascending: false });
       if (error) return { success: false, error: error.message };
+
+      const fromMs = new Date(fromIso).getTime();
+      const toMs = new Date(toIso).getTime();
+      const inRange = (value: unknown) => {
+        const raw = String(value || "");
+        const ms = new Date(raw).getTime();
+        return Number.isFinite(ms) && ms >= fromMs && ms <= toMs;
+      };
+
       return {
         success: true,
         data: {
           columns: ["Collection No", "Deleted At", "Customer", "Status", "Amount"],
-          rows: (data ?? []).map((r: any) => ({
-            "Collection No": Number(r.old_data?.collection_number) || 0,
-            "Deleted At": String(r.created_at).slice(0, 10),
-            Customer: r.old_data?.customer_name || "Unknown",
-            Status: "deleted",
-            Amount: Number(r.old_data?.amount) || 0
-          }))
+          rows: (data ?? [])
+            .filter((r: any) => inRange(r.created_at) || inRange(r.old_data?.created_at))
+            .map((r: any) => ({
+              "Collection No": Number(r.old_data?.collection_number) || 0,
+              "Deleted At": String(r.created_at).slice(0, 10),
+              Customer: r.old_data?.customer_name || "Unknown",
+              Status: "deleted",
+              Amount: Number(r.old_data?.amount) || 0
+            }))
         }
       };
     }
