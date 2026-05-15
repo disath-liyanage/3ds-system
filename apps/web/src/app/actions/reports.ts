@@ -439,7 +439,8 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
     case "customer/customer-payment-details": {
       const { data, error } = await adminClient
         .from("collections")
-        .select("collection_number, amount, payment_type, cheque_deposit_date, status, created_at, customer:customers(name)")
+        .select("id, collection_number, amount, payment_type, cheque_deposit_date, status, created_at, customer:customers(name)")
+        .eq("status", "validated")
         .gte("created_at", fromIso)
         .lte("created_at", toIso)
         .order("collection_number", { ascending: false });
@@ -455,7 +456,8 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
             "Payment Type": r.payment_type || "",
             "Cheque Date": r.cheque_deposit_date || "-",
             Status: r.status || "",
-            Amount: Number(r.amount) || 0
+            Amount: Number(r.amount) || 0,
+            __collectionId: r.id ?? ""
           }))
         }
       };

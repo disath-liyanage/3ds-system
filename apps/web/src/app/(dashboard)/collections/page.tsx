@@ -11,6 +11,7 @@ import "react-day-picker/dist/style.css";
 
 import {
   deleteCollectionEntry,
+  getCollectionContextById,
   getInvoiceCollectionHistory,
   type InvoiceCollectionHistoryRow,
   updateCollectionEntry
@@ -26,6 +27,7 @@ import { useCollectionInvoices } from "@/hooks/useCollectionInvoices";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
+import { useSearchParams } from "next/navigation";
 
 type StatusFilter = "open" | "unpaid" | "partially_paid" | "paid" | "all";
 
@@ -41,6 +43,7 @@ const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-LK", { style: "currency", currency: "LKR", maximumFractionDigits: 2 }).format(value);
 
 export default function CollectionsPage() {
+  const searchParams = useSearchParams();
   const { permissions, isLoading, user } = useCurrentUserPermissions();
   const { data: invoices, isLoading: isInvoicesLoading, error } = useCollectionInvoices();
   const queryClient = useQueryClient();
@@ -54,6 +57,7 @@ export default function CollectionsPage() {
   const [salesRepFilter, setSalesRepFilter] = useState("all");
   const [historyInvoiceId, setHistoryInvoiceId] = useState<string | null>(null);
   const [historyInvoiceNumber, setHistoryInvoiceNumber] = useState<number | null>(null);
+  const [focusedCollectionId, setFocusedCollectionId] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<InvoiceCollectionHistoryRow | null>(null);
   const [editAmount, setEditAmount] = useState("");
   const [editType, setEditType] = useState<"cash" | "cheque">("cash");
@@ -214,6 +218,24 @@ export default function CollectionsPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDatePickerOpen]);
+
+  useEffect(() => {
+    const collectionId = searchParams.get("collectionId");
+    if (!collectionId) return;
+
+    let active = true;
+    void (async () => {
+      const result = await getCollectionContextById(collectionId);
+      if (!active || !result.success || !result.data) return;
+      setHistoryInvoiceId(result.data.invoice_id);
+      setHistoryInvoiceNumber(result.data.invoice_number);
+      setFocusedCollectionId(result.data.collection_id);
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [searchParams]);
 
   if (!isLoading && !canViewCollections) {
     return (
@@ -479,6 +501,7 @@ export default function CollectionsPage() {
           if (!open) {
             setHistoryInvoiceId(null);
             setHistoryInvoiceNumber(null);
+            setFocusedCollectionId(null);
           }
         }}
         title={historyInvoiceNumber ? `Collection History · Invoice #${historyInvoiceNumber}` : "Collection History"}
@@ -491,7 +514,12 @@ export default function CollectionsPage() {
         ) : historyQuery.data && historyQuery.data.length > 0 ? (
           <div className="max-h-[60vh] space-y-3 overflow-auto pr-1">
             {historyQuery.data.map((entry) => (
-              <div key={entry.id} className="rounded-md border border-border p-3 text-sm">
+              <div
+                key={entry.id}
+                className={`rounded-md border p-3 text-sm ${
+                  focusedCollectionId === entry.id ? "border-primary bg-primary/5" : "border-border"
+                }`}
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-medium">Collection #{entry.collection_number}</p>

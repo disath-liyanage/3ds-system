@@ -188,6 +188,14 @@ type InvoiceCollectionHistoryQueryRow = {
   validated_by_user: { full_name: string | null } | { full_name: string | null }[] | null;
 };
 
+type CollectionByIdQueryRow = {
+  id: string;
+  invoice_id: string | null;
+  collection_number: number;
+  collected_by: string;
+  invoice: { invoice_number: number | null } | null;
+};
+
 async function getCurrentUserProfile() {
   const supabase = createClient();
 
@@ -445,6 +453,48 @@ export async function getInvoiceCollectionHistory(
   });
 
   return { success: true, data: rows };
+}
+
+export async function getCollectionContextById(
+  collectionId: string
+): Promise<{ success: boolean; data?: { invoice_id: string; invoice_number: number | null; collection_id: string }; error?: string }> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!canRecordCollections(access.profile) && !canManageCollectionApprovals(access.profile)) {
+    return { success: false, error: "You do not have permission to view collection details" };
+  }
+
+  if (!collectionId) {
+    return { success: false, error: "Collection id is required" };
+  }
+
+  const { data, error } = await adminClient
+    .from("collections")
+    .select("id, invoice_id, collection_number, collected_by, invoice:invoices(invoice_number)")
+    .eq("id", collectionId)
+    .maybeSingle<CollectionByIdQueryRow>();
+
+  if (error || !data) {
+    return { success: false, error: error?.message || "Collection not found" };
+  }
+
+  if (!canViewAllCollections(access.profile) && data.collected_by !== access.profile.id) {
+    return { success: false, error: "You do not have permission to view this collection" };
+  }
+
+  if (!data.invoice_id) {
+    return { success: false, error: "Collection is not linked to an invoice" };
+  }
+
+  return {
+    success: true,
+    data: {
+      collection_id: data.id,
+      invoice_id: data.invoice_id,
+      invoice_number: data.invoice?.invoice_number ?? null
+    }
+  };
 }
 
 export async function updateCollectionEntry(input: {

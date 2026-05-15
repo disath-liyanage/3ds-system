@@ -46,18 +46,6 @@ function getMonthRange(monthsBack: number): DateRange {
   return { from: firstDay, to: lastDay };
 }
 
-const DETAIL_ONLY_REPORT_KEYS = new Set([
-  "sales/fast-moving-products-report",
-  "sales/product-wise-sales-qty-reports",
-  "sales/route-wise-invoice-payment-details",
-  "sales/customer-wise-sales-and-quantity-summary",
-  "sales/department-wise-sales-invoice",
-  "sales/delete-invoice-report",
-  "sales/return-invoice-report",
-  "sales/route-wise-sales-report",
-  "customer/customer-outstanding-reports"
-]);
-
 export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const section = getReportSection(params.section);
   const report = getReportItem(params.section, params.report);
@@ -71,7 +59,6 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const [error, setError] = useState("");
   const [isPending, startTransition] = useTransition();
   const [isExportingPdf, setIsExportingPdf] = useState(false);
-  const [reportMode, setReportMode] = useState<"detail" | "summary">("detail");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [reportUser, setReportUser] = useState("ALL");
   const previewFrameRef = useRef<HTMLIFrameElement>(null);
@@ -82,7 +69,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const isRouteWiseSalesReport = reportKey === "sales/route-wise-sales-report";
   const isDepartmentWiseSalesReport = reportKey === "sales/department-wise-sales-invoice";
   const isCustomerOutstandingReport = reportKey === "customer/customer-outstanding-reports";
-  const isDetailOnlyReport = DETAIL_ONLY_REPORT_KEYS.has(reportKey);
+  const isCustomerPaymentDetailsReport = reportKey === "customer/customer-payment-details";
   const totalRows = result?.rows.length ?? 0;
   const [routeFilter, setRouteFilter] = useState("ALL");
   const [routeOptions, setRouteOptions] = useState<Array<{ value: string; label: string }>>([
@@ -99,27 +86,8 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     Array<{ department: string; subcategory: string }>
   >([]);
 
-  const summaryResult = useMemo<ReportResult | null>(() => {
-    if (!result) return null;
-    const numericCols = result.columns.filter((column) =>
-      result.rows.every((row) => typeof row[column] === "number")
-    );
-    const rows: Array<Record<string, string | number>> = [{ Metric: "Total Records", Value: result.rows.length }];
-    for (const column of numericCols) {
-      const total = result.rows.reduce((acc, row) => acc + (Number(row[column]) || 0), 0);
-      rows.push({ Metric: `Total ${column}`, Value: total });
-    }
-    return { columns: ["Metric", "Value"], rows };
-  }, [result]);
-
-  const activeMode: "detail" | "summary" = isDetailOnlyReport ? "detail" : reportMode;
-  const activeResult = activeMode === "detail" ? result : summaryResult;
-
-  useEffect(() => {
-    if (isDetailOnlyReport && reportMode !== "detail") {
-      setReportMode("detail");
-    }
-  }, [isDetailOnlyReport, reportMode]);
+  const activeMode: "detail" = "detail";
+  const activeResult = result;
 
   useEffect(() => {
     if (!isRouteWiseSalesReport) return;
@@ -396,24 +364,6 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <CardTitle>Filters</CardTitle>
-            {!isDetailOnlyReport ? (
-              <div className="ml-auto flex items-center gap-3">
-                <Button
-                  type="button"
-                  variant={reportMode === "detail" ? "default" : "outline"}
-                  onClick={() => setReportMode("detail")}
-                >
-                  Detail
-                </Button>
-                <Button
-                  type="button"
-                  variant={reportMode === "summary" ? "default" : "outline"}
-                  onClick={() => setReportMode("summary")}
-                >
-                  Summary
-                </Button>
-              </div>
-            ) : null}
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -560,18 +510,23 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                     {activeResult.columns.map((column) => {
                       const colLower = column.trim().toLowerCase();
                       const isInvoiceColumn = /invoice\s*(no|number)/i.test(column);
+                      const isCollectionNoColumn = /collection\s*(no|number)/i.test(column);
                       const isNumeric = numericColumns.has(column);
                       const isDeleteQtyColumn =
                         reportKey === "sales/delete-invoice-report" &&
                         (colLower === "product qty" || colLower === "free qty");
                       const isReturnNoColumn = reportKey === "sales/return-invoice-report" && colLower === "return no";
+                      const forceLeftAlign = isCustomerPaymentDetailsReport;
                       const headerAlignClass = isDeleteQtyColumn
                         ? "text-center"
-                        : isReturnNoColumn || isInvoiceColumn || !isNumeric
+                        : forceLeftAlign || isReturnNoColumn || isInvoiceColumn || !isNumeric
                           ? "text-left"
                           : "text-right";
                       return (
-                        <th key={column} className={`px-3 py-2 font-semibold ${headerAlignClass}`}>
+                        <th
+                          key={column}
+                          className={`py-2 font-semibold ${isCollectionNoColumn ? "pl-0 pr-3" : "px-3"} ${headerAlignClass}`}
+                        >
                           {column}
                         </th>
                       );
@@ -586,6 +541,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                         const isNumeric = numericColumns.has(column);
                         const colLower = column.trim().toLowerCase();
                         const isInvoiceColumn = /invoice\s*(no|number)/i.test(column);
+                        const isCollectionNoColumn = /collection\s*(no|number)/i.test(column);
                         const isReturnNoColumn = /return\s*(no|number)/i.test(column);
                         const isDeleteQtyColumn =
                           reportKey === "sales/delete-invoice-report" &&
@@ -600,14 +556,31 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                           /return\s*(no|number)/i.test(column) &&
                           typeof row.__returnInvoiceId === "string" &&
                           row.__returnInvoiceId.length > 0;
+                        const hasCollectionLink =
+                          reportKey === "customer/customer-payment-details" &&
+                          isCollectionNoColumn &&
+                          typeof row.__collectionId === "string" &&
+                          row.__collectionId.length > 0;
+                        const forceLeftAlign = isCustomerPaymentDetailsReport;
                         const cellAlignClass = isDeleteQtyColumn
                           ? "text-center"
-                          : isReturnNoColumn || isInvoiceColumn || !isNumeric
+                          : forceLeftAlign || isReturnNoColumn || isInvoiceColumn || !isNumeric
                             ? "text-left"
                             : "text-right";
                         return (
-                          <td key={column} className={`px-3 py-2 ${cellAlignClass}`}>
-                            {hasReturnInvoiceLink ? (
+                          <td className={`py-2 ${isCollectionNoColumn ? "pl-0 pr-3" : "px-3"} ${cellAlignClass}`} key={column}>
+                            {hasCollectionLink ? (
+                              <Link
+                                href={`/collections?collectionId=${row.__collectionId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-primary underline-offset-2 hover:underline"
+                              >
+                                {typeof value === "number"
+                                  ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                  : String(value ?? "")}
+                              </Link>
+                            ) : hasReturnInvoiceLink ? (
                               <Link
                                 href={`/invoices/return/${row.__returnInvoiceId}`}
                                 target="_blank"
@@ -655,14 +628,16 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                       {activeResult.columns.map((column) => {
                         const colLower = column.trim().toLowerCase();
                         const isInvoiceColumn = /invoice\s*(no|number)/i.test(column);
+                        const isCollectionNoColumn = /collection\s*(no|number)/i.test(column);
                         const isReturnNoColumn = /return\s*(no|number)/i.test(column);
                         const isDeleteQtyColumn =
                           reportKey === "sales/delete-invoice-report" &&
                           (colLower === "product qty" || colLower === "free qty");
                         const isNumeric = numericColumns.has(column);
+                        const forceLeftAlign = isCustomerPaymentDetailsReport;
                         const cellAlignClass = isDeleteQtyColumn
                           ? "text-center"
-                          : isReturnNoColumn || isInvoiceColumn || !isNumeric
+                          : forceLeftAlign || isReturnNoColumn || isInvoiceColumn || !isNumeric
                             ? "text-left"
                             : "text-right";
                         const text =
@@ -672,7 +647,10 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                               ? totalRowConfig.total.toLocaleString(undefined, { maximumFractionDigits: 2 })
                               : "";
                         return (
-                          <td key={`total-${column}`} className={`px-3 py-2 ${cellAlignClass}`}>
+                          <td
+                            key={`total-${column}`}
+                            className={`py-2 ${isCollectionNoColumn ? "pl-0 pr-3" : "px-3"} ${cellAlignClass}`}
+                          >
                             {text}
                           </td>
                         );
