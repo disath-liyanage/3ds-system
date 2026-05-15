@@ -309,15 +309,6 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       const total = activeResult.rows.reduce((sum, row) => sum + (Number(row["Return Amount"]) || 0), 0);
       return { labelColumn: "Return No", amountColumn: "Return Amount", total, label: "Total" };
     }
-    if (reportKey === "customer/customer-outstanding-reports") {
-      const total = activeResult.rows.reduce((sum, row) => sum + (Number(row["Outstanding Balance"]) || 0), 0);
-      return {
-        labelColumn: "Customer",
-        amountColumn: "Outstanding Balance",
-        total,
-        label: "Total Outstandings Available to Collect"
-      };
-    }
     return null;
   }, [activeResult, reportKey, activeMode]);
 
@@ -534,10 +525,31 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {activeResult.rows.map((row, index) => (
-                    <tr key={`${index}-${String(row[activeResult.columns[0]] ?? index)}`} className="border-b border-border">
-                      {activeResult.columns.map((column) => {
-                        const value = row[column];
+                  {activeResult.rows.map((row, index) => {
+                    const isOutstanding = reportKey === "customer/customer-outstanding-reports";
+                    const rowType = String(row.__rowType || "");
+                    if (isOutstanding && rowType === "divider") {
+                      return (
+                        <tr key={`${index}-${String(row[activeResult.columns[0]] ?? index)}`}>
+                          <td colSpan={activeResult.columns.length} className="px-0 py-3">
+                            <div className="h-px w-full bg-black" />
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    const rowClassName = isOutstanding
+                      ? rowType === "customer"
+                        ? "bg-muted/30 border-b border-border"
+                        : Number(row.__isLastInvoice) === 1
+                          ? ""
+                          : "border-b border-border"
+                      : "border-b border-border";
+
+                    return (
+                      <tr key={`${index}-${String(row[activeResult.columns[0]] ?? index)}`} className={rowClassName}>
+                        {activeResult.columns.map((column) => {
+                          const value = row[column];
                         const isNumeric = numericColumns.has(column);
                         const colLower = column.trim().toLowerCase();
                         const isInvoiceColumn = /invoice\s*(no|number)/i.test(column);
@@ -561,6 +573,12 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                           isCollectionNoColumn &&
                           typeof row.__collectionId === "string" &&
                           row.__collectionId.length > 0;
+                        const hasOutstandingInvoiceLink =
+                          isOutstanding &&
+                          rowType === "invoice" &&
+                          column === activeResult.columns[0] &&
+                          typeof row.__invoiceId === "string" &&
+                          row.__invoiceId.length > 0;
                         const forceLeftAlign = isCustomerPaymentDetailsReport;
                         const cellAlignClass = isDeleteQtyColumn
                           ? "text-center"
@@ -569,7 +587,18 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                             : "text-right";
                         return (
                           <td className={`py-2 ${isCollectionNoColumn ? "pl-0 pr-3" : "px-3"} ${cellAlignClass}`} key={column}>
-                            {hasCollectionLink ? (
+                            {hasOutstandingInvoiceLink ? (
+                              <Link
+                                href={`/invoices/${row.__invoiceId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-primary underline-offset-2 hover:underline"
+                              >
+                                {typeof value === "number"
+                                  ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                  : String(value ?? "")}
+                              </Link>
+                            ) : hasCollectionLink ? (
                               <Link
                                 href={`/collections?collectionId=${row.__collectionId}`}
                                 target="_blank"
@@ -621,8 +650,9 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                           </td>
                         );
                       })}
-                    </tr>
-                  ))}
+                      </tr>
+                    );
+                  })}
                   {totalRowConfig ? (
                     <tr className="border-b border-border font-semibold">
                       {activeResult.columns.map((column) => {

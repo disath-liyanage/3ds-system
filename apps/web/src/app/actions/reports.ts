@@ -351,25 +351,109 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
       return { success: true, data: { columns: ["Product", "Sold Qty"], rows } };
     }
     case "customer/customer-outstanding-reports": {
-      const { data, error } = await adminClient.from("customers").select("name, area, credit_limit, balance").order("name");
-      if (error) return { success: false, error: error.message };
+      const { data: customers, error: customersError } = await adminClient
+        .from("customers")
+        .select("id, name, area, balance")
+        .order("name");
+      if (customersError) return { success: false, error: customersError.message };
+
+      const { data: invoices, error: invoicesError } = await adminClient
+        .from("invoices")
+        .select("id, customer_id, invoice_number, total_amount, created_at, status")
+        .in("status", ["approved", "issued", "paid"])
+        .order("created_at", { ascending: true });
+      if (invoicesError) return { success: false, error: invoicesError.message };
+
       const routeQueryRaw = String(input.route || "").trim();
       const routeQuery = routeQueryRaw.toUpperCase() === "ALL" ? "" : routeQueryRaw.toLowerCase();
       const customerQuery = String(input.customer || "").trim().toLowerCase();
+
+      const invoiceIds = (invoices ?? []).map((invoice: any) => String(invoice.id)).filter(Boolean);
+      const collectionTotals = new Map<string, number>();
+      if (invoiceIds.length > 0) {
+        const { data: collections, error: collectionsError } = await adminClient
+          .from("collections")
+          .select("invoice_id, amount, status")
+          .in("invoice_id", invoiceIds)
+          .eq("status", "validated");
+        if (collectionsError) return { success: false, error: collectionsError.message };
+        for (const row of collections ?? []) {
+          const invoiceId = String((row as any).invoice_id || "");
+          if (!invoiceId) continue;
+          collectionTotals.set(invoiceId, (collectionTotals.get(invoiceId) ?? 0) + (Number((row as any).amount) || 0));
+        }
+      }
+
+      const invoicesByCustomer = new Map<
+        string,
+        Array<{ id: string; invoice_number: number; created_at: string; total_amount: number; remaining_amount: number }>
+      >();
+      for (const invoice of invoices ?? []) {
+        const invoiceId = String((invoice as any).id || "");
+        const customerId = String((invoice as any).customer_id || "");
+        if (!invoiceId || !customerId) continue;
+        const totalAmount = Number((invoice as any).total_amount) || 0;
+        const collected = collectionTotals.get(invoiceId) ?? 0;
+        const remainingAmount = Math.max(0, totalAmount - collected);
+        if (remainingAmount <= 0) continue;
+        const list = invoicesByCustomer.get(customerId) ?? [];
+        list.push({
+          id: invoiceId,
+          invoice_number: Number((invoice as any).invoice_number) || 0,
+          created_at: String((invoice as any).created_at || ""),
+          total_amount: totalAmount,
+          remaining_amount: remainingAmount
+        });
+        invoicesByCustomer.set(customerId, list);
+      }
+
+      const rows: Array<Record<string, string | number>> = [];
+      const filteredCustomers = (customers ?? [])
+        .map((r: any) => ({
+          id: String(r.id || ""),
+          name: r.name || "",
+          area: r.area || "",
+          balance: Number(r.balance) || 0
+        }))
+        .filter((row) => (routeQuery ? String(row.area).trim().toLowerCase() === routeQuery : true))
+        .filter((row) => (customerQuery ? String(row.name).trim().toLowerCase() === customerQuery : true));
+
+      for (const customer of filteredCustomers) {
+        const customerInvoices = (invoicesByCustomer.get(customer.id) ?? []).sort((a, b) => a.invoice_number - b.invoice_number);
+        if (customerInvoices.length === 0) continue;
+        const totalOutstanding = customerInvoices.reduce((sum, item) => sum + item.remaining_amount, 0);
+
+        rows.push({
+          __rowType: "customer",
+          "Customer / Invoice": customer.name,
+          "Route / Date Issued": customer.area || "-",
+          "Total Outstanding / Amount": totalOutstanding
+        });
+
+        for (const [invoiceIndex, invoice] of customerInvoices.entries()) {
+          rows.push({
+            __rowType: "invoice",
+            __invoiceId: invoice.id,
+            __isLastInvoice: invoiceIndex === customerInvoices.length - 1 ? 1 : 0,
+            "Customer / Invoice": invoice.invoice_number,
+            "Route / Date Issued": String(invoice.created_at).slice(0, 10),
+            "Total Outstanding / Amount": invoice.remaining_amount
+          });
+        }
+
+        rows.push({
+          __rowType: "divider",
+          "Customer / Invoice": "",
+          "Route / Date Issued": "",
+          "Total Outstanding / Amount": ""
+        });
+      }
+
       return {
         success: true,
         data: {
-          columns: ["Customer", "Route", "Credit Limit", "Outstanding Balance"],
-          rows: (data ?? [])
-            .map((r: any) => ({
-              Customer: r.name || "",
-              Route: r.area || "",
-              "Credit Limit": Number(r.credit_limit) || 0,
-              "Outstanding Balance": Number(r.balance) || 0
-            }))
-            .filter((row) => Number(row["Outstanding Balance"]) > 0)
-            .filter((row) => (routeQuery ? String(row.Route).trim().toLowerCase() === routeQuery : true))
-            .filter((row) => (customerQuery ? String(row.Customer).trim().toLowerCase() === customerQuery : true))
+          columns: ["Customer / Invoice", "Route / Date Issued", "Total Outstanding / Amount"],
+          rows
         }
       };
     }
@@ -415,23 +499,24 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
     }
     case "customer/cacel-customer-payments": {
       const { data, error } = await adminClient
-        .from("collections")
-        .select("collection_number, amount, created_at, status, customer:customers(name)")
-        .eq("status", "rejected")
+        .from("audit_log")
+        .select("created_at, old_data")
+        .eq("table_name", "collections")
+        .eq("action", "delete")
         .gte("created_at", fromIso)
         .lte("created_at", toIso)
-        .order("collection_number", { ascending: false });
+        .order("created_at", { ascending: false });
       if (error) return { success: false, error: error.message };
       return {
         success: true,
         data: {
-          columns: ["Collection No", "Date", "Customer", "Status", "Amount"],
+          columns: ["Collection No", "Deleted At", "Customer", "Status", "Amount"],
           rows: (data ?? []).map((r: any) => ({
-            "Collection No": Number(r.collection_number) || 0,
-            Date: String(r.created_at).slice(0, 10),
-            Customer: r.customer?.name || "Unknown",
-            Status: r.status || "",
-            Amount: Number(r.amount) || 0
+            "Collection No": Number(r.old_data?.collection_number) || 0,
+            "Deleted At": String(r.created_at).slice(0, 10),
+            Customer: r.old_data?.customer_name || "Unknown",
+            Status: "deleted",
+            Amount: Number(r.old_data?.amount) || 0
           }))
         }
       };
