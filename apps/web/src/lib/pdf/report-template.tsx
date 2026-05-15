@@ -70,6 +70,27 @@ export function ReportPdfTemplate({ reportTitle, fromDate, toDate, reportDate, u
     return `${100 / Math.max(columns.length, 1)}%`;
   };
 
+  const totalRowConfig = (() => {
+    if (mode !== "detail") return null;
+    const hasInvoiceWiseLayout =
+      result.columns.includes("Invoice No") &&
+      result.columns.includes("Amount") &&
+      result.columns.includes("P. Method") &&
+      result.columns.includes("Status");
+    if (hasInvoiceWiseLayout) {
+      const total = result.rows.reduce((sum, row) => sum + (Number(row.Amount) || 0), 0);
+      return { labelColumn: "Invoice No", amountColumn: "Amount", total };
+    }
+
+    const hasReturnInvoiceLayout = result.columns.includes("Return No") && result.columns.includes("Return Amount");
+    if (hasReturnInvoiceLayout) {
+      const total = result.rows.reduce((sum, row) => sum + (Number(row["Return Amount"]) || 0), 0);
+      return { labelColumn: "Return No", amountColumn: "Return Amount", total };
+    }
+
+    return null;
+  })();
+
   return (
     <Document>
       <Page size="LETTER" style={styles.page}>
@@ -121,6 +142,19 @@ export function ReportPdfTemplate({ reportTitle, fromDate, toDate, reportDate, u
             })}
           </View>
         ))}
+        {totalRowConfig ? (
+          <View style={styles.tableRow}>
+            {result.columns.map((column) => (
+              <Text key={`total-${column}`} style={{ ...styles.cell, width: getColumnWidth(column) }}>
+                {column === totalRowConfig.labelColumn
+                  ? "Total"
+                  : column === totalRowConfig.amountColumn
+                    ? totalRowConfig.total.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                    : ""}
+              </Text>
+            ))}
+          </View>
+        ) : null}
       </Page>
     </Document>
   );

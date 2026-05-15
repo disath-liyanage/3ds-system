@@ -50,6 +50,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
 
   const reportTitle = report?.title ?? "Report";
   const sectionTitle = section?.title ?? "Reports";
+  const reportKey = section && report ? `${section.key}/${report.key}` : "";
   const totalRows = result?.rows.length ?? 0;
 
   const summaryResult = useMemo<ReportResult | null>(() => {
@@ -190,6 +191,19 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     return out;
   }, [activeResult]);
 
+  const totalRowConfig = useMemo(() => {
+    if (!activeResult || reportMode !== "detail") return null;
+    if (reportKey === "sales/invoice-wise-sales-report") {
+      const total = activeResult.rows.reduce((sum, row) => sum + (Number(row.Amount) || 0), 0);
+      return { labelColumn: "Invoice No", amountColumn: "Amount", total };
+    }
+    if (reportKey === "sales/return-invoice-report") {
+      const total = activeResult.rows.reduce((sum, row) => sum + (Number(row["Return Amount"]) || 0), 0);
+      return { labelColumn: "Return No", amountColumn: "Return Amount", total };
+    }
+    return null;
+  }, [activeResult, reportKey, reportMode]);
+
   useEffect(() => {
     let cancelled = false;
     let objectUrl: string | null = null;
@@ -313,11 +327,25 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    {activeResult.columns.map((column) => (
-                      <th key={column} className="px-3 py-2 text-left font-semibold">
-                        {column}
-                      </th>
-                    ))}
+                    {activeResult.columns.map((column) => {
+                      const colLower = column.trim().toLowerCase();
+                      const isInvoiceColumn = /invoice\s*(no|number)/i.test(column);
+                      const isNumeric = numericColumns.has(column);
+                      const isDeleteQtyColumn =
+                        reportKey === "sales/delete-invoice-report" &&
+                        (colLower === "product qty" || colLower === "free qty");
+                      const isReturnNoColumn = reportKey === "sales/return-invoice-report" && colLower === "return no";
+                      const headerAlignClass = isDeleteQtyColumn
+                        ? "text-center"
+                        : isReturnNoColumn || isInvoiceColumn || !isNumeric
+                          ? "text-left"
+                          : "text-right";
+                      return (
+                        <th key={column} className={`px-3 py-2 font-semibold ${headerAlignClass}`}>
+                          {column}
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
@@ -326,10 +354,52 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                       {activeResult.columns.map((column) => {
                         const value = row[column];
                         const isNumeric = numericColumns.has(column);
+                        const colLower = column.trim().toLowerCase();
+                        const isInvoiceColumn = /invoice\s*(no|number)/i.test(column);
+                        const isReturnNoColumn = /return\s*(no|number)/i.test(column);
+                        const isDeleteQtyColumn =
+                          reportKey === "sales/delete-invoice-report" &&
+                          (colLower === "product qty" || colLower === "free qty");
                         const hasInvoiceLink = /invoice\s*(no|number)/i.test(column) && typeof row.__invoiceId === "string" && row.__invoiceId.length > 0;
+                        const hasCancelledInvoiceReportLink =
+                          reportKey === "sales/delete-invoice-report" &&
+                          /invoice\s*(no|number)/i.test(column) &&
+                          typeof row.__cancelledInvoiceReportId === "string" &&
+                          row.__cancelledInvoiceReportId.length > 0;
+                        const hasReturnInvoiceLink =
+                          /return\s*(no|number)/i.test(column) &&
+                          typeof row.__returnInvoiceId === "string" &&
+                          row.__returnInvoiceId.length > 0;
+                        const cellAlignClass = isDeleteQtyColumn
+                          ? "text-center"
+                          : isReturnNoColumn || isInvoiceColumn || !isNumeric
+                            ? "text-left"
+                            : "text-right";
                         return (
-                          <td key={column} className={`px-3 py-2 ${isNumeric ? "text-right" : "text-left"}`}>
-                            {hasInvoiceLink ? (
+                          <td key={column} className={`px-3 py-2 ${cellAlignClass}`}>
+                            {hasReturnInvoiceLink ? (
+                              <Link
+                                href={`/invoices/return/${row.__returnInvoiceId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-primary underline-offset-2 hover:underline"
+                              >
+                                {typeof value === "number"
+                                  ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                  : String(value ?? "")}
+                              </Link>
+                            ) : hasCancelledInvoiceReportLink ? (
+                              <Link
+                                href={`/invoices/cancelled/${row.__cancelledInvoiceReportId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-primary underline-offset-2 hover:underline"
+                              >
+                                {typeof value === "number"
+                                  ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                  : String(value ?? "")}
+                              </Link>
+                            ) : hasInvoiceLink ? (
                               <Link
                                 href={`/invoices/${row.__invoiceId}`}
                                 target="_blank"
@@ -350,6 +420,35 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                       })}
                     </tr>
                   ))}
+                  {totalRowConfig ? (
+                    <tr className="border-b border-border font-semibold">
+                      {activeResult.columns.map((column) => {
+                        const colLower = column.trim().toLowerCase();
+                        const isInvoiceColumn = /invoice\s*(no|number)/i.test(column);
+                        const isReturnNoColumn = /return\s*(no|number)/i.test(column);
+                        const isDeleteQtyColumn =
+                          reportKey === "sales/delete-invoice-report" &&
+                          (colLower === "product qty" || colLower === "free qty");
+                        const isNumeric = numericColumns.has(column);
+                        const cellAlignClass = isDeleteQtyColumn
+                          ? "text-center"
+                          : isReturnNoColumn || isInvoiceColumn || !isNumeric
+                            ? "text-left"
+                            : "text-right";
+                        const text =
+                          column === totalRowConfig.labelColumn
+                            ? "Total"
+                            : column === totalRowConfig.amountColumn
+                              ? totalRowConfig.total.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                              : "";
+                        return (
+                          <td key={`total-${column}`} className={`px-3 py-2 ${cellAlignClass}`}>
+                            {text}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ) : null}
                 </tbody>
               </table>
             </div>
