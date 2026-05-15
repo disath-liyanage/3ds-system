@@ -13,7 +13,7 @@ type ReportPdfTemplateProps = {
 };
 
 const styles = StyleSheet.create({
-  page: { padding: 24, fontSize: 10, fontFamily: "Helvetica" },
+  page: { padding: 24, fontSize: 11, fontFamily: "Times-Roman" },
   companyName: { fontSize: 13, fontWeight: 700, marginBottom: 2 },
   companyAddress: { fontSize: 10, marginBottom: 1 },
   companyContact: { fontSize: 10, marginBottom: 6 },
@@ -59,20 +59,20 @@ export function ReportPdfTemplate({ reportTitle, fromDate, toDate, reportDate, u
       return `${100 / Math.max(columns.length, 1)}%`;
     }
 
-    if (normalized === "invoice no") return "8%";
+    if (normalized === "invoice no") return "9%";
     if (normalized === "date") return "8%";
-    if (normalized === "customer") return "44%";
-    if (normalized === "payment method" || normalized === "p. method") return "9%";
+    if (normalized === "customer") return "48%";
+    if (normalized === "payment method" || normalized === "p. method") return "11%";
     if (normalized === "status") return "8%";
     if (normalized === "amount") return "10%";
-    if (normalized === "route") return "13%";
+    if (normalized === "route") return "6%";
 
     return `${100 / Math.max(columns.length, 1)}%`;
   };
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size="LETTER" style={styles.page}>
         <Text style={styles.companyName}>3D&apos;s Distributors (PVT) ltd.</Text>
         <Text style={styles.companyAddress}>No : 44/1,Tharanga Place, Panagoda, Homagama</Text>
         <Text style={styles.companyContact}>070 321 5756/ 011 208 3773</Text>
@@ -101,7 +101,7 @@ export function ReportPdfTemplate({ reportTitle, fromDate, toDate, reportDate, u
         <View style={styles.tableHeader}>
           {result.columns.map((column) => (
             <Text key={column} style={{ ...styles.cell, width: getColumnWidth(column) }}>
-              {column}
+              {column.trim().toLowerCase() === "invoice no" ? "Invoice" : column}
             </Text>
           ))}
         </View>
