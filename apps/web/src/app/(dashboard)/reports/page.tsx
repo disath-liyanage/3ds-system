@@ -1,7 +1,6 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useMemo, useState } from "react";
@@ -76,21 +75,27 @@ export default function ReportsPage() {
         <div className="space-y-4">
           {visibleSections.map((section) => (
             <Card key={section.key}>
-              <CardHeader>
+              <CardHeader
+                role="button"
+                tabIndex={0}
+                onClick={() => toggleSection(section.key)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    toggleSection(section.key);
+                  }
+                }}
+                className="cursor-pointer rounded-t-lg transition hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle className="text-base">{section.title}</CardTitle>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => toggleSection(section.key)}>
-                    <span className="flex items-center gap-2">
-                      <ChevronRight
-                        className={
-                          normalizedQuery || openSections[section.key]
-                            ? "h-4 w-4 rotate-90 transition-transform"
-                            : "h-4 w-4 rotate-0 transition-transform"
-                        }
-                      />
-                      {normalizedQuery || openSections[section.key] ? "Hide" : "Show"}
-                    </span>
-                  </Button>
+                  <ChevronRight
+                    className={
+                      normalizedQuery || openSections[section.key]
+                        ? "h-4 w-4 rotate-90 transition-transform"
+                        : "h-4 w-4 rotate-0 transition-transform"
+                    }
+                  />
                 </div>
               </CardHeader>
               {normalizedQuery || openSections[section.key] ? (
