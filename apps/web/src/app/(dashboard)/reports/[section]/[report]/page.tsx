@@ -30,6 +30,17 @@ function ymd(date: Date) {
   return format(date, "yyyy-MM-dd");
 }
 
+const DETAIL_ONLY_REPORT_KEYS = new Set([
+  "sales/fast-moving-products-report",
+  "sales/product-wise-sales-qty-reports",
+  "sales/route-wise-invoice-payment-details",
+  "sales/customer-wise-sales-and-quantity-summary",
+  "sales/department-wise-sales-invoice",
+  "sales/delete-invoice-report",
+  "sales/return-invoice-report",
+  "sales/route-wise-sales-report"
+]);
+
 export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const section = getReportSection(params.section);
   const report = getReportItem(params.section, params.report);
@@ -51,6 +62,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const reportTitle = report?.title ?? "Report";
   const sectionTitle = section?.title ?? "Reports";
   const reportKey = section && report ? `${section.key}/${report.key}` : "";
+  const isDetailOnlyReport = DETAIL_ONLY_REPORT_KEYS.has(reportKey);
   const totalRows = result?.rows.length ?? 0;
 
   const summaryResult = useMemo<ReportResult | null>(() => {
@@ -66,7 +78,14 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     return { columns: ["Metric", "Value"], rows };
   }, [result]);
 
-  const activeResult = reportMode === "detail" ? result : summaryResult;
+  const activeMode: "detail" | "summary" = isDetailOnlyReport ? "detail" : reportMode;
+  const activeResult = activeMode === "detail" ? result : summaryResult;
+
+  useEffect(() => {
+    if (isDetailOnlyReport && reportMode !== "detail") {
+      setReportMode("detail");
+    }
+  }, [isDetailOnlyReport, reportMode]);
 
   const dateRangeLabel = useMemo(() => {
     if (dateRange?.from && dateRange?.to) {
@@ -148,6 +167,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
         reportDate={format(new Date(), "dd-MM-yyyy")}
         userName={reportUser}
         mode={reportMode}
+        mode={activeMode}
         result={activeResult}
       />
     ).toBlob();
@@ -164,7 +184,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${section.key}-${report.key}-${reportMode}-${ymd(new Date())}.pdf`;
+      anchor.download = `${section.key}-${report.key}-${activeMode}-${ymd(new Date())}.pdf`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -192,7 +212,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   }, [activeResult]);
 
   const totalRowConfig = useMemo(() => {
-    if (!activeResult || reportMode !== "detail") return null;
+    if (!activeResult || activeMode !== "detail") return null;
     if (reportKey === "sales/invoice-wise-sales-report") {
       const total = activeResult.rows.reduce((sum, row) => sum + (Number(row.Amount) || 0), 0);
       return { labelColumn: "Invoice No", amountColumn: "Amount", total };
@@ -202,7 +222,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       return { labelColumn: "Return No", amountColumn: "Return Amount", total };
     }
     return null;
-  }, [activeResult, reportKey, reportMode]);
+  }, [activeResult, reportKey, activeMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -222,7 +242,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [activeResult, section, report, reportMode, dateRangeLabel]);
+  }, [activeResult, section, report, activeMode, dateRangeLabel]);
 
   if (!section || !report) {
     return (
@@ -247,22 +267,24 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <CardTitle>Filters</CardTitle>
-            <div className="ml-auto flex items-center gap-3">
-              <Button
-                type="button"
-                variant={reportMode === "detail" ? "default" : "outline"}
-                onClick={() => setReportMode("detail")}
-              >
-                Detail
-              </Button>
-              <Button
-                type="button"
-                variant={reportMode === "summary" ? "default" : "outline"}
-                onClick={() => setReportMode("summary")}
-              >
-                Summary
-              </Button>
-            </div>
+            {!isDetailOnlyReport ? (
+              <div className="ml-auto flex items-center gap-3">
+                <Button
+                  type="button"
+                  variant={reportMode === "detail" ? "default" : "outline"}
+                  onClick={() => setReportMode("detail")}
+                >
+                  Detail
+                </Button>
+                <Button
+                  type="button"
+                  variant={reportMode === "summary" ? "default" : "outline"}
+                  onClick={() => setReportMode("summary")}
+                >
+                  Summary
+                </Button>
+              </div>
+            ) : null}
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -458,7 +480,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>PDF Preview ({reportMode === "detail" ? "Detail" : "Summary"})</CardTitle>
+          <CardTitle>PDF Preview ({activeMode === "detail" ? "Detail" : "Summary"})</CardTitle>
         </CardHeader>
         <CardContent>
           {!previewUrl ? (
