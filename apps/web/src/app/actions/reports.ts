@@ -34,6 +34,7 @@ export type ReportQueryInput = {
   from: string;
   to: string;
   route?: string;
+  customer?: string;
   department?: string;
   subcategory?: string;
 };
@@ -54,6 +55,13 @@ export type SalesDepartmentSubcategoryOptionsResponse = {
   success: boolean;
   error?: string;
   pairs?: Array<{ department: string; subcategory: string }>;
+};
+
+export type CustomerOutstandingFilterOptionsResponse = {
+  success: boolean;
+  error?: string;
+  routes?: string[];
+  customers?: string[];
 };
 
 function one<T>(value: T | T[] | null | undefined): T | null {
@@ -345,16 +353,23 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
     case "customer/customer-outstanding-reports": {
       const { data, error } = await adminClient.from("customers").select("name, area, credit_limit, balance").order("name");
       if (error) return { success: false, error: error.message };
+      const routeQueryRaw = String(input.route || "").trim();
+      const routeQuery = routeQueryRaw.toUpperCase() === "ALL" ? "" : routeQueryRaw.toLowerCase();
+      const customerQuery = String(input.customer || "").trim().toLowerCase();
       return {
         success: true,
         data: {
           columns: ["Customer", "Route", "Credit Limit", "Outstanding Balance"],
-          rows: (data ?? []).map((r: any) => ({
-            Customer: r.name || "",
-            Route: r.area || "",
-            "Credit Limit": Number(r.credit_limit) || 0,
-            "Outstanding Balance": Number(r.balance) || 0
-          }))
+          rows: (data ?? [])
+            .map((r: any) => ({
+              Customer: r.name || "",
+              Route: r.area || "",
+              "Credit Limit": Number(r.credit_limit) || 0,
+              "Outstanding Balance": Number(r.balance) || 0
+            }))
+            .filter((row) => Number(row["Outstanding Balance"]) > 0)
+            .filter((row) => (routeQuery ? String(row.Route).trim().toLowerCase() === routeQuery : true))
+            .filter((row) => (customerQuery ? String(row.Customer).trim().toLowerCase() === customerQuery : true))
         }
       };
     }
@@ -646,4 +661,31 @@ export async function getSalesDepartmentSubcategoryOptions(): Promise<SalesDepar
   }
 
   return { success: true, pairs };
+}
+
+export async function getCustomerOutstandingFilterOptions(): Promise<CustomerOutstandingFilterOptionsResponse> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+  if (!canViewReports(access.profile)) return { success: false, error: "You do not have permission to view reports" };
+
+  const { data, error } = await adminClient.from("customers").select("name, area, balance").order("name");
+  if (error) return { success: false, error: error.message };
+
+  const routeSet = new Set<string>();
+  const customerSet = new Set<string>();
+  for (const row of data ?? []) {
+    const balance = Number((row as { balance?: unknown }).balance) || 0;
+    if (balance <= 0) continue;
+
+    const route = String((row as { area?: unknown }).area || "").trim();
+    const customer = String((row as { name?: unknown }).name || "").trim();
+    if (route) routeSet.add(route);
+    if (customer) customerSet.add(customer);
+  }
+
+  return {
+    success: true,
+    routes: Array.from(routeSet).sort((a, b) => a.localeCompare(b)),
+    customers: Array.from(customerSet).sort((a, b) => a.localeCompare(b))
+  };
 }

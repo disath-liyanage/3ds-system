@@ -9,6 +9,7 @@ import { pdf } from "@react-pdf/renderer";
 import "react-day-picker/dist/style.css";
 
 import {
+  getCustomerOutstandingFilterOptions,
   getReportData,
   getSalesDepartmentSubcategoryOptions,
   getSalesDepartmentOptions,
@@ -17,6 +18,7 @@ import {
 } from "@/app/actions/reports";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select";
 import { Select } from "@/components/ui/select";
 import { ReportPdfTemplate } from "@/lib/pdf/report-template";
 import { getReportItem, getReportSection } from "../../reports-data";
@@ -52,7 +54,8 @@ const DETAIL_ONLY_REPORT_KEYS = new Set([
   "sales/department-wise-sales-invoice",
   "sales/delete-invoice-report",
   "sales/return-invoice-report",
-  "sales/route-wise-sales-report"
+  "sales/route-wise-sales-report",
+  "customer/customer-outstanding-reports"
 ]);
 
 export default function ReportDetailPage({ params }: ReportDetailPageProps) {
@@ -78,6 +81,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const reportKey = section && report ? `${section.key}/${report.key}` : "";
   const isRouteWiseSalesReport = reportKey === "sales/route-wise-sales-report";
   const isDepartmentWiseSalesReport = reportKey === "sales/department-wise-sales-invoice";
+  const isCustomerOutstandingReport = reportKey === "customer/customer-outstanding-reports";
   const isDetailOnlyReport = DETAIL_ONLY_REPORT_KEYS.has(reportKey);
   const totalRows = result?.rows.length ?? 0;
   const [routeFilter, setRouteFilter] = useState("ALL");
@@ -89,6 +93,8 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     { value: "ALL", label: "All departments" }
   ]);
   const [subcategoryFilter, setSubcategoryFilter] = useState("ALL");
+  const [customerFilter, setCustomerFilter] = useState("");
+  const [customerOptions, setCustomerOptions] = useState<SearchableSelectOption[]>([]);
   const [departmentSubcategoryPairs, setDepartmentSubcategoryPairs] = useState<
     Array<{ department: string; subcategory: string }>
   >([]);
@@ -176,6 +182,26 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     }
   }, [isDepartmentWiseSalesReport, subcategoryFilter, subcategoryOptions]);
 
+  useEffect(() => {
+    if (!isCustomerOutstandingReport) return;
+    let active = true;
+
+    const loadOutstandingFilters = async () => {
+      const response = await getCustomerOutstandingFilterOptions();
+      if (!active || !response.success) return;
+      setRouteOptions([
+        { value: "ALL", label: "All routes" },
+        ...((response.routes || []).map((route) => ({ value: route, label: route })))
+      ]);
+      setCustomerOptions((response.customers || []).map((customer) => ({ value: customer, label: customer })));
+    };
+
+    void loadOutstandingFilters();
+    return () => {
+      active = false;
+    };
+  }, [isCustomerOutstandingReport]);
+
   const dateRangeLabel = useMemo(() => {
     if (dateRange?.from && dateRange?.to) {
       return `${format(dateRange.from, "MMM dd, yyyy")} - ${format(dateRange.to, "MMM dd, yyyy")}`;
@@ -224,19 +250,22 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       return;
     }
 
-    if (!dateRange?.from || !dateRange?.to) {
+    if (!isCustomerOutstandingReport && (!dateRange?.from || !dateRange?.to)) {
       setError("Please select a complete date range");
       return;
     }
 
     startTransition(async () => {
       setError("");
+      const reportFromDate = isCustomerOutstandingReport ? today : (dateRange?.from ?? today);
+      const reportToDate = isCustomerOutstandingReport ? today : (dateRange?.to ?? reportFromDate);
       const response = await getReportData({
         section: section.key,
         report: report.key,
-        from: ymd(dateRange.from as Date),
-        to: ymd(dateRange.to as Date),
-        route: isRouteWiseSalesReport ? routeFilter : undefined,
+        from: ymd(reportFromDate),
+        to: ymd(reportToDate),
+        route: isRouteWiseSalesReport || isCustomerOutstandingReport ? routeFilter : undefined,
+        customer: isCustomerOutstandingReport ? customerFilter : undefined,
         department: isDepartmentWiseSalesReport ? departmentFilter : undefined,
         subcategory: isDepartmentWiseSalesReport ? subcategoryFilter : undefined
       });
@@ -306,11 +335,20 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     if (!activeResult || activeMode !== "detail") return null;
     if (reportKey === "sales/invoice-wise-sales-report") {
       const total = activeResult.rows.reduce((sum, row) => sum + (Number(row.Amount) || 0), 0);
-      return { labelColumn: "Invoice No", amountColumn: "Amount", total };
+      return { labelColumn: "Invoice No", amountColumn: "Amount", total, label: "Total" };
     }
     if (reportKey === "sales/return-invoice-report") {
       const total = activeResult.rows.reduce((sum, row) => sum + (Number(row["Return Amount"]) || 0), 0);
-      return { labelColumn: "Return No", amountColumn: "Return Amount", total };
+      return { labelColumn: "Return No", amountColumn: "Return Amount", total, label: "Total" };
+    }
+    if (reportKey === "customer/customer-outstanding-reports") {
+      const total = activeResult.rows.reduce((sum, row) => sum + (Number(row["Outstanding Balance"]) || 0), 0);
+      return {
+        labelColumn: "Customer",
+        amountColumn: "Outstanding Balance",
+        total,
+        label: "Total Outstandings Available to Collect"
+      };
     }
     return null;
   }, [activeResult, reportKey, activeMode]);
@@ -379,7 +417,44 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {isRouteWiseSalesReport ? (
+          {isCustomerOutstandingReport ? (
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Route or Customer</label>
+              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] md:items-center">
+                <SearchableSelect
+                  value={routeFilter === "ALL" ? "" : routeFilter}
+                  options={routeOptions
+                    .filter((option) => option.value !== "ALL")
+                    .map((option) => ({ value: option.value, label: option.label }))}
+                  placeholder="Search and select route"
+                  onChange={(value) => {
+                    setRouteFilter(value || "ALL");
+                    if (value) setCustomerFilter("");
+                  }}
+                />
+                <span className="px-1 text-sm text-muted-foreground text-center">/</span>
+                <SearchableSelect
+                  value={customerFilter}
+                  options={customerOptions}
+                  placeholder="Search and select customer"
+                  onChange={(value) => {
+                    setCustomerFilter(value);
+                    if (value) setRouteFilter("ALL");
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setRouteFilter("ALL");
+                    setCustomerFilter("");
+                  }}
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+          ) : isRouteWiseSalesReport ? (
             <div className="space-y-1">
               <label className="text-sm font-medium">Route</label>
               <Select
@@ -408,42 +483,44 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
             </div>
           ) : null}
 
-          <div className="space-y-1" ref={datePickerRef}>
-            <label className="text-sm font-medium">Date Range</label>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsDatePickerOpen((prev) => !prev)}
-                className="flex h-10 min-w-[260px] flex-1 items-center justify-between rounded-md border border-input bg-background px-3 text-sm text-foreground transition focus:outline-none focus:ring-2 focus:ring-primary/40"
-              >
-                <span className={dateRange?.from ? "text-foreground" : "text-muted-foreground"}>{dateRangeLabel}</span>
-                <span className="text-xs text-muted-foreground">Pick</span>
-              </button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setDateRange(getMonthRange(0))}>
-                This Month
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setDateRange(getMonthRange(1))}>
-                Last Month
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setDateRange(getMonthRange(2))}>
-                Month Before Last
-              </Button>
-            </div>
-            {isDatePickerOpen ? (
-              <div className="relative">
-                <div className="absolute z-20 mt-2 rounded-md border border-border bg-white p-3 shadow-lg">
-                  <DayPicker
-                    mode="range"
-                    selected={dateRange}
-                    onSelect={setDateRange}
-                    numberOfMonths={2}
-                    defaultMonth={dateRange?.from}
-                    className="rounded-md"
-                  />
-                </div>
+          {isCustomerOutstandingReport ? null : (
+            <div className="space-y-1" ref={datePickerRef}>
+              <label className="text-sm font-medium">Date Range</label>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDatePickerOpen((prev) => !prev)}
+                  className="flex h-10 min-w-[260px] flex-1 items-center justify-between rounded-md border border-input bg-background px-3 text-sm text-foreground transition focus:outline-none focus:ring-2 focus:ring-primary/40"
+                >
+                  <span className={dateRange?.from ? "text-foreground" : "text-muted-foreground"}>{dateRangeLabel}</span>
+                  <span className="text-xs text-muted-foreground">Pick</span>
+                </button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setDateRange(getMonthRange(0))}>
+                  This Month
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setDateRange(getMonthRange(1))}>
+                  Last Month
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setDateRange(getMonthRange(2))}>
+                  Month Before Last
+                </Button>
               </div>
-            ) : null}
-          </div>
+              {isDatePickerOpen ? (
+                <div className="relative">
+                  <div className="absolute z-20 mt-2 rounded-md border border-border bg-white p-3 shadow-lg">
+                    <DayPicker
+                      mode="range"
+                      selected={dateRange}
+                      onSelect={setDateRange}
+                      numberOfMonths={2}
+                      defaultMonth={dateRange?.from}
+                      className="rounded-md"
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
 
           <div className="flex items-center gap-3">
             <Button type="button" onClick={runReport} disabled={isPending}>
@@ -590,7 +667,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                             : "text-right";
                         const text =
                           column === totalRowConfig.labelColumn
-                            ? "Total"
+                            ? totalRowConfig.label
                             : column === totalRowConfig.amountColumn
                               ? totalRowConfig.total.toLocaleString(undefined, { maximumFractionDigits: 2 })
                               : "";
