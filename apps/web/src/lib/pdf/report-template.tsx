@@ -39,10 +39,37 @@ const styles = StyleSheet.create({
     borderBottomColor: "#e5e7eb",
     paddingVertical: 5
   },
+  tableRowNoBorder: {
+    flexDirection: "row",
+    paddingVertical: 5
+  },
+  tableRowWithBorder: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+    paddingVertical: 5
+  },
+  customerRow: {
+    backgroundColor: "#f3f4f6"
+  },
+  dividerRow: {
+    flexDirection: "row",
+    paddingVertical: 8
+  },
+  dividerLine: {
+    width: "100%",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000000"
+  },
   cell: { paddingRight: 8 }
 });
 
 export function ReportPdfTemplate({ reportTitle, fromDate, toDate, reportDate, userName, mode, result }: ReportPdfTemplateProps) {
+  const isOutstandingLayout =
+    result.columns.length === 3 &&
+    result.columns[0] === "Customer / Invoice" &&
+    result.columns[1] === "Route / Date Issued" &&
+    result.columns[2] === "Total Outstanding / Amount";
   const formatPdfDate = (value: unknown) => {
     const raw = String(value ?? "");
     const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -127,21 +154,43 @@ export function ReportPdfTemplate({ reportTitle, fromDate, toDate, reportDate, u
           ))}
         </View>
 
-        {result.rows.map((row, index) => (
-          <View key={`r-${index}`} style={styles.tableRow}>
-            {result.columns.map((column) => {
-              const value = row[column];
-              const displayValue = column.trim().toLowerCase() === "date" ? formatPdfDate(value) : value;
-              return (
-                <Text key={`${index}-${column}`} style={{ ...styles.cell, width: getColumnWidth(column) }}>
-                  {typeof displayValue === "number"
-                    ? displayValue.toLocaleString(undefined, { maximumFractionDigits: 2 })
-                    : String(displayValue ?? "")}
-                </Text>
-              );
-            })}
-          </View>
-        ))}
+        {result.rows.map((row, index) => {
+          const rowType = String(row.__rowType || "");
+          if (isOutstandingLayout && rowType === "divider") {
+            return (
+              <View key={`r-${index}`} style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+              </View>
+            );
+          }
+
+          return (
+            <View
+              key={`r-${index}`}
+              style={
+                isOutstandingLayout && rowType === "customer"
+                  ? [styles.tableRowWithBorder, styles.customerRow]
+                  : isOutstandingLayout
+                    ? Number(row.__isLastInvoice) === 1
+                      ? styles.tableRowNoBorder
+                      : styles.tableRowWithBorder
+                    : styles.tableRow
+              }
+            >
+              {result.columns.map((column) => {
+                const value = row[column];
+                const displayValue = column.trim().toLowerCase() === "date" ? formatPdfDate(value) : value;
+                return (
+                  <Text key={`${index}-${column}`} style={{ ...styles.cell, width: getColumnWidth(column) }}>
+                    {typeof displayValue === "number"
+                      ? displayValue.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                      : String(displayValue ?? "")}
+                  </Text>
+                );
+              })}
+            </View>
+          );
+        })}
         {totalRowConfig ? (
           <View style={styles.tableRow}>
             {result.columns.map((column) => (

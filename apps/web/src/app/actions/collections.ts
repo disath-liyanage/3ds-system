@@ -561,9 +561,17 @@ export async function deleteCollectionEntry(collectionId: string): Promise<Actio
 
   const { data: collection, error: collectionError } = await adminClient
     .from("collections")
-    .select("id, collected_by, status")
+    .select("id, collection_number, amount, created_at, status, collected_by, customer:customers(name)")
     .eq("id", collectionId)
-    .maybeSingle<{ id: string; collected_by: string; status: "pending" | "validated" | "rejected" }>();
+    .maybeSingle<{
+      id: string;
+      collection_number: number;
+      amount: number;
+      created_at: string;
+      collected_by: string;
+      status: "pending" | "validated" | "rejected";
+      customer: { name: string } | { name: string }[] | null;
+    }>();
 
   if (collectionError || !collection) {
     return { success: false, error: collectionError?.message || "Collection not found" };
@@ -575,6 +583,23 @@ export async function deleteCollectionEntry(collectionId: string): Promise<Actio
   if (!isManagerOrAdmin && !isOwnerPending) {
     return { success: false, error: "You do not have permission to delete this collection" };
   }
+
+  const customerRelation = collection.customer;
+  const customer = Array.isArray(customerRelation) ? customerRelation[0] : customerRelation;
+
+  await adminClient.from("audit_log").insert({
+    table_name: "collections",
+    record_id: collectionId,
+    action: "delete",
+    performed_by: access.profile.id,
+    old_data: {
+      collection_number: collection.collection_number,
+      amount: collection.amount,
+      created_at: collection.created_at,
+      status: collection.status,
+      customer_name: customer?.name ?? "Unknown"
+    }
+  });
 
   const { error: deleteError } = await adminClient.from("collections").delete().eq("id", collectionId);
   if (deleteError) return { success: false, error: deleteError.message };
