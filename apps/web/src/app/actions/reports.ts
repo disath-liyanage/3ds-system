@@ -157,7 +157,7 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
     case "sales/return-invoice-report": {
       const { data, error } = await adminClient
         .from("return_invoices")
-        .select("return_number, total_return_amount, created_at, customer:customers(name)")
+        .select("id, return_number, total_return_amount, created_at, customer:customers(name), source_invoice:invoices!return_invoices_invoice_id_fkey(invoice_number)")
         .gte("created_at", fromIso)
         .lte("created_at", toIso)
         .order("return_number", { ascending: false });
@@ -165,10 +165,12 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
       return {
         success: true,
         data: {
-          columns: ["Return No", "Date", "Customer", "Return Amount"],
+          columns: ["Return No", "Date", "Invoice Number", "Customer", "Return Amount"],
           rows: (data ?? []).map((r: any) => ({
+            __returnInvoiceId: r.id ?? "",
             "Return No": Number(r.return_number) || 0,
             Date: String(r.created_at).slice(0, 10),
+            "Invoice Number": Number(r.source_invoice?.invoice_number) || 0,
             Customer: r.customer?.name ?? "Unknown",
             "Return Amount": Number(r.total_return_amount) || 0
           }))
@@ -189,6 +191,7 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         data: {
           columns: ["Cancelled At", "Invoice Number", "Product Qty", "Free Qty"],
           rows: (data ?? []).map((r: any) => ({
+            __cancelledInvoiceReportId: r.id ?? "",
             "Cancelled At": String(r.created_at).slice(0, 10),
             "Invoice Number": Number(r.old_data?.invoice_number) || 0,
             "Product Qty": Number(r.old_data?.qty) || 0,
