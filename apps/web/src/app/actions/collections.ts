@@ -925,9 +925,6 @@ export async function addCollectionExpense(input: {
   }
 
   const notes = input.notes?.trim() || "";
-  if (input.category === "Other" && !notes) {
-    return { success: false, error: "Notes are required for Other category" };
-  }
 
   const amount = Number(input.amount);
   if (!Number.isFinite(amount) || amount <= 0) {

@@ -52,6 +52,16 @@ export const REPORT_SECTIONS: ReportSection[] = [
     reports: [{ key: "goods-received-note-reports", title: "Goods Received Note Reports" }]
   },
   {
+    key: "profit",
+    title: "Profit",
+    reports: [{ key: "profit-summary", title: "Profit Summary" }]
+  },
+  {
+    key: "expenses",
+    title: "Expenses",
+    reports: [{ key: "expenses-by-user", title: "Expenses by User and Category" }]
+  },
+  {
     key: "salary",
     title: "Salary",
     reports: [{ key: "salary-slip", title: "Salary Slip" }]
