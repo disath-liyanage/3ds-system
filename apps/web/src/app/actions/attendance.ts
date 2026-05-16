@@ -24,6 +24,13 @@ type BulkMarkAttendanceInput = {
   note?: string;
 };
 
+type UpsertSalesTargetInput = {
+  salesRepId: string;
+  month: string;
+  targetAmount: number;
+  incentiveAmount: number;
+};
+
 async function requireAdminOrManager() {
   const supabase = createClient();
   const {
@@ -118,5 +125,73 @@ export async function markWorkersAttendance(input: BulkMarkAttendanceInput): Pro
   if (error) {
     return { success: false, error: error.message };
   }
+  return { success: true };
+}
+
+export async function listSalesReps(): Promise<{ success: boolean; error?: string; reps?: Array<{ id: string; full_name: string }> }> {
+  const auth = await requireAdminOrManager();
+  if ("error" in auth) return { success: false, error: auth.error };
+
+  const { data, error } = await auth.supabase
+    .from("users_profile")
+    .select("id, full_name")
+    .eq("role", "sales_rep")
+    .order("full_name", { ascending: true });
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, reps: (data ?? []) as Array<{ id: string; full_name: string }> };
+}
+
+export async function upsertSalesRepMonthlyTarget(input: UpsertSalesTargetInput): Promise<ActionResult> {
+  const auth = await requireAdminOrManager();
+  if ("error" in auth) return { success: false, error: auth.error };
+
+  if (!input.salesRepId || !input.month) {
+    return { success: false, error: "Sales rep and month are required" };
+  }
+
+  const targetAmount = Number(input.targetAmount);
+  const incentiveAmount = Number(input.incentiveAmount);
+  if (!Number.isFinite(targetAmount) || targetAmount < 0) {
+    return { success: false, error: "Target amount must be valid" };
+  }
+  if (!Number.isFinite(incentiveAmount) || incentiveAmount < 0) {
+    return { success: false, error: "Incentive amount must be valid" };
+  }
+
+  const targetMonth = new Date(`${input.month}-01T00:00:00.000Z`);
+  if (!Number.isFinite(targetMonth.getTime())) {
+    return { success: false, error: "Invalid month" };
+  }
+  const monthDate = targetMonth.toISOString().slice(0, 10);
+  const monthEnd = new Date(Date.UTC(targetMonth.getUTCFullYear(), targetMonth.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+
+  const { data: salesInvoices, error: salesError } = await auth.supabase
+    .from("invoices")
+    .select("total_amount")
+    .eq("issued_by", input.salesRepId)
+    .in("status", ["approved", "issued", "paid"])
+    .gte("created_at", targetMonth.toISOString())
+    .lte("created_at", monthEnd.toISOString());
+  if (salesError) return { success: false, error: salesError.message };
+
+  const currentSales = (salesInvoices ?? []).reduce((sum, row: any) => sum + (Number(row.total_amount) || 0), 0);
+  const achieved = currentSales >= targetAmount;
+
+  const { error } = await auth.supabase.from("sales_rep_monthly_targets").upsert(
+    {
+      sales_rep_id: input.salesRepId,
+      target_month: monthDate,
+      target_amount: targetAmount,
+      incentive_amount: achieved ? incentiveAmount : 0,
+      incentive_given_by: achieved && incentiveAmount > 0 ? auth.userId : null,
+      incentive_given_at: achieved && incentiveAmount > 0 ? new Date().toISOString() : null,
+      created_by: auth.userId,
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: "sales_rep_id,target_month" }
+  );
+
+  if (error) return { success: false, error: error.message };
   return { success: true };
 }

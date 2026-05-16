@@ -626,6 +626,20 @@ create table if not exists public.worker_deductions (
   )
 );
 
+create table if not exists public.sales_rep_monthly_targets (
+  id uuid primary key default gen_random_uuid(),
+  sales_rep_id uuid not null references public.users_profile (id) on delete cascade,
+  target_month date not null,
+  target_amount numeric(12, 2) not null check (target_amount >= 0),
+  incentive_amount numeric(12, 2) not null default 0 check (incentive_amount >= 0),
+  incentive_given_by uuid references public.users_profile (id),
+  incentive_given_at timestamptz,
+  created_by uuid not null references public.users_profile (id),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (sales_rep_id, target_month)
+);
+
 create or replace function public.set_worker_attendance_updated_at()
 returns trigger
 language plpgsql
@@ -654,11 +668,13 @@ create index if not exists idx_workers_name on public.workers (name);
 create index if not exists idx_worker_attendance_date on public.worker_attendance (attendance_date);
 create index if not exists idx_worker_attendance_worker on public.worker_attendance (worker_id);
 create index if not exists idx_worker_deductions_worker_created_at on public.worker_deductions (worker_id, created_at);
+create index if not exists idx_sales_rep_monthly_targets_rep_month on public.sales_rep_monthly_targets (sales_rep_id, target_month);
 
 alter table public.custom_roles enable row level security;
 alter table public.workers enable row level security;
 alter table public.worker_attendance enable row level security;
 alter table public.worker_deductions enable row level security;
+alter table public.sales_rep_monthly_targets enable row level security;
 
 drop policy if exists "admin_all_custom_roles" on public.custom_roles;
 drop policy if exists "manager_view_custom_roles" on public.custom_roles;
@@ -666,6 +682,8 @@ drop policy if exists "admin_all_workers" on public.workers;
 drop policy if exists "manager_view_workers" on public.workers;
 drop policy if exists "admin_manager_all_worker_attendance" on public.worker_attendance;
 drop policy if exists "admin_manager_all_worker_deductions" on public.worker_deductions;
+drop policy if exists "admin_manager_all_sales_rep_monthly_targets" on public.sales_rep_monthly_targets;
+drop policy if exists "sales_rep_select_own_sales_targets" on public.sales_rep_monthly_targets;
 
 create policy "admin_all_custom_roles" on public.custom_roles
   for all
@@ -713,6 +731,22 @@ create policy "admin_manager_all_worker_deductions" on public.worker_deductions
   )
   with check (
     public.current_user_role() in ('admin', 'manager')
+  );
+
+create policy "admin_manager_all_sales_rep_monthly_targets" on public.sales_rep_monthly_targets
+  for all
+  using (
+    public.current_user_role() in ('admin', 'manager')
+  )
+  with check (
+    public.current_user_role() in ('admin', 'manager')
+  );
+
+create policy "sales_rep_select_own_sales_targets" on public.sales_rep_monthly_targets
+  for select
+  using (
+    public.current_user_role() = 'sales_rep'
+    and sales_rep_id = auth.uid()
   );
 
 drop policy if exists "users_view_own_profile" on public.users_profile;
