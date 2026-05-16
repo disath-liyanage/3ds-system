@@ -41,7 +41,6 @@ export const REPORT_SECTIONS: ReportSection[] = [
     title: "Stock",
     reports: [
       { key: "product-stock-summary", title: "Product Stock Summary" },
-      { key: "categorization-wise-stock-reports", title: "Categorization Wise Stock Reports" },
       { key: "return-stock-details", title: "Return Stock Details" }
     ]
   },

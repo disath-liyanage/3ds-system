@@ -628,11 +628,17 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         .select("name, category, unit, stock_qty, low_stock_threshold")
         .order("name", { ascending: true });
       if (error) return { success: false, error: error.message };
+      const filteredRows = (data ?? []).filter((row: any) => {
+        const { department, subcategory } = splitDepartmentCategory(row.category);
+        if (input.department && input.department !== "ALL" && department !== input.department) return false;
+        if (input.subcategory && input.subcategory !== "ALL" && subcategory !== input.subcategory) return false;
+        return true;
+      });
       return {
         success: true,
         data: {
           columns: ["Product", "Category", "Unit", "Stock Qty", "Low Stock Threshold"],
-          rows: (data ?? []).map((r: any) => ({
+          rows: filteredRows.map((r: any) => ({
             Product: r.name || "",
             Category: r.category || "",
             Unit: r.unit || "",
