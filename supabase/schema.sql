@@ -597,6 +597,35 @@ create table if not exists public.worker_attendance (
   unique(worker_id, attendance_date)
 );
 
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_type t
+    join pg_namespace n on n.oid = t.typnamespace
+    where t.typname = 'worker_deduction_type'
+      and n.nspname = 'public'
+  ) then
+    create type public.worker_deduction_type as enum ('advance', 'loan');
+  end if;
+end $$;
+
+create table if not exists public.worker_deductions (
+  id uuid primary key default gen_random_uuid(),
+  worker_id uuid not null references public.workers (id) on delete cascade,
+  deduction_type public.worker_deduction_type not null,
+  amount numeric(12, 2) not null check (amount > 0),
+  months integer check (months is null or months > 0),
+  monthly_amount numeric(12, 2) not null check (monthly_amount > 0),
+  note text,
+  created_by uuid not null references public.users_profile (id),
+  created_at timestamptz not null default now(),
+  check (
+    (deduction_type = 'advance' and months is null)
+    or (deduction_type = 'loan' and months is not null)
+  )
+);
+
 create or replace function public.set_worker_attendance_updated_at()
 returns trigger
 language plpgsql
@@ -624,16 +653,19 @@ create unique index if not exists idx_users_profile_worker_id_unique on public.u
 create index if not exists idx_workers_name on public.workers (name);
 create index if not exists idx_worker_attendance_date on public.worker_attendance (attendance_date);
 create index if not exists idx_worker_attendance_worker on public.worker_attendance (worker_id);
+create index if not exists idx_worker_deductions_worker_created_at on public.worker_deductions (worker_id, created_at);
 
 alter table public.custom_roles enable row level security;
 alter table public.workers enable row level security;
 alter table public.worker_attendance enable row level security;
+alter table public.worker_deductions enable row level security;
 
 drop policy if exists "admin_all_custom_roles" on public.custom_roles;
 drop policy if exists "manager_view_custom_roles" on public.custom_roles;
 drop policy if exists "admin_all_workers" on public.workers;
 drop policy if exists "manager_view_workers" on public.workers;
 drop policy if exists "admin_manager_all_worker_attendance" on public.worker_attendance;
+drop policy if exists "admin_manager_all_worker_deductions" on public.worker_deductions;
 
 create policy "admin_all_custom_roles" on public.custom_roles
   for all
@@ -666,6 +698,15 @@ create policy "manager_view_workers" on public.workers
   );
 
 create policy "admin_manager_all_worker_attendance" on public.worker_attendance
+  for all
+  using (
+    public.current_user_role() in ('admin', 'manager')
+  )
+  with check (
+    public.current_user_role() in ('admin', 'manager')
+  );
+
+create policy "admin_manager_all_worker_deductions" on public.worker_deductions
   for all
   using (
     public.current_user_role() in ('admin', 'manager')

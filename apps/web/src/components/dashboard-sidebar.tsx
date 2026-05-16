@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 
 type DashboardSidebarProps = {
   isAdmin: boolean;
+  isManager: boolean;
   user: {
     fullName: string | null;
     email: string;
@@ -46,7 +47,7 @@ const adminNavItems: SidebarItem[] = [
   { href: "/admin/workers", label: "Workers", icon: Users }
 ];
 
-export function DashboardSidebar({ isAdmin, user }: DashboardSidebarProps) {
+export function DashboardSidebar({ isAdmin, isManager, user }: DashboardSidebarProps) {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -184,7 +185,7 @@ export function DashboardSidebar({ isAdmin, user }: DashboardSidebarProps) {
     <Sidebar
       title="3D's Distributors (PVT) Ltd."
       items={navItems}
-      adminItems={isAdmin ? adminNavItems : []}
+      adminItems={isAdmin || isManager ? adminNavItems : []}
       footer={
         <div className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
           <div className="min-w-0">
