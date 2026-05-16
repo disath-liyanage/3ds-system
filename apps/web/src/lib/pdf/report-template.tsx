@@ -14,17 +14,17 @@ type ReportPdfTemplateProps = {
 };
 
 const styles = StyleSheet.create({
-  page: { padding: 24, fontSize: 11, fontFamily: "Times-Roman" },
-  companyName: { fontSize: 13, fontWeight: 700, marginBottom: 2 },
-  companyAddress: { fontSize: 10, marginBottom: 1 },
-  companyContact: { fontSize: 10, marginBottom: 6 },
+  page: { padding: 24, fontSize: 13, fontFamily: "Times-Roman" },
+  companyName: { fontSize: 15, fontWeight: 700, marginBottom: 2 },
+  companyAddress: { fontSize: 12, marginBottom: 1 },
+  companyContact: { fontSize: 12, marginBottom: 6 },
   divider: { borderBottomWidth: 1, borderBottomColor: "#111827", marginBottom: 8 },
-  reportTitle: { fontSize: 15, fontWeight: 700, textAlign: "center", marginBottom: 8 },
-  filterHeading: { fontSize: 11, fontWeight: 700, marginBottom: 4 },
+  reportTitle: { fontSize: 18, fontWeight: 700, textAlign: "center", marginBottom: 8 },
+  filterHeading: { fontSize: 13, fontWeight: 700, marginBottom: 4 },
   filterRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 2 },
-  filterItem: { width: "48%", fontSize: 10 },
+  filterItem: { width: "48%", fontSize: 12 },
   metaValue: { fontWeight: 700 },
-  modeText: { fontSize: 10, marginBottom: 8 },
+  modeText: { fontSize: 12, marginBottom: 8 },
   tableHeader: {
     flexDirection: "row",
     borderBottomWidth: 1,
@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
   salarySection: { width: "50%", paddingHorizontal: 12, paddingVertical: 8 },
   salarySectionLeft: { borderRightWidth: 1, borderRightColor: "#111827", paddingRight: 16 },
   salarySectionRight: { paddingLeft: 16 },
-  salaryLine: { flexDirection: "row", justifyContent: "space-between", marginBottom: 7, fontSize: 12 },
+  salaryLine: { flexDirection: "row", justifyContent: "space-between", marginBottom: 7, fontSize: 14 },
   salaryTotalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -75,7 +75,7 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     borderTopWidth: 1,
     borderTopColor: "#111827",
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: 700
   },
   salaryFooterBlock: {
@@ -84,8 +84,8 @@ const styles = StyleSheet.create({
     borderTopColor: "#111827",
     paddingTop: 5
   },
-  salaryFooterRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4, fontSize: 12 },
-  salaryFooterNetRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 2, fontSize: 13, fontWeight: 700 }
+  salaryFooterRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4, fontSize: 14 },
+  salaryFooterNetRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 2, fontSize: 15, fontWeight: 700 }
 });
 
 export function ReportPdfTemplate({ reportTitle, reportKey, fromDate, toDate, reportDate, userName, mode, result }: ReportPdfTemplateProps) {
