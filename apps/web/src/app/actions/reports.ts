@@ -667,7 +667,7 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
     case "stock/return-stock-details": {
       const { data, error } = await adminClient
         .from("return_invoice_items")
-        .select("qty, created_at, product:products(name, category), return_invoice:return_invoices!return_invoice_items_return_invoice_id_fkey(return_number)")
+        .select("qty, created_at, product:products(name, category), return_invoice:return_invoices!return_invoice_items_return_invoice_id_fkey(id, return_number)")
         .gte("created_at", fromIso)
         .lte("created_at", toIso)
         .order("created_at", { ascending: false });
@@ -677,6 +677,7 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         data: {
           columns: ["Date", "Return No", "Product", "Category", "Returned Qty"],
           rows: (data ?? []).map((r: any) => ({
+            __returnInvoiceId: r.return_invoice?.id ?? "",
             Date: String(r.created_at).slice(0, 10),
             "Return No": Number(r.return_invoice?.return_number) || 0,
             Product: r.product?.name || "Unknown Product",

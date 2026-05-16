@@ -580,7 +580,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                       const isDeleteQtyColumn =
                         reportKey === "sales/delete-invoice-report" &&
                         (colLower === "product qty" || colLower === "free qty");
-                      const isReturnNoColumn = reportKey === "sales/return-invoice-report" && colLower === "return no";
+                      const isReturnNoColumn = /return\s*(no|number)/i.test(column);
                       const forceLeftAlign = isCustomerPaymentDetailsReport;
                       const headerAlignClass = isDeleteQtyColumn
                         ? "text-center"
