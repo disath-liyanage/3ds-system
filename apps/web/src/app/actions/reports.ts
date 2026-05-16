@@ -33,6 +33,7 @@ export type ReportQueryInput = {
   report: string;
   from: string;
   to: string;
+  toTimestamp?: string;
   route?: string;
   customer?: string;
   department?: string;
@@ -58,6 +59,13 @@ export type SalesDepartmentSubcategoryOptionsResponse = {
 };
 
 export type CustomerOutstandingFilterOptionsResponse = {
+  success: boolean;
+  error?: string;
+  routes?: string[];
+  customers?: string[];
+};
+
+export type CustomerFilterOptionsResponse = {
   success: boolean;
   error?: string;
   routes?: string[];
@@ -138,7 +146,12 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
   if (!input.from || !input.to) return { success: false, error: "Date range is required" };
   if (input.from > input.to) return { success: false, error: "From date must be earlier than To date" };
 
-  const { fromIso, toIso } = buildDateTimeRange(input.from, input.to);
+  const { fromIso, toIso: toDateIso } = buildDateTimeRange(input.from, input.to);
+  const parsedToTimestamp = input.toTimestamp ? new Date(input.toTimestamp) : null;
+  const toIso =
+    parsedToTimestamp && Number.isFinite(parsedToTimestamp.getTime())
+      ? parsedToTimestamp.toISOString()
+      : toDateIso;
   const reportKey = `${input.section}/${input.report}`;
 
   switch (reportKey) {
@@ -581,18 +594,23 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
       };
     }
     case "customer/customer-details": {
+      const routeQueryRaw = String(input.route || "").trim();
+      const routeQuery = routeQueryRaw.toUpperCase() === "ALL" ? "" : routeQueryRaw.toLowerCase();
+      const customerQuery = String(input.customer || "").trim().toLowerCase();
       const { data, error } = await adminClient
         .from("customers")
         .select("name, phone, address, area, credit_limit, balance, created_at")
-        .gte("created_at", fromIso)
         .lte("created_at", toIso)
         .order("created_at", { ascending: false });
       if (error) return { success: false, error: error.message };
+      const filteredRows = (data ?? [])
+        .filter((row: any) => (routeQuery ? String(row.area || "").trim().toLowerCase() === routeQuery : true))
+        .filter((row: any) => (customerQuery ? String(row.name || "").trim().toLowerCase() === customerQuery : true));
       return {
         success: true,
         data: {
           columns: ["Customer", "Phone", "Address", "Route", "Credit Limit", "Balance", "Created Date"],
-          rows: (data ?? []).map((r: any) => ({
+          rows: filteredRows.map((r: any) => ({
             Customer: r.name || "",
             Phone: r.phone || "",
             Address: r.address || "",
@@ -773,6 +791,30 @@ export async function getCustomerOutstandingFilterOptions(): Promise<CustomerOut
     const balance = Number((row as { balance?: unknown }).balance) || 0;
     if (balance <= 0) continue;
 
+    const route = String((row as { area?: unknown }).area || "").trim();
+    const customer = String((row as { name?: unknown }).name || "").trim();
+    if (route) routeSet.add(route);
+    if (customer) customerSet.add(customer);
+  }
+
+  return {
+    success: true,
+    routes: Array.from(routeSet).sort((a, b) => a.localeCompare(b)),
+    customers: Array.from(customerSet).sort((a, b) => a.localeCompare(b))
+  };
+}
+
+export async function getCustomerFilterOptions(): Promise<CustomerFilterOptionsResponse> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+  if (!canViewReports(access.profile)) return { success: false, error: "You do not have permission to view reports" };
+
+  const { data, error } = await adminClient.from("customers").select("name, area").order("name");
+  if (error) return { success: false, error: error.message };
+
+  const routeSet = new Set<string>();
+  const customerSet = new Set<string>();
+  for (const row of data ?? []) {
     const route = String((row as { area?: unknown }).area || "").trim();
     const customer = String((row as { name?: unknown }).name || "").trim();
     if (route) routeSet.add(route);
