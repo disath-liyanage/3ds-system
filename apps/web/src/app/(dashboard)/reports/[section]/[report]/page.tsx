@@ -70,6 +70,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const isRouteWiseSalesReport = reportKey === "sales/route-wise-sales-report";
   const isDepartmentWiseSalesReport = reportKey === "sales/department-wise-sales-invoice";
   const isCustomerOutstandingReport = reportKey === "customer/customer-outstanding-reports";
+  const isGrnReport = reportKey === "grn/goods-received-note-reports";
   const isCustomerDetailsReport = reportKey === "customer/customer-details";
   const isOutstandingStyleCustomerFilterReport = isCustomerOutstandingReport || isCustomerDetailsReport;
   const isCustomerPaymentDetailsReport = reportKey === "customer/customer-payment-details";
@@ -349,6 +350,19 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     return null;
   }, [activeResult, reportKey, activeMode]);
 
+  const grnShadeMap = useMemo(() => {
+    const out = new Map<string, string>();
+    if (!isGrnReport || !activeResult) return out;
+    let colorIndex = 0;
+    for (const row of activeResult.rows) {
+      const grnNo = String(row["GRN No"] ?? "");
+      if (!grnNo || out.has(grnNo)) continue;
+      out.set(grnNo, colorIndex % 2 === 0 ? "bg-slate-50" : "bg-amber-50");
+      colorIndex += 1;
+    }
+    return out;
+  }, [activeResult, isGrnReport]);
+
   const onSortColumn = (column: string) => {
     if (sortColumn !== column) {
       setSortColumn(column);
@@ -580,17 +594,18 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                       const isDeleteQtyColumn =
                         reportKey === "sales/delete-invoice-report" &&
                         (colLower === "product qty" || colLower === "free qty");
+                      const isGrnNoColumn = isGrnReport && colLower === "grn no";
                       const isReturnNoColumn = /return\s*(no|number)/i.test(column);
                       const forceLeftAlign = isCustomerPaymentDetailsReport;
                       const headerAlignClass = isDeleteQtyColumn
                         ? "text-center"
-                        : forceLeftAlign || isReturnNoColumn || isInvoiceColumn || !isNumeric
+                        : forceLeftAlign || isGrnNoColumn || isReturnNoColumn || isInvoiceColumn || !isNumeric
                           ? "text-left"
                           : "text-right";
                       return (
                         <th
                           key={column}
-                          className={`py-2 font-semibold ${isCollectionNoColumn ? "pl-0 pr-3" : "px-3"} ${headerAlignClass}`}
+                          className={`py-2 font-semibold ${isCollectionNoColumn ? "pl-0 pr-3" : isGrnNoColumn ? "pl-1 pr-3" : "px-3"} ${headerAlignClass}`}
                         >
                           <button
                             type="button"
@@ -619,12 +634,21 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                       );
                     }
 
+                    const grnNo = String(row["GRN No"] ?? "");
+                    const grnRowType = String(row.__rowType || "");
+                    const grnShadeClass = grnShadeMap.get(grnNo) ?? "";
                     const rowClassName = isOutstanding
                       ? rowType === "customer"
                         ? "bg-muted/30 border-b border-border"
                         : Number(row.__isLastInvoice) === 1
                           ? ""
                           : "border-b border-border"
+                      : isGrnReport
+                        ? grnRowType === "grn-total"
+                          ? `${grnShadeClass} border-b-2 border-slate-500 font-semibold`
+                          : grnRowType === "grn-grand-total"
+                            ? "bg-slate-200 border-b-2 border-black font-bold"
+                          : `${grnShadeClass} border-b border-border`
                       : "border-b border-border";
 
                     return (
@@ -635,6 +659,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                         const colLower = column.trim().toLowerCase();
                         const isInvoiceColumn = /invoice\s*(no|number)/i.test(column);
                         const isCollectionNoColumn = /collection\s*(no|number)/i.test(column);
+                        const isGrnNoColumn = isGrnReport && colLower === "grn no";
                         const isReturnNoColumn = /return\s*(no|number)/i.test(column);
                         const isDeleteQtyColumn =
                           reportKey === "sales/delete-invoice-report" &&
@@ -649,6 +674,12 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                           /return\s*(no|number)/i.test(column) &&
                           typeof row.__returnInvoiceId === "string" &&
                           row.__returnInvoiceId.length > 0;
+                        const hasGrnLink =
+                          isGrnReport &&
+                          isGrnNoColumn &&
+                          typeof row.__receiveNoteId === "string" &&
+                          row.__receiveNoteId.length > 0 &&
+                          String(row.__rowType || "") !== "grn-total";
                         const hasCollectionLink =
                           reportKey === "customer/customer-payment-details" &&
                           isCollectionNoColumn &&
@@ -663,11 +694,11 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                         const forceLeftAlign = isCustomerPaymentDetailsReport;
                         const cellAlignClass = isDeleteQtyColumn
                           ? "text-center"
-                          : forceLeftAlign || isReturnNoColumn || isInvoiceColumn || !isNumeric
+                          : forceLeftAlign || isGrnNoColumn || isReturnNoColumn || isInvoiceColumn || !isNumeric
                             ? "text-left"
                             : "text-right";
                         return (
-                          <td className={`py-2 ${isCollectionNoColumn ? "pl-0 pr-3" : "px-3"} ${cellAlignClass}`} key={column}>
+                          <td className={`py-2 ${isCollectionNoColumn ? "pl-0 pr-3" : isGrnNoColumn ? "pl-1 pr-3" : "px-3"} ${cellAlignClass}`} key={column}>
                             {hasOutstandingInvoiceLink ? (
                               <Link
                                 href={`/invoices/${row.__invoiceId}`}
@@ -693,6 +724,17 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                             ) : hasReturnInvoiceLink ? (
                               <Link
                                 href={`/invoices/return/${row.__returnInvoiceId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-primary underline-offset-2 hover:underline"
+                              >
+                                {typeof value === "number"
+                                  ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                  : String(value ?? "")}
+                              </Link>
+                            ) : hasGrnLink ? (
+                              <Link
+                                href={`/receive-notes/${row.__receiveNoteId}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="font-medium text-primary underline-offset-2 hover:underline"

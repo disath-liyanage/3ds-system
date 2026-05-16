@@ -690,25 +690,93 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
     case "grn/goods-received-note-reports": {
       const { data, error } = await adminClient
         .from("receive_note_items")
-        .select("qty, free_qty, unit_cost, created_at, product:products(name, category), receive_note:receive_notes!receive_note_items_receive_note_id_fkey(rn_number, supplier_name)")
+        .select("qty, free_qty, unit_cost, created_at, product:products(name), receive_note:receive_notes!receive_note_items_receive_note_id_fkey(id, rn_number, supplier_name)")
         .gte("created_at", fromIso)
         .lte("created_at", toIso)
+        .order("rn_number", { ascending: false, referencedTable: "receive_note" })
         .order("created_at", { ascending: false });
       if (error) return { success: false, error: error.message };
+
+      const groupedRows = new Map<
+        string,
+        {
+          rnNumber: number;
+          supplier: string;
+          rows: Array<Record<string, string | number>>;
+          totalAmount: number;
+        }
+      >();
+      const formatShortDate = (raw: string) => {
+        const d = new Date(raw);
+        if (!Number.isFinite(d.getTime())) return String(raw).slice(0, 10);
+        return `${String(d.getUTCFullYear()).slice(-2)}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`;
+      };
+      for (const r of data ?? []) {
+        const receiveNote = one((r as any).receive_note);
+        const product = one((r as any).product);
+        const receiveNoteId = String(receiveNote?.id ?? "");
+        if (!groupedRows.has(receiveNoteId)) {
+          groupedRows.set(receiveNoteId, {
+            rnNumber: Number(receiveNote?.rn_number) || 0,
+            supplier: receiveNote?.supplier_name || "",
+            rows: [],
+            totalAmount: 0
+          });
+        }
+        const group = groupedRows.get(receiveNoteId)!;
+        const qty = Number(r.qty) || 0;
+        const unitCost = Number(r.unit_cost) || 0;
+        const amount = qty * unitCost;
+        const isFirstLine = group.rows.length === 0;
+        group.totalAmount += amount;
+        group.rows.push({
+          __rowType: "grn-item",
+          __receiveNoteId: isFirstLine ? receiveNoteId : "",
+          Date: formatShortDate(String(r.created_at)),
+          "GRN No": isFirstLine ? group.rnNumber : "",
+          Supplier: isFirstLine ? group.supplier : "",
+          Product: product?.name || "Unknown Product",
+          Qty: qty,
+          "Free Qty": Number(r.free_qty) || 0,
+          "Unit Cost": unitCost,
+          Amount: amount
+        });
+      }
+
+      const rows: Array<Record<string, string | number>> = [];
+      let grandTotalAmount = 0;
+      for (const group of groupedRows.values()) {
+        rows.push(...group.rows);
+        rows.push({
+          __rowType: "grn-total",
+          Date: "",
+          "GRN No": "",
+          Supplier: "",
+          Product: "GRN Total",
+          Qty: "",
+          "Free Qty": "",
+          "Unit Cost": "",
+          Amount: group.totalAmount
+        });
+        grandTotalAmount += group.totalAmount;
+      }
+      rows.push({
+        __rowType: "grn-grand-total",
+        Date: "",
+        "GRN No": "",
+        Supplier: "",
+        Product: "Grand Total",
+        Qty: "",
+        "Free Qty": "",
+        "Unit Cost": "",
+        Amount: grandTotalAmount
+      });
+
       return {
         success: true,
         data: {
-          columns: ["Date", "GRN No", "Supplier", "Product", "Category", "Qty", "Free Qty", "Unit Cost"],
-          rows: (data ?? []).map((r: any) => ({
-            Date: String(r.created_at).slice(0, 10),
-            "GRN No": Number(r.receive_note?.rn_number) || 0,
-            Supplier: r.receive_note?.supplier_name || "",
-            Product: r.product?.name || "Unknown Product",
-            Category: r.product?.category || "Uncategorized",
-            Qty: Number(r.qty) || 0,
-            "Free Qty": Number(r.free_qty) || 0,
-            "Unit Cost": Number(r.unit_cost) || 0
-          }))
+          columns: ["Date", "GRN No", "Supplier", "Product", "Qty", "Free Qty", "Unit Cost", "Amount"],
+          rows
         }
       };
     }
