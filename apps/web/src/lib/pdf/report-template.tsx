@@ -63,14 +63,29 @@ const styles = StyleSheet.create({
     borderBottomColor: "#000000"
   },
   cell: { paddingRight: 8 },
-  salaryColumns: { flexDirection: "row", marginTop: 10, minHeight: 240 },
-  salarySection: { width: "49%", paddingHorizontal: 12, paddingVertical: 8 },
-  salaryDivider: { width: "2%", alignItems: "center" },
-  salaryDividerLine: { width: 1, height: "100%", backgroundColor: "#111827" },
+  salaryColumns: { flexDirection: "row", marginTop: 10 },
+  salarySection: { width: "50%", paddingHorizontal: 12, paddingVertical: 8 },
+  salarySectionLeft: { borderRightWidth: 1, borderRightColor: "#111827", paddingRight: 16 },
+  salarySectionRight: { paddingLeft: 16 },
   salaryLine: { flexDirection: "row", justifyContent: "space-between", marginBottom: 7, fontSize: 12 },
-  salaryBottomBlock: { marginTop: 12, borderTopWidth: 1, borderTopColor: "#111827", paddingTop: 10 },
-  salaryBottomRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 5, fontSize: 12 },
-  salaryNetRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 6, fontSize: 13, fontWeight: 700 }
+  salaryTotalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 4,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: "#111827",
+    fontSize: 12,
+    fontWeight: 700
+  },
+  salaryFooterBlock: {
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: "#111827",
+    paddingTop: 5
+  },
+  salaryFooterRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4, fontSize: 12 },
+  salaryFooterNetRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 2, fontSize: 13, fontWeight: 700 }
 });
 
 export function ReportPdfTemplate({ reportTitle, reportKey, fromDate, toDate, reportDate, userName, mode, result }: ReportPdfTemplateProps) {
@@ -165,7 +180,7 @@ export function ReportPdfTemplate({ reportTitle, reportKey, fromDate, toDate, re
         {isSalarySlip ? (
           <>
             <View style={styles.salaryColumns}>
-              <View style={styles.salarySection}>
+              <View style={[styles.salarySection, styles.salarySectionLeft]}>
                 {result.rows
                   .filter((row) => String(row.__bucket || "") === "gain")
                   .map((row, index) => (
@@ -175,25 +190,42 @@ export function ReportPdfTemplate({ reportTitle, reportKey, fromDate, toDate, re
                     </View>
                   ))}
               </View>
-              <View style={styles.salaryDivider}>
-                <View style={styles.salaryDividerLine} />
-              </View>
-              <View style={styles.salarySection}>
+              <View style={[styles.salarySection, styles.salarySectionRight]}>
                 {result.rows
-                  .filter((row) => String(row.__bucket || "") === "deduction")
+                  .filter(
+                    (row) => String(row.__bucket || "") === "deduction" && String(row.Item || "") !== "Total Deductions"
+                  )
                   .map((row, index) => (
                     <View key={`deduction-${index}`} style={styles.salaryLine}>
                       <Text>{String(row.Item || "")}</Text>
                       <Text>{Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
                     </View>
                   ))}
+                {result.rows
+                  .filter(
+                    (row) => String(row.__bucket || "") === "deduction" && String(row.Item || "") === "Total Deductions"
+                  )
+                  .map((row, index) => (
+                    <View key={`deduction-total-${index}`} style={styles.salaryTotalRow}>
+                      <Text>{String(row.Item || "")}</Text>
+                      <Text>{Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+                    </View>
+                  ))}
               </View>
             </View>
-            <View style={styles.salaryBottomBlock}>
+            <View style={styles.salaryFooterBlock}>
               {result.rows
-                .filter((row) => String(row.__bucket || "") === "stat")
+                .filter((row) => String(row.Item || "") === "Employee EPF (8%)")
                 .map((row, index) => (
-                  <View key={`stat-${index}`} style={styles.salaryBottomRow}>
+                  <View key={`epf-${index}`} style={styles.salaryFooterRow}>
+                    <Text>{String(row.Item || "")}</Text>
+                    <Text>{Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+                  </View>
+                ))}
+              {result.rows
+                .filter((row) => String(row.Item || "") === "Employer ETF (3%)")
+                .map((row, index) => (
+                  <View key={`etf-${index}`} style={styles.salaryFooterRow}>
                     <Text>{String(row.Item || "")}</Text>
                     <Text>{Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
                   </View>
@@ -201,7 +233,7 @@ export function ReportPdfTemplate({ reportTitle, reportKey, fromDate, toDate, re
               {result.rows
                 .filter((row) => String(row.__bucket || "") === "final")
                 .map((row, index) => (
-                  <View key={`final-${index}`} style={styles.salaryNetRow}>
+                  <View key={`net-${index}`} style={styles.salaryFooterNetRow}>
                     <Text>{String(row.Item || "")}</Text>
                     <Text>{Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
                   </View>
