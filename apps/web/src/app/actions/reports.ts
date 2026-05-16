@@ -976,27 +976,44 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
       }
 
       const basicSalary = Number((worker as any).salary_amount) || 0;
+      const employeeEpf = basicSalary * 0.08;
+      const employerEpf = basicSalary * 0.12;
+      const employerEtf = basicSalary * 0.03;
       const grossSalary = basicSalary + salesCommission + collectionCommission + attendanceIncentive;
       const totalDeductions = advanceDeduction + loanDeduction;
-      const netSalary = grossSalary - totalDeductions;
+      const netSalary = grossSalary - totalDeductions - employeeEpf;
+
+      const rows: Array<Record<string, string | number>> = [
+        { Item: "Basic Salary", Amount: basicSalary, __bucket: "gain" },
+        { Item: "Sales Commission", Amount: salesCommission, __bucket: "gain" },
+        { Item: "Collection Commission", Amount: collectionCommission, __bucket: "gain" }
+      ];
+      if (attendanceIncentive > 0) {
+        rows.push({ Item: "Attendance Incentive", Amount: attendanceIncentive, __bucket: "gain" });
+      }
+      if (advanceDeduction > 0) {
+        rows.push({ Item: "Advance Deduction", Amount: advanceDeduction, __bucket: "deduction" });
+      }
+      if (loanDeduction > 0) {
+        rows.push({ Item: "Loan Deduction", Amount: loanDeduction, __bucket: "deduction" });
+      }
+      if (totalDeductions > 0) {
+        rows.push({ Item: "Total Deductions", Amount: totalDeductions, __bucket: "deduction" });
+      }
+      rows.push(
+        { Item: "Employee EPF (8%)", Amount: employeeEpf, __bucket: "deduction" },
+        { Item: "Net Salary", Amount: netSalary, __bucket: "final" },
+        { Item: "Employer EPF (12%)", Amount: employerEpf, __bucket: "stat" },
+        { Item: "Employer ETF (3%)", Amount: employerEtf, __bucket: "stat" },
+        { Item: "Total Work Days (Excluding Holidays)", Amount: totalWorkingDays, __bucket: "meta" },
+        { Item: "Attendance Count", Amount: presentEquivalent, __bucket: "meta" }
+      );
 
       return {
         success: true,
         data: {
           columns: ["Item", "Amount"],
-          rows: [
-            { Item: "Worker", Amount: worker.name || "" },
-            { Item: "Basic Salary", Amount: basicSalary },
-            { Item: "Sales Commission", Amount: salesCommission },
-            { Item: "Collection Commission", Amount: collectionCommission },
-            { Item: "Attendance Incentive", Amount: attendanceIncentive },
-            { Item: "Advance Deduction", Amount: advanceDeduction },
-            { Item: "Loan Deduction", Amount: loanDeduction },
-            { Item: "Total Deductions", Amount: totalDeductions },
-            { Item: "Net Salary", Amount: netSalary },
-            { Item: "Total Work Days (Excluding Holidays)", Amount: totalWorkingDays },
-            { Item: "Attendance Count", Amount: presentEquivalent }
-          ]
+          rows: rows.map((row) => ({ ...row, __workerName: worker.name || "" }))
         }
       };
     }
