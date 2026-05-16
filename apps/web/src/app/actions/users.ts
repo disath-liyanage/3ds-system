@@ -71,6 +71,14 @@ export type WorkerInput = {
   salary_amount: number;
 };
 
+export type WorkerDeductionInput = {
+  worker_id: string;
+  deduction_type: "advance" | "loan";
+  amount: number;
+  months?: number;
+  note?: string;
+};
+
 export type CustomRoleInput = {
   name: string;
   description?: string;
@@ -115,6 +123,54 @@ async function requireAdmin() {
   }
 
   if (!profile || profile.role !== "admin") {
+    return { error: "Unauthorized" as const };
+  }
+
+  return {
+    supabase: adminClient,
+    userId: user.id
+  };
+}
+
+async function requireAdminOrManager() {
+  const supabase = createClient();
+
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { error: "Unauthorized" as const };
+  }
+
+  const { data: profileById, error: profileByIdError } = await adminClient
+    .from("users_profile")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileByIdError) {
+    return { error: "Unauthorized" as const };
+  }
+
+  let profile = profileById;
+
+  if (!profile && user.email) {
+    const { data: profileByEmail, error: profileByEmailError } = await adminClient
+      .from("users_profile")
+      .select("role")
+      .eq("email", user.email)
+      .maybeSingle();
+
+    if (profileByEmailError) {
+      return { error: "Unauthorized" as const };
+    }
+
+    profile = profileByEmail;
+  }
+
+  if (!profile || (profile.role !== "admin" && profile.role !== "manager")) {
     return { error: "Unauthorized" as const };
   }
 
@@ -497,5 +553,50 @@ export async function deleteWorker(id: string): Promise<ActionResult> {
 
   revalidatePath("/admin/workers");
   revalidatePath("/admin/users");
+  return { success: true };
+}
+
+export async function createWorkerDeduction(data: WorkerDeductionInput): Promise<ActionResult> {
+  const access = await requireAdminOrManager();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!data.worker_id) return { success: false, error: "Worker is required" };
+
+  const amount = Number(data.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { success: false, error: "Amount must be greater than 0" };
+  }
+
+  const deductionType = data.deduction_type === "loan" ? "loan" : "advance";
+  const months = deductionType === "loan" ? Number(data.months) : null;
+
+  if (deductionType === "loan" && (!Number.isInteger(months) || (months ?? 0) <= 0)) {
+    return { success: false, error: "Loan months must be a valid positive number" };
+  }
+
+  const monthlyAmount = deductionType === "loan" ? amount / Number(months) : amount;
+
+  const { data: worker, error: workerError } = await access.supabase
+    .from("workers")
+    .select("id")
+    .eq("id", data.worker_id)
+    .maybeSingle();
+  if (workerError) return { success: false, error: workerError.message };
+  if (!worker) return { success: false, error: "Worker not found" };
+
+  const { error } = await access.supabase.from("worker_deductions").insert({
+    worker_id: data.worker_id,
+    deduction_type: deductionType,
+    amount,
+    months,
+    monthly_amount: monthlyAmount,
+    note: data.note?.trim() || null,
+    created_by: access.userId
+  });
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/admin/workers");
+  revalidatePath("/reports");
   return { success: true };
 }

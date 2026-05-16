@@ -34,6 +34,7 @@ export type ReportQueryInput = {
   from: string;
   to: string;
   toTimestamp?: string;
+  workerId?: string;
   route?: string;
   customer?: string;
   department?: string;
@@ -70,6 +71,12 @@ export type CustomerFilterOptionsResponse = {
   error?: string;
   routes?: string[];
   customers?: string[];
+};
+
+export type SalaryWorkerOptionsResponse = {
+  success: boolean;
+  error?: string;
+  workers?: Array<{ id: string; name: string }>;
 };
 
 function one<T>(value: T | T[] | null | undefined): T | null {
@@ -147,6 +154,19 @@ function splitDepartmentCategory(rawCategory: string | null | undefined): { depa
   }
 
   return { department: text, subcategory: "General" };
+}
+
+function getMonthRangeFromYmd(value: string) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const monthStart = new Date(Date.UTC(year, month, 1));
+  const monthEnd = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
+  return { year, month, monthStart, monthEnd };
+}
+
+function getMonthDistance(start: Date, end: Date) {
+  return (end.getUTCFullYear() - start.getUTCFullYear()) * 12 + (end.getUTCMonth() - start.getUTCMonth());
 }
 
 async function fetchDateWiseSalesRows(fromIso: string, toIso: string) {
@@ -817,6 +837,169 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         }
       };
     }
+    case "salary/salary-slip": {
+      if (!input.workerId) return { success: false, error: "Worker is required" };
+      const { monthStart, monthEnd, year } = getMonthRangeFromYmd(input.from);
+      const fromMonthIso = monthStart.toISOString();
+      const toMonthIso = monthEnd.toISOString();
+
+      const { data: worker, error: workerError } = await adminClient
+        .from("workers")
+        .select("id, name, salary_amount")
+        .eq("id", input.workerId)
+        .maybeSingle();
+      if (workerError || !worker) return { success: false, error: workerError?.message || "Worker not found" };
+
+      const { data: workerUser, error: workerUserError } = await adminClient
+        .from("users_profile")
+        .select("id")
+        .eq("worker_id", input.workerId)
+        .maybeSingle();
+      if (workerUserError) return { success: false, error: workerUserError.message };
+
+      const workerUserId = workerUser?.id ?? null;
+
+      let salesCommission = 0;
+      if (workerUserId) {
+        const { data: invoiceItems, error: invoiceItemsError } = await adminClient
+          .from("invoice_items")
+          .select("qty, product_id, invoice:invoices!inner(created_at, status, issued_by)")
+          .eq("invoice.issued_by", workerUserId)
+          .in("invoice.status", ["approved", "issued", "paid"])
+          .gte("invoice.created_at", fromMonthIso)
+          .lte("invoice.created_at", toMonthIso);
+        if (invoiceItemsError) return { success: false, error: invoiceItemsError.message };
+
+        const productIds = Array.from(
+          new Set((invoiceItems ?? []).map((row: any) => String(row.product_id || "")).filter(Boolean))
+        );
+        const rateMap = new Map<string, number>();
+        if (productIds.length > 0) {
+          const { data: rateRows, error: rateError } = await adminClient
+            .from("receive_note_items")
+            .select("product_id, rep_sales_discount, created_at")
+            .in("product_id", productIds)
+            .order("created_at", { ascending: false });
+          if (rateError) return { success: false, error: rateError.message };
+          for (const row of rateRows ?? []) {
+            const productId = String((row as any).product_id || "");
+            if (!productId || rateMap.has(productId)) continue;
+            rateMap.set(productId, Number((row as any).rep_sales_discount) || 0);
+          }
+        }
+        for (const item of invoiceItems ?? []) {
+          const qty = Number((item as any).qty) || 0;
+          const productId = String((item as any).product_id || "");
+          const rate = rateMap.get(productId) ?? 0;
+          salesCommission += qty * rate;
+        }
+      }
+
+      let collectionCommission = 0;
+      if (workerUserId) {
+        const { data: collectionIncentives, error: collectionIncentivesError } = await adminClient
+          .from("collection_incentives")
+          .select("amount, created_at, sales_rep_id")
+          .eq("sales_rep_id", workerUserId)
+          .gte("created_at", fromMonthIso)
+          .lte("created_at", toMonthIso);
+        if (collectionIncentivesError) return { success: false, error: collectionIncentivesError.message };
+        for (const row of collectionIncentives ?? []) {
+          collectionCommission += Number((row as any).amount) || 0;
+        }
+      }
+
+      const { data: attendanceRows, error: attendanceError } = await adminClient
+        .from("worker_attendance")
+        .select("attendance_date, status")
+        .eq("worker_id", input.workerId)
+        .gte("attendance_date", String(fromMonthIso).slice(0, 10))
+        .lte("attendance_date", String(toMonthIso).slice(0, 10));
+      if (attendanceError) return { success: false, error: attendanceError.message };
+
+      const holidayRows = (await import("@/lib/sri-lanka-holidays")).getSriLankaHolidays(year);
+      const holidayDates = new Set<string>(holidayRows.map((holiday) => holiday.date));
+      const totalDaysInMonth = monthEnd.getUTCDate();
+      let totalWorkingDays = 0;
+      for (let day = 1; day <= totalDaysInMonth; day += 1) {
+        const key = `${year}-${String(monthStart.getUTCMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        if (!holidayDates.has(key)) totalWorkingDays += 1;
+      }
+
+      const attendanceMap = new Map<string, string>();
+      for (const row of attendanceRows ?? []) {
+        attendanceMap.set(String((row as any).attendance_date || ""), String((row as any).status || ""));
+      }
+
+      let presentEquivalent = 0;
+      for (let day = 1; day <= totalDaysInMonth; day += 1) {
+        const dateKey = `${year}-${String(monthStart.getUTCMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        if (holidayDates.has(dateKey)) continue;
+        const status = attendanceMap.get(dateKey) || "absent";
+        if (status === "present" || status === "holiday") presentEquivalent += 1;
+        else if (status === "half_day") presentEquivalent += 0.5;
+      }
+
+      const missingDays = totalWorkingDays - presentEquivalent;
+      let attendanceIncentive = 0;
+      if (missingDays <= 0) attendanceIncentive = 7500;
+      else if (missingDays <= 1) attendanceIncentive = 6500;
+      else if (missingDays <= 2) attendanceIncentive = 5500;
+      else if (missingDays <= 3) attendanceIncentive = 4500;
+      else if (missingDays <= 4) attendanceIncentive = 3500;
+
+      const { data: deductions, error: deductionsError } = await adminClient
+        .from("worker_deductions")
+        .select("deduction_type, amount, months, monthly_amount, created_at")
+        .eq("worker_id", input.workerId);
+      if (deductionsError) return { success: false, error: deductionsError.message };
+
+      let advanceDeduction = 0;
+      let loanDeduction = 0;
+      for (const row of deductions ?? []) {
+        const createdAt = new Date(String((row as any).created_at || ""));
+        if (!Number.isFinite(createdAt.getTime())) continue;
+        const monthsDiff = getMonthDistance(
+          new Date(Date.UTC(createdAt.getUTCFullYear(), createdAt.getUTCMonth(), 1)),
+          new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth(), 1))
+        );
+
+        const type = String((row as any).deduction_type || "");
+        if (type === "advance") {
+          if (monthsDiff === 0) advanceDeduction += Number((row as any).amount) || 0;
+        } else if (type === "loan") {
+          const months = Number((row as any).months) || 0;
+          if (monthsDiff >= 0 && monthsDiff < months) {
+            loanDeduction += Number((row as any).monthly_amount) || 0;
+          }
+        }
+      }
+
+      const basicSalary = Number((worker as any).salary_amount) || 0;
+      const grossSalary = basicSalary + salesCommission + collectionCommission + attendanceIncentive;
+      const totalDeductions = advanceDeduction + loanDeduction;
+      const netSalary = grossSalary - totalDeductions;
+
+      return {
+        success: true,
+        data: {
+          columns: ["Item", "Amount"],
+          rows: [
+            { Item: "Worker", Amount: worker.name || "" },
+            { Item: "Basic Salary", Amount: basicSalary },
+            { Item: "Sales Commission", Amount: salesCommission },
+            { Item: "Collection Commission", Amount: collectionCommission },
+            { Item: "Attendance Incentive", Amount: attendanceIncentive },
+            { Item: "Advance Deduction", Amount: advanceDeduction },
+            { Item: "Loan Deduction", Amount: loanDeduction },
+            { Item: "Total Deductions", Amount: totalDeductions },
+            { Item: "Net Salary", Amount: netSalary },
+            { Item: "Total Work Days (Excluding Holidays)", Amount: totalWorkingDays },
+            { Item: "Attendance Count", Amount: presentEquivalent }
+          ]
+        }
+      };
+    }
     default:
       return { success: false, error: "Unsupported report key" };
   }
@@ -937,5 +1120,19 @@ export async function getCustomerFilterOptions(): Promise<CustomerFilterOptionsR
     success: true,
     routes: Array.from(routeSet).sort((a, b) => a.localeCompare(b)),
     customers: Array.from(customerSet).sort((a, b) => a.localeCompare(b))
+  };
+}
+
+export async function getSalaryWorkerOptions(): Promise<SalaryWorkerOptionsResponse> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+  if (!canViewReports(access.profile)) return { success: false, error: "You do not have permission to view reports" };
+
+  const { data, error } = await adminClient.from("workers").select("id, name").order("name", { ascending: true });
+  if (error) return { success: false, error: error.message };
+
+  return {
+    success: true,
+    workers: (data ?? []).map((worker: any) => ({ id: String(worker.id), name: String(worker.name || "") }))
   };
 }

@@ -38,11 +38,13 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
 
   const role = resolvedProfile?.role ?? "sales_rep";
   const isAdmin = role === "admin";
+  const isManager = role === "manager";
 
   return (
     <div className="min-h-screen lg:flex">
       <DashboardSidebar
         isAdmin={isAdmin}
+        isManager={isManager}
         user={{
           fullName: resolvedProfile?.full_name ?? null,
           email: user.email ?? "",

@@ -12,6 +12,7 @@ import {
   getCustomerFilterOptions,
   getCustomerOutstandingFilterOptions,
   getReportData,
+  getSalaryWorkerOptions,
   getSalesDepartmentSubcategoryOptions,
   getSalesDepartmentOptions,
   getSalesRouteOptions,
@@ -79,6 +80,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const isOutstandingStyleCustomerFilterReport = isCustomerOutstandingReport || isCustomerDetailsReport;
   const isCustomerPaymentDetailsReport = reportKey === "customer/customer-payment-details";
   const isProductStockSummaryReport = reportKey === "stock/product-stock-summary";
+  const isSalarySlipReport = reportKey === "salary/salary-slip";
   const isDepartmentSubdepartmentFilterReport = isDepartmentWiseSalesReport || isProductStockSummaryReport;
   const [routeFilter, setRouteFilter] = useState("ALL");
   const [routeOptions, setRouteOptions] = useState<Array<{ value: string; label: string }>>([
@@ -96,6 +98,9 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   >([]);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [salaryWorkerId, setSalaryWorkerId] = useState("");
+  const [salaryWorkerOptions, setSalaryWorkerOptions] = useState<SearchableSelectOption[]>([]);
+  const [salaryMonth, setSalaryMonth] = useState(format(new Date(), "yyyy-MM"));
 
   const activeMode: "detail" = "detail";
 
@@ -159,6 +164,22 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       setSubcategoryFilter("ALL");
     }
   }, [isDepartmentSubdepartmentFilterReport, subcategoryFilter, subcategoryOptions]);
+
+  useEffect(() => {
+    if (!isSalarySlipReport) return;
+    let active = true;
+
+    const loadWorkers = async () => {
+      const response = await getSalaryWorkerOptions();
+      if (!active || !response.success || !response.workers) return;
+      setSalaryWorkerOptions(response.workers.map((worker) => ({ value: worker.id, label: worker.name })));
+    };
+
+    void loadWorkers();
+    return () => {
+      active = false;
+    };
+  }, [isSalarySlipReport]);
 
   useEffect(() => {
     if (!isOutstandingStyleCustomerFilterReport) return;
@@ -230,7 +251,11 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       return;
     }
 
-    if (!isOutstandingStyleCustomerFilterReport && !isProductStockSummaryReport && (!dateRange?.from || !dateRange?.to)) {
+    if (isSalarySlipReport && (!salaryWorkerId || !salaryMonth)) {
+      setError("Please select worker and month");
+      return;
+    }
+    if (!isOutstandingStyleCustomerFilterReport && !isProductStockSummaryReport && !isSalarySlipReport && (!dateRange?.from || !dateRange?.to)) {
       setError("Please select a complete date range");
       return;
     }
@@ -244,13 +269,20 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
         ? new Date("1970-01-01T00:00:00.000Z")
         : isCustomerOutstandingReport
           ? today
+          : isSalarySlipReport
+            ? new Date(`${salaryMonth}-01T00:00:00.000Z`)
           : (dateRange?.from ?? today);
-      const reportToDate = isOutstandingStyleCustomerFilterReport || isProductStockSummaryReport ? today : (dateRange?.to ?? reportFromDate);
+      const reportToDate = isOutstandingStyleCustomerFilterReport || isProductStockSummaryReport
+        ? today
+        : isSalarySlipReport
+          ? new Date(`${salaryMonth}-01T00:00:00.000Z`)
+          : (dateRange?.to ?? reportFromDate);
       const response = await getReportData({
         section: section.key,
         report: report.key,
         from: ymd(reportFromDate),
         to: ymd(reportToDate),
+        workerId: isSalarySlipReport ? salaryWorkerId : undefined,
         toTimestamp: isCustomerDetailsReport ? runTimestamp : undefined,
         route: isRouteWiseSalesReport || isOutstandingStyleCustomerFilterReport ? routeFilter : undefined,
         customer: isOutstandingStyleCustomerFilterReport ? customerFilter : undefined,
@@ -430,7 +462,28 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {isOutstandingStyleCustomerFilterReport ? (
+          {isSalarySlipReport ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Worker</label>
+                <SearchableSelect
+                  value={salaryWorkerId}
+                  options={salaryWorkerOptions}
+                  placeholder="Search and select worker"
+                  onChange={(value) => setSalaryWorkerId(value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Month</label>
+                <input
+                  type="month"
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={salaryMonth}
+                  onChange={(event) => setSalaryMonth(event.target.value)}
+                />
+              </div>
+            </div>
+          ) : isOutstandingStyleCustomerFilterReport ? (
             <div className="space-y-1">
               <label className="text-sm font-medium">Route or Customer</label>
               <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] md:items-center">
@@ -506,7 +559,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
             </div>
           ) : null}
 
-          {isOutstandingStyleCustomerFilterReport || isProductStockSummaryReport ? null : (
+          {isOutstandingStyleCustomerFilterReport || isProductStockSummaryReport || isSalarySlipReport ? null : (
             <div className="space-y-1" ref={datePickerRef}>
               <label className="text-sm font-medium">Date Range</label>
               <div className="flex flex-wrap items-center gap-2">

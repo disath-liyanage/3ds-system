@@ -50,6 +50,11 @@ export const REPORT_SECTIONS: ReportSection[] = [
     key: "grn",
     title: "GRN",
     reports: [{ key: "goods-received-note-reports", title: "Goods Received Note Reports" }]
+  },
+  {
+    key: "salary",
+    title: "Salary",
+    reports: [{ key: "salary-slip", title: "Salary Slip" }]
   }
 ];
 
