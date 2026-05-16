@@ -169,6 +169,91 @@ function getMonthDistance(start: Date, end: Date) {
   return (end.getUTCFullYear() - start.getUTCFullYear()) * 12 + (end.getUTCMonth() - start.getUTCMonth());
 }
 
+function getDaysInMonthUtc(year: number, monthZeroIndexed: number) {
+  return new Date(Date.UTC(year, monthZeroIndexed + 1, 0)).getUTCDate();
+}
+
+function startOfDayUtc(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+function endOfDayUtc(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 23, 59, 59, 999));
+}
+
+function dayKeyFromDate(date: Date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+async function calculateSalaryCostForRange(fromIso: string, toIso: string) {
+  const { data: workers, error: workersError } = await adminClient.from("workers").select("id, name, salary_type, salary_amount");
+  if (workersError) return { error: workersError };
+
+  const { data: attendanceRows, error: attendanceError } = await adminClient
+    .from("worker_attendance")
+    .select("worker_id, attendance_date, status")
+    .gte("attendance_date", fromIso.slice(0, 10))
+    .lte("attendance_date", toIso.slice(0, 10));
+  if (attendanceError) return { error: attendanceError };
+
+  const attendanceMap = new Map<string, string>();
+  for (const row of attendanceRows ?? []) {
+    const workerId = String((row as any).worker_id || "");
+    const date = String((row as any).attendance_date || "");
+    const status = String((row as any).status || "");
+    if (!workerId || !date) continue;
+    attendanceMap.set(`${workerId}:${date}`, status);
+  }
+
+  const fromDate = startOfDayUtc(new Date(fromIso));
+  const toDate = endOfDayUtc(new Date(toIso));
+  const salaryByWorker = new Map<string, number>();
+  const dayMs = 24 * 60 * 60 * 1000;
+
+  for (const worker of workers ?? []) {
+    const workerId = String((worker as any).id || "");
+    if (!workerId) continue;
+    const salaryAmount = Number((worker as any).salary_amount) || 0;
+    const salaryType = String((worker as any).salary_type || "monthly_basic");
+    let workerTotal = 0;
+
+    if (salaryType === "daily") {
+      for (let time = fromDate.getTime(); time <= toDate.getTime(); time += dayMs) {
+        const date = new Date(time);
+        const key = `${workerId}:${dayKeyFromDate(date)}`;
+        const status = attendanceMap.get(key) || "absent";
+        if (status === "present" || status === "holiday") workerTotal += salaryAmount;
+        else if (status === "half_day") workerTotal += salaryAmount * 0.5;
+      }
+    } else {
+      let cursor = new Date(Date.UTC(fromDate.getUTCFullYear(), fromDate.getUTCMonth(), 1));
+      const lastMonth = new Date(Date.UTC(toDate.getUTCFullYear(), toDate.getUTCMonth(), 1));
+      while (cursor.getTime() <= lastMonth.getTime()) {
+        const year = cursor.getUTCFullYear();
+        const month = cursor.getUTCMonth();
+        const monthStart = new Date(Date.UTC(year, month, 1));
+        const monthEnd = new Date(Date.UTC(year, month, getDaysInMonthUtc(year, month), 23, 59, 59, 999));
+        const segmentStart = new Date(Math.max(monthStart.getTime(), fromDate.getTime()));
+        const segmentEnd = new Date(Math.min(monthEnd.getTime(), toDate.getTime()));
+        const coveredDays = Math.floor((segmentEnd.getTime() - segmentStart.getTime()) / dayMs) + 1;
+        const daysInMonth = getDaysInMonthUtc(year, month);
+        if (coveredDays > 0 && daysInMonth > 0) {
+          workerTotal += (salaryAmount * coveredDays) / daysInMonth;
+        }
+        cursor = new Date(Date.UTC(year, month + 1, 1));
+      }
+    }
+
+    salaryByWorker.set(workerId, workerTotal);
+  }
+
+  const totalSalary = Array.from(salaryByWorker.values()).reduce((sum, amount) => sum + amount, 0);
+  const employerEpf = totalSalary * 0.12;
+  const employerEtf = totalSalary * 0.03;
+
+  return { totalSalary, employerEpf, employerEtf };
+}
+
 async function fetchDateWiseSalesRows(fromIso: string, toIso: string) {
   const rows: Array<{ created_at: string; total_amount: number }> = [];
   for (let offset = 0; ; offset += reportPageSize) {
@@ -1043,6 +1128,79 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         data: {
           columns: ["Item", "Amount"],
           rows: rows.map((row) => ({ ...row, __workerName: worker.name || "" }))
+        }
+      };
+    }
+    case "profit/profit-summary": {
+      const { data: salesRows, error: salesError } = await adminClient
+        .from("invoices")
+        .select("total_amount")
+        .in("status", ["approved", "issued", "paid"])
+        .gte("created_at", fromIso)
+        .lte("created_at", toIso);
+      if (salesError) return { success: false, error: salesError.message };
+
+      const salaryCost = await calculateSalaryCostForRange(fromIso, toIso);
+      if ("error" in salaryCost) {
+        return { success: false, error: salaryCost.error?.message || "Failed to calculate salary cost" };
+      }
+
+      const { data: expenseRows, error: expenseError } = await adminClient
+        .from("collection_expenses")
+        .select("amount")
+        .in("status", ["pending", "approved"])
+        .gte("created_at", fromIso)
+        .lte("created_at", toIso);
+      if (expenseError) return { success: false, error: expenseError.message };
+
+      const totalSales = (salesRows ?? []).reduce((sum, row: any) => sum + (Number(row.total_amount) || 0), 0);
+      const totalExpenses = (expenseRows ?? []).reduce((sum, row: any) => sum + (Number(row.amount) || 0), 0);
+      const totalDeductions =
+        salaryCost.totalSalary + salaryCost.employerEpf + salaryCost.employerEtf + totalExpenses;
+      const remainingAmount = totalSales - totalDeductions;
+
+      return {
+        success: true,
+        data: {
+          columns: ["Item", "Amount"],
+          rows: [
+            { Item: "Total Sales", Amount: totalSales },
+            { Item: "Total Employee Salary", Amount: salaryCost.totalSalary },
+            { Item: "Employer EPF (12%)", Amount: salaryCost.employerEpf },
+            { Item: "Employer ETF (3%)", Amount: salaryCost.employerEtf },
+            { Item: "Total Expenses", Amount: totalExpenses },
+            { Item: "Total Deductions", Amount: totalDeductions },
+            { Item: "Remaining Amount", Amount: remainingAmount }
+          ]
+        }
+      };
+    }
+    case "expenses/expenses-by-user": {
+      const { data: expenseRows, error: expenseError } = await adminClient
+        .from("collection_expenses")
+        .select("id, category, amount, notes, status, created_at, user:users_profile!collection_expenses_sales_rep_id_fkey(full_name, role)")
+        .in("status", ["pending", "approved"])
+        .gte("created_at", fromIso)
+        .lte("created_at", toIso)
+        .order("created_at", { ascending: false });
+      if (expenseError) return { success: false, error: expenseError.message };
+
+      return {
+        success: true,
+        data: {
+          columns: ["Date", "User / Worker", "Role", "Category", "Amount", "Note", "Status"],
+          rows: (expenseRows ?? []).map((row: any) => {
+            const user = one(row.user);
+            return {
+              Date: String(row.created_at || "").slice(0, 10),
+              "User / Worker": user?.full_name || "Unknown",
+              Role: user?.role || "unknown",
+              Category: row.category || "Other",
+              Amount: Number(row.amount) || 0,
+              Note: row.notes || "-",
+              Status: row.status || "pending"
+            };
+          })
         }
       };
     }

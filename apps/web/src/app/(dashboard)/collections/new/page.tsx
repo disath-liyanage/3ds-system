@@ -152,9 +152,6 @@ export default function NewCollectionPage() {
   const addExpenseMutation = useMutation({
     mutationFn: async () => {
       const notes = expenseNotes.trim();
-      if (expenseCategory === "Other" && !notes) {
-        throw new Error("Notes are required for Other category");
-      }
       const result = await addCollectionExpense({
         category: expenseCategory,
         amount: Number(expenseAmount),
@@ -457,7 +454,7 @@ export default function NewCollectionPage() {
                 <Input
                   value={expenseNotes}
                   onChange={(event) => setExpenseNotes(event.target.value)}
-                  placeholder={expenseCategory === "Other" ? "Required for Other" : "Optional"}
+                  placeholder="Optional note"
                 />
               </div>
             </div>

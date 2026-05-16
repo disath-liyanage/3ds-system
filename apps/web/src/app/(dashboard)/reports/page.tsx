@@ -15,7 +15,10 @@ export default function ReportsPage() {
     sales: true,
     customer: false,
     stock: false,
-    grn: false
+    grn: false,
+    profit: false,
+    expenses: false,
+    salary: false
   });
 
   const normalizedQuery = query.trim().toLowerCase();
@@ -46,7 +49,7 @@ export default function ReportsPage() {
       <header>
         <h1 className="text-2xl font-bold">Reports</h1>
         <p className="text-sm text-muted-foreground">
-          Use the universal search to quickly find reports across Sales, Customer, Stock, and GRN sections.
+          Use the universal search to quickly find reports across Sales, Customer, Stock, GRN, Profit, Expenses, and Salary sections.
         </p>
       </header>
 
