@@ -33,8 +33,8 @@ type ReportDetailPageProps = {
 };
 
 function todayDate() {
-  const raw = new Date().toISOString().slice(0, 10);
-  return new Date(`${raw}T00:00:00`);
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 function ymd(date: Date) {
@@ -269,6 +269,10 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const sortedRows = useMemo(() => {
     if (!result) return [];
     if (!sortColumn) return result.rows;
+    const hasStructuredRows = result.rows.some((row) => typeof row.__rowType === "string");
+    if (hasStructuredRows || reportKey === "customer/customer-outstanding-reports" || isGrnReport) {
+      return result.rows;
+    }
     const rows = [...result.rows];
     rows.sort((a, b) => {
       const av = a[sortColumn];
@@ -281,7 +285,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       return sortDirection === "asc" ? aText.localeCompare(bText) : bText.localeCompare(aText);
     });
     return rows;
-  }, [result, sortColumn, sortDirection]);
+  }, [result, sortColumn, sortDirection, reportKey, isGrnReport]);
 
   const activeResult = useMemo(() => {
     if (!result) return null;
