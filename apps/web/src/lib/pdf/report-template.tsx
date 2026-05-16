@@ -4,6 +4,7 @@ import type { ReportResult } from "@/app/actions/reports";
 
 type ReportPdfTemplateProps = {
   reportTitle: string;
+  reportKey?: string;
   fromDate: string;
   toDate: string;
   reportDate: string;
@@ -61,10 +62,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#000000"
   },
-  cell: { paddingRight: 8 }
+  cell: { paddingRight: 8 },
+  salaryColumns: { flexDirection: "row", marginTop: 10, minHeight: 240 },
+  salarySection: { width: "49%", paddingHorizontal: 12, paddingVertical: 8 },
+  salaryDivider: { width: "2%", alignItems: "center" },
+  salaryDividerLine: { width: 1, height: "100%", backgroundColor: "#111827" },
+  salaryLine: { flexDirection: "row", justifyContent: "space-between", marginBottom: 7, fontSize: 12 },
+  salaryBottomBlock: { marginTop: 12, borderTopWidth: 1, borderTopColor: "#111827", paddingTop: 10 },
+  salaryBottomRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 5, fontSize: 12 },
+  salaryNetRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 6, fontSize: 13, fontWeight: 700 }
 });
 
-export function ReportPdfTemplate({ reportTitle, fromDate, toDate, reportDate, userName, mode, result }: ReportPdfTemplateProps) {
+export function ReportPdfTemplate({ reportTitle, reportKey, fromDate, toDate, reportDate, userName, mode, result }: ReportPdfTemplateProps) {
+  const isSalarySlip = reportKey === "salary/salary-slip";
   const isOutstandingLayout =
     result.columns.length === 3 &&
     result.columns[0] === "Customer / Invoice" &&
@@ -120,90 +130,146 @@ export function ReportPdfTemplate({ reportTitle, fromDate, toDate, reportDate, u
 
   return (
     <Document>
-      <Page size="LETTER" style={styles.page}>
+      <Page size="LETTER" orientation={isSalarySlip ? "landscape" : "portrait"} style={styles.page}>
         <Text style={styles.companyName}>3D&apos;s Distributors (PVT) ltd.</Text>
         <Text style={styles.companyAddress}>No : 44/1,Tharanga Place, Panagoda, Homagama</Text>
         <Text style={styles.companyContact}>070 321 5756/ 011 208 3773</Text>
         <View style={styles.divider} />
 
-        <Text style={styles.reportTitle}>{reportTitle}</Text>
-        <Text style={styles.filterHeading}>Filter Details</Text>
-        <View style={styles.filterRow}>
-          <Text style={styles.filterItem}>
-            From Date : <Text style={styles.metaValue}>{fromDate}</Text>
-          </Text>
-          <Text style={styles.filterItem}>
-            Report Date : <Text style={styles.metaValue}>{reportDate}</Text>
-          </Text>
-        </View>
-        <View style={styles.filterRow}>
-          <Text style={styles.filterItem}>
-            To Date : <Text style={styles.metaValue}>{toDate}</Text>
-          </Text>
-          <Text style={styles.filterItem}>
-            User : <Text style={styles.metaValue}>{userName}</Text>
-          </Text>
-        </View>
-        <Text style={styles.modeText}>Type: {mode === "detail" ? "Detail" : "Summary"} | Rows: {result.rows.length}</Text>
-
-        <View style={styles.tableHeader}>
-          {result.columns.map((column) => (
-            <Text key={column} style={{ ...styles.cell, width: getColumnWidth(column) }}>
-              {column.trim().toLowerCase() === "invoice no" ? "Invoice" : column}
-            </Text>
-          ))}
-        </View>
-
-        {result.rows.map((row, index) => {
-          const rowType = String(row.__rowType || "");
-          if (isOutstandingLayout && rowType === "divider") {
-            return (
-              <View key={`r-${index}`} style={styles.dividerRow}>
-                <View style={styles.dividerLine} />
-              </View>
-            );
-          }
-
-          return (
-            <View
-              key={`r-${index}`}
-              style={
-                isOutstandingLayout && rowType === "customer"
-                  ? [styles.tableRowWithBorder, styles.customerRow]
-                  : isOutstandingLayout
-                    ? Number(row.__isLastInvoice) === 1
-                      ? styles.tableRowNoBorder
-                      : styles.tableRowWithBorder
-                    : styles.tableRow
-              }
-            >
-              {result.columns.map((column) => {
-                const value = row[column];
-                const displayValue = column.trim().toLowerCase() === "date" ? formatPdfDate(value) : value;
-                return (
-                  <Text key={`${index}-${column}`} style={{ ...styles.cell, width: getColumnWidth(column) }}>
-                    {typeof displayValue === "number"
-                      ? displayValue.toLocaleString(undefined, { maximumFractionDigits: 2 })
-                      : String(displayValue ?? "")}
-                  </Text>
-                );
-              })}
-            </View>
-          );
-        })}
-        {totalRowConfig ? (
-          <View style={styles.tableRow}>
-            {result.columns.map((column) => (
-              <Text key={`total-${column}`} style={{ ...styles.cell, width: getColumnWidth(column) }}>
-                {column === totalRowConfig.labelColumn
-                  ? "Total"
-                  : column === totalRowConfig.amountColumn
-                    ? totalRowConfig.total.toLocaleString(undefined, { maximumFractionDigits: 2 })
-                    : ""}
+        <Text style={styles.reportTitle}>
+          {isSalarySlip ? `Salary Slip - ${String(result.rows[0]?.__workerName || "").trim()}` : reportTitle}
+        </Text>
+        {!isSalarySlip ? (
+          <>
+            <Text style={styles.filterHeading}>Filter Details</Text>
+            <View style={styles.filterRow}>
+              <Text style={styles.filterItem}>
+                From Date : <Text style={styles.metaValue}>{fromDate}</Text>
               </Text>
-            ))}
-          </View>
+              <Text style={styles.filterItem}>
+                Report Date : <Text style={styles.metaValue}>{reportDate}</Text>
+              </Text>
+            </View>
+            <View style={styles.filterRow}>
+              <Text style={styles.filterItem}>
+                To Date : <Text style={styles.metaValue}>{toDate}</Text>
+              </Text>
+              <Text style={styles.filterItem}>
+                User : <Text style={styles.metaValue}>{userName}</Text>
+              </Text>
+            </View>
+            <Text style={styles.modeText}>Type: {mode === "detail" ? "Detail" : "Summary"} | Rows: {result.rows.length}</Text>
+          </>
         ) : null}
+
+        {isSalarySlip ? (
+          <>
+            <View style={styles.salaryColumns}>
+              <View style={styles.salarySection}>
+                {result.rows
+                  .filter((row) => String(row.__bucket || "") === "gain")
+                  .map((row, index) => (
+                    <View key={`gain-${index}`} style={styles.salaryLine}>
+                      <Text>{String(row.Item || "")}</Text>
+                      <Text>{Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+                    </View>
+                  ))}
+              </View>
+              <View style={styles.salaryDivider}>
+                <View style={styles.salaryDividerLine} />
+              </View>
+              <View style={styles.salarySection}>
+                {result.rows
+                  .filter((row) => String(row.__bucket || "") === "deduction")
+                  .map((row, index) => (
+                    <View key={`deduction-${index}`} style={styles.salaryLine}>
+                      <Text>{String(row.Item || "")}</Text>
+                      <Text>{Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+                    </View>
+                  ))}
+              </View>
+            </View>
+            <View style={styles.salaryBottomBlock}>
+              {result.rows
+                .filter((row) => String(row.__bucket || "") === "stat")
+                .map((row, index) => (
+                  <View key={`stat-${index}`} style={styles.salaryBottomRow}>
+                    <Text>{String(row.Item || "")}</Text>
+                    <Text>{Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+                  </View>
+                ))}
+              {result.rows
+                .filter((row) => String(row.__bucket || "") === "final")
+                .map((row, index) => (
+                  <View key={`final-${index}`} style={styles.salaryNetRow}>
+                    <Text>{String(row.Item || "")}</Text>
+                    <Text>{Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+                  </View>
+                ))}
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.tableHeader}>
+              {result.columns.map((column) => (
+                <Text key={column} style={{ ...styles.cell, width: getColumnWidth(column) }}>
+                  {column.trim().toLowerCase() === "invoice no" ? "Invoice" : column}
+                </Text>
+              ))}
+            </View>
+
+            {result.rows.map((row, index) => {
+              const rowType = String(row.__rowType || "");
+              if (isOutstandingLayout && rowType === "divider") {
+                return (
+                  <View key={`r-${index}`} style={styles.dividerRow}>
+                    <View style={styles.dividerLine} />
+                  </View>
+                );
+              }
+
+              return (
+                <View
+                  key={`r-${index}`}
+                  style={
+                    isOutstandingLayout && rowType === "customer"
+                      ? [styles.tableRowWithBorder, styles.customerRow]
+                      : isOutstandingLayout
+                        ? Number(row.__isLastInvoice) === 1
+                          ? styles.tableRowNoBorder
+                          : styles.tableRowWithBorder
+                        : styles.tableRow
+                  }
+                >
+                  {result.columns.map((column) => {
+                    const value = row[column];
+                    const displayValue = column.trim().toLowerCase() === "date" ? formatPdfDate(value) : value;
+                    return (
+                      <Text key={`${index}-${column}`} style={{ ...styles.cell, width: getColumnWidth(column) }}>
+                        {typeof displayValue === "number"
+                          ? displayValue.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                          : String(displayValue ?? "")}
+                      </Text>
+                    );
+                  })}
+                </View>
+              );
+            })}
+            {totalRowConfig ? (
+              <View style={styles.tableRow}>
+                {result.columns.map((column) => (
+                  <Text key={`total-${column}`} style={{ ...styles.cell, width: getColumnWidth(column) }}>
+                    {column === totalRowConfig.labelColumn
+                      ? "Total"
+                      : column === totalRowConfig.amountColumn
+                        ? totalRowConfig.total.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                        : ""}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+          </>
+        )}
       </Page>
     </Document>
   );

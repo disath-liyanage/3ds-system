@@ -329,6 +329,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     return pdf(
       <ReportPdfTemplate
         reportTitle={report.title}
+        reportKey={reportKey}
         fromDate={dateRange?.from ? ymd(dateRange.from as Date) : ""}
         toDate={dateRange?.to ? ymd(dateRange.to as Date) : ""}
         reportDate={format(new Date(), "dd-MM-yyyy")}
