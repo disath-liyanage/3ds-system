@@ -648,6 +648,65 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
             <p className="text-sm text-muted-foreground">Run the report to view data.</p>
           ) : activeResult.rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">No records found for selected range.</p>
+          ) : isSalarySlipReport ? (
+            <div className="space-y-3 text-base">
+              <div className="grid grid-cols-2 gap-0 border-t border-b border-border">
+                <div className="space-y-2 border-r border-border p-4">
+                  {activeResult.rows
+                    .filter((row) => String(row.__bucket || "") === "gain")
+                    .map((row, index) => (
+                      <div key={`gain-${index}`} className="flex items-center justify-between">
+                        <span>{String(row.Item || "")}</span>
+                        <span className="font-medium">
+                          {Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+                <div className="space-y-2 p-4">
+                  {activeResult.rows
+                    .filter(
+                      (row) => String(row.__bucket || "") === "deduction" && String(row.Item || "") !== "Total Deductions"
+                    )
+                    .map((row, index) => (
+                      <div key={`ded-${index}`} className="flex items-center justify-between">
+                        <span>{String(row.Item || "")}</span>
+                        <span className="font-medium">
+                          {Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    ))}
+                  {activeResult.rows
+                    .filter((row) => String(row.Item || "") === "Total Deductions")
+                    .map((row, index) => (
+                      <div key={`tot-${index}`} className="mt-2 flex items-center justify-between border-t border-border pt-2 text-lg font-bold">
+                        <span>{String(row.Item || "")}</span>
+                        <span>{Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+              <div className="space-y-1 border-t border-border pt-2">
+                {activeResult.rows
+                  .filter((row) => String(row.Item || "") === "Employee EPF (8%)" || String(row.Item || "") === "Employer ETF (3%)")
+                  .map((row, index) => (
+                    <div key={`foot-${index}`} className="flex items-center justify-between">
+                      <span>{String(row.Item || "")}</span>
+                      <span className="font-medium">
+                        {Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  ))}
+                {activeResult.rows
+                  .filter((row) => String(row.__bucket || "") === "final")
+                  .map((row, index) => (
+                    <div key={`net-${index}`} className="mt-1 flex items-center justify-between text-xl font-bold">
+                      <span>{String(row.Item || "")}</span>
+                      <span>{Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-sm">

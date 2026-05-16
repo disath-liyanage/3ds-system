@@ -5,9 +5,12 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { markWorkerAttendance, markWorkersAttendance } from "@/app/actions/attendance";
+import { createWorkerDeduction } from "@/app/actions/users";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Select } from "@/components/ui/select";
 import { getSriLankaHolidays } from "@/lib/sri-lanka-holidays";
 import { toast } from "@/lib/toast";
@@ -80,6 +83,12 @@ export function AttendanceClient({
     return Object.fromEntries(entries);
   });
   const [isPending, startTransition] = useTransition();
+  const [deductionWorkerId, setDeductionWorkerId] = useState("");
+  const [deductionType, setDeductionType] = useState<"advance" | "loan">("advance");
+  const [deductionAmount, setDeductionAmount] = useState("");
+  const [deductionMonths, setDeductionMonths] = useState("");
+  const [deductionNote, setDeductionNote] = useState("");
+  const [deductionSaving, setDeductionSaving] = useState(false);
 
   useEffect(() => {
     setYear(initialYear);
@@ -336,6 +345,92 @@ export function AttendanceClient({
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Add Advance / Loan</CardTitle>
+          <CardDescription>Managers and admins can record worker advances and loans from here.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="grid gap-3 md:grid-cols-2"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const amount = Number(deductionAmount);
+              const months = Number(deductionMonths);
+              if (!deductionWorkerId) {
+                toast({ title: "Missing worker", description: "Please select a worker.", variant: "error" });
+                return;
+              }
+              if (!Number.isFinite(amount) || amount <= 0) {
+                toast({ title: "Invalid amount", description: "Enter a valid amount.", variant: "error" });
+                return;
+              }
+              if (deductionType === "loan" && (!Number.isInteger(months) || months <= 0)) {
+                toast({ title: "Invalid months", description: "Enter valid loan months.", variant: "error" });
+                return;
+              }
+              setDeductionSaving(true);
+              const result = await createWorkerDeduction({
+                worker_id: deductionWorkerId,
+                deduction_type: deductionType,
+                amount,
+                months: deductionType === "loan" ? months : undefined,
+                note: deductionNote
+              });
+              setDeductionSaving(false);
+              if (!result.success) {
+                toast({ title: "Save failed", description: result.error || "Could not save deduction", variant: "error" });
+                return;
+              }
+              toast({ title: "Saved", description: "Advance/loan recorded.", variant: "success" });
+              setDeductionAmount("");
+              setDeductionMonths("");
+              setDeductionNote("");
+            }}
+          >
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Worker</label>
+              <SearchableSelect
+                value={deductionWorkerId}
+                options={workers.map((worker) => ({ value: worker.id, label: worker.name }))}
+                placeholder="Search worker"
+                onChange={setDeductionWorkerId}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Type</label>
+              <SearchableSelect
+                value={deductionType}
+                options={[
+                  { value: "advance", label: "Advance" },
+                  { value: "loan", label: "Loan" }
+                ]}
+                onChange={(value) => setDeductionType(value === "loan" ? "loan" : "advance")}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Amount</label>
+              <Input type="number" min={0.01} step="0.01" value={deductionAmount} onChange={(e) => setDeductionAmount(e.target.value)} />
+            </div>
+            {deductionType === "loan" ? (
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Months</label>
+                <Input type="number" min={1} step={1} value={deductionMonths} onChange={(e) => setDeductionMonths(e.target.value)} />
+              </div>
+            ) : null}
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-sm font-medium">Note</label>
+              <Input value={deductionNote} onChange={(e) => setDeductionNote(e.target.value)} placeholder="Optional note" />
+            </div>
+            <div className="md:col-span-2">
+              <Button type="submit" disabled={deductionSaving}>
+                {deductionSaving ? "Saving..." : "Save Advance / Loan"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </section>
   );
 }

@@ -43,7 +43,7 @@ export default async function AdminWorkersPage() {
     currentProfile = profileByEmail;
   }
 
-  if (!currentProfile || (currentProfile.role !== "admin" && currentProfile.role !== "manager")) {
+  if (!currentProfile || currentProfile.role !== "admin") {
     redirect("/dashboard");
   }
 
