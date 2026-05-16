@@ -4,7 +4,7 @@ import type { Worker } from "@paintdist/shared";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { markWorkerAttendance, markWorkersAttendance } from "@/app/actions/attendance";
+import { listSalesReps, markWorkerAttendance, markWorkersAttendance, upsertSalesRepMonthlyTarget } from "@/app/actions/attendance";
 import { createWorkerDeduction } from "@/app/actions/users";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -89,6 +89,12 @@ export function AttendanceClient({
   const [deductionMonths, setDeductionMonths] = useState("");
   const [deductionNote, setDeductionNote] = useState("");
   const [deductionSaving, setDeductionSaving] = useState(false);
+  const [salesRepOptions, setSalesRepOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [targetRepId, setTargetRepId] = useState("");
+  const [targetMonth, setTargetMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [targetAmount, setTargetAmount] = useState("");
+  const [targetIncentive, setTargetIncentive] = useState("");
+  const [targetSaving, setTargetSaving] = useState(false);
 
   useEffect(() => {
     setYear(initialYear);
@@ -188,6 +194,19 @@ export function AttendanceClient({
     const value = initialYear - 2 + index;
     return { value: String(value), label: String(value) };
   });
+
+  useEffect(() => {
+    let active = true;
+    const loadSalesReps = async () => {
+      const result = await listSalesReps();
+      if (!active || !result.success || !result.reps) return;
+      setSalesRepOptions(result.reps.map((rep) => ({ value: rep.id, label: rep.full_name })));
+    };
+    void loadSalesReps();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <section className="space-y-4">
@@ -426,6 +445,75 @@ export function AttendanceClient({
             <div className="md:col-span-2">
               <Button type="submit" disabled={deductionSaving}>
                 {deductionSaving ? "Saving..." : "Save Advance / Loan"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Set Sales Target for Reps</CardTitle>
+          <CardDescription>Set monthly sales target and incentive. Incentive applies only if the rep achieves the target.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="grid gap-3 md:grid-cols-2"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const parsedTarget = Number(targetAmount);
+              const parsedIncentive = Number(targetIncentive || 0);
+              if (!targetRepId) {
+                toast({ title: "Missing rep", description: "Please select a sales rep.", variant: "error" });
+                return;
+              }
+              if (!Number.isFinite(parsedTarget) || parsedTarget < 0) {
+                toast({ title: "Invalid target", description: "Enter valid target amount.", variant: "error" });
+                return;
+              }
+              if (!Number.isFinite(parsedIncentive) || parsedIncentive < 0) {
+                toast({ title: "Invalid incentive", description: "Enter valid incentive amount.", variant: "error" });
+                return;
+              }
+              setTargetSaving(true);
+              const result = await upsertSalesRepMonthlyTarget({
+                salesRepId: targetRepId,
+                month: targetMonth,
+                targetAmount: parsedTarget,
+                incentiveAmount: parsedIncentive
+              });
+              setTargetSaving(false);
+              if (!result.success) {
+                toast({ title: "Save failed", description: result.error || "Could not save target", variant: "error" });
+                return;
+              }
+              toast({ title: "Saved", description: "Sales target saved.", variant: "success" });
+            }}
+          >
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Sales Rep</label>
+              <SearchableSelect
+                value={targetRepId}
+                options={salesRepOptions}
+                placeholder="Select sales rep"
+                onChange={setTargetRepId}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Month</label>
+              <Input type="month" value={targetMonth} onChange={(e) => setTargetMonth(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Sales Target</label>
+              <Input type="number" min={0} step="0.01" value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Incentive (if achieved)</label>
+              <Input type="number" min={0} step="0.01" value={targetIncentive} onChange={(e) => setTargetIncentive(e.target.value)} />
+            </div>
+            <div className="md:col-span-2">
+              <Button type="submit" disabled={targetSaving}>
+                {targetSaving ? "Saving..." : "Save Sales Target"}
               </Button>
             </div>
           </form>

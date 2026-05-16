@@ -976,10 +976,36 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
       }
 
       const basicSalary = Number((worker as any).salary_amount) || 0;
+      let targetAchievementIncentive = 0;
+      if (workerUserId) {
+        const { data: targetRow, error: targetError } = await adminClient
+          .from("sales_rep_monthly_targets")
+          .select("target_amount, incentive_amount")
+          .eq("sales_rep_id", workerUserId)
+          .eq("target_month", monthStart.toISOString().slice(0, 10))
+          .maybeSingle();
+        if (targetError) return { success: false, error: targetError.message };
+
+        const { data: monthlySalesRows, error: monthlySalesError } = await adminClient
+          .from("invoices")
+          .select("total_amount")
+          .eq("issued_by", workerUserId)
+          .in("status", ["approved", "issued", "paid"])
+          .gte("created_at", monthStart.toISOString())
+          .lte("created_at", monthEnd.toISOString());
+        if (monthlySalesError) return { success: false, error: monthlySalesError.message };
+        const totalMonthlySales = (monthlySalesRows ?? []).reduce((sum, row: any) => sum + (Number(row.total_amount) || 0), 0);
+        const targetAmount = Number((targetRow as any)?.target_amount) || 0;
+        const incentiveAmount = Number((targetRow as any)?.incentive_amount) || 0;
+        if (targetAmount > 0 && totalMonthlySales >= targetAmount) {
+          targetAchievementIncentive = incentiveAmount;
+        }
+      }
+
       const employeeEpf = basicSalary * 0.08;
       const employerEpf = basicSalary * 0.12;
       const employerEtf = basicSalary * 0.03;
-      const grossSalary = basicSalary + salesCommission + collectionCommission + attendanceIncentive;
+      const grossSalary = basicSalary + salesCommission + collectionCommission + attendanceIncentive + targetAchievementIncentive;
       const totalDeductions = advanceDeduction + loanDeduction;
       const netSalary = grossSalary - totalDeductions - employeeEpf;
 
@@ -990,6 +1016,9 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
       ];
       if (attendanceIncentive > 0) {
         rows.push({ Item: "Attendance Incentive", Amount: attendanceIncentive, __bucket: "gain" });
+      }
+      if (targetAchievementIncentive > 0) {
+        rows.push({ Item: "Target Achievement Incentive", Amount: targetAchievementIncentive, __bucket: "gain" });
       }
       if (advanceDeduction > 0) {
         rows.push({ Item: "Advance Deduction", Amount: advanceDeduction, __bucket: "deduction" });
