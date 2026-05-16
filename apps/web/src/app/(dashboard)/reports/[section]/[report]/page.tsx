@@ -73,7 +73,8 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const isCustomerDetailsReport = reportKey === "customer/customer-details";
   const isOutstandingStyleCustomerFilterReport = isCustomerOutstandingReport || isCustomerDetailsReport;
   const isCustomerPaymentDetailsReport = reportKey === "customer/customer-payment-details";
-  const totalRows = result?.rows.length ?? 0;
+  const isProductStockSummaryReport = reportKey === "stock/product-stock-summary";
+  const isDepartmentSubdepartmentFilterReport = isDepartmentWiseSalesReport || isProductStockSummaryReport;
   const [routeFilter, setRouteFilter] = useState("ALL");
   const [routeOptions, setRouteOptions] = useState<Array<{ value: string; label: string }>>([
     { value: "ALL", label: "All routes" }
@@ -88,9 +89,10 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const [departmentSubcategoryPairs, setDepartmentSubcategoryPairs] = useState<
     Array<{ department: string; subcategory: string }>
   >([]);
+  const [sortColumn, setSortColumn] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   const activeMode: "detail" = "detail";
-  const activeResult = result;
 
   useEffect(() => {
     if (!isRouteWiseSalesReport) return;
@@ -114,7 +116,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   }, [isRouteWiseSalesReport]);
 
   useEffect(() => {
-    if (!isDepartmentWiseSalesReport) return;
+    if (!isDepartmentSubdepartmentFilterReport) return;
     let active = true;
 
     const loadDepartments = async () => {
@@ -136,7 +138,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     return () => {
       active = false;
     };
-  }, [isDepartmentWiseSalesReport]);
+  }, [isDepartmentSubdepartmentFilterReport]);
 
   const subcategoryOptions = useMemo(() => {
     const filtered = departmentSubcategoryPairs.filter(
@@ -147,11 +149,11 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   }, [departmentFilter, departmentSubcategoryPairs]);
 
   useEffect(() => {
-    if (!isDepartmentWiseSalesReport) return;
+    if (!isDepartmentSubdepartmentFilterReport) return;
     if (!subcategoryOptions.some((option) => option.value === subcategoryFilter)) {
       setSubcategoryFilter("ALL");
     }
-  }, [isDepartmentWiseSalesReport, subcategoryFilter, subcategoryOptions]);
+  }, [isDepartmentSubdepartmentFilterReport, subcategoryFilter, subcategoryOptions]);
 
   useEffect(() => {
     if (!isOutstandingStyleCustomerFilterReport) return;
@@ -223,7 +225,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       return;
     }
 
-    if (!isOutstandingStyleCustomerFilterReport && (!dateRange?.from || !dateRange?.to)) {
+    if (!isOutstandingStyleCustomerFilterReport && !isProductStockSummaryReport && (!dateRange?.from || !dateRange?.to)) {
       setError("Please select a complete date range");
       return;
     }
@@ -231,12 +233,14 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     startTransition(async () => {
       setError("");
       const runTimestamp = new Date().toISOString();
-      const reportFromDate = isCustomerDetailsReport
+      const reportFromDate = isProductStockSummaryReport
+        ? today
+        : isCustomerDetailsReport
         ? new Date("1970-01-01T00:00:00.000Z")
         : isCustomerOutstandingReport
           ? today
           : (dateRange?.from ?? today);
-      const reportToDate = isOutstandingStyleCustomerFilterReport ? today : (dateRange?.to ?? reportFromDate);
+      const reportToDate = isOutstandingStyleCustomerFilterReport || isProductStockSummaryReport ? today : (dateRange?.to ?? reportFromDate);
       const response = await getReportData({
         section: section.key,
         report: report.key,
@@ -245,8 +249,8 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
         toTimestamp: isCustomerDetailsReport ? runTimestamp : undefined,
         route: isRouteWiseSalesReport || isOutstandingStyleCustomerFilterReport ? routeFilter : undefined,
         customer: isOutstandingStyleCustomerFilterReport ? customerFilter : undefined,
-        department: isDepartmentWiseSalesReport ? departmentFilter : undefined,
-        subcategory: isDepartmentWiseSalesReport ? subcategoryFilter : undefined
+        department: isDepartmentSubdepartmentFilterReport ? departmentFilter : undefined,
+        subcategory: isDepartmentSubdepartmentFilterReport ? subcategoryFilter : undefined
       });
       if (!response.success || !response.data) {
         setResult(null);
@@ -257,6 +261,28 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     });
   };
 
+  const sortedRows = useMemo(() => {
+    if (!result) return [];
+    if (!sortColumn) return result.rows;
+    const rows = [...result.rows];
+    rows.sort((a, b) => {
+      const av = a[sortColumn];
+      const bv = b[sortColumn];
+      if (typeof av === "number" && typeof bv === "number") {
+        return sortDirection === "asc" ? av - bv : bv - av;
+      }
+      const aText = String(av ?? "");
+      const bText = String(bv ?? "");
+      return sortDirection === "asc" ? aText.localeCompare(bText) : bText.localeCompare(aText);
+    });
+    return rows;
+  }, [result, sortColumn, sortDirection]);
+
+  const activeResult = useMemo(() => {
+    if (!result) return null;
+    return { ...result, rows: sortedRows };
+  }, [result, sortedRows]);
+  const totalRows = activeResult?.rows.length ?? 0;
   async function buildReportPdfBlob() {
     if (!activeResult || !section || !report) return null;
     return pdf(
@@ -322,6 +348,15 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     }
     return null;
   }, [activeResult, reportKey, activeMode]);
+
+  const onSortColumn = (column: string) => {
+    if (sortColumn !== column) {
+      setSortColumn(column);
+      setSortDirection("asc");
+      return;
+    }
+    setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -421,10 +456,10 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
             </div>
           ) : null}
 
-          {isDepartmentWiseSalesReport ? (
+          {isDepartmentSubdepartmentFilterReport ? (
             <div className="space-y-1">
-              <label className="text-sm font-medium">Department</label>
-              <div className="grid gap-2 md:grid-cols-2">
+              <label className="text-sm font-medium">Department / Sub Department</label>
+              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center">
                 <Select
                   value={departmentFilter}
                   options={departmentOptions}
@@ -435,11 +470,21 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                   options={subcategoryOptions}
                   onChange={(event) => setSubcategoryFilter(event.target.value)}
                 />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setDepartmentFilter("ALL");
+                    setSubcategoryFilter("ALL");
+                  }}
+                >
+                  Reset
+                </Button>
               </div>
             </div>
           ) : null}
 
-          {isOutstandingStyleCustomerFilterReport ? null : (
+          {isOutstandingStyleCustomerFilterReport || isProductStockSummaryReport ? null : (
             <div className="space-y-1" ref={datePickerRef}>
               <label className="text-sm font-medium">Date Range</label>
               <div className="flex flex-wrap items-center gap-2">
@@ -501,7 +546,21 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Results ({totalRows})</CardTitle>
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle>Results ({totalRows})</CardTitle>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSortColumn(null);
+                setSortDirection("asc");
+              }}
+              disabled={!sortColumn}
+            >
+              Reset Sorting
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {!activeResult ? (
@@ -533,7 +592,14 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                           key={column}
                           className={`py-2 font-semibold ${isCollectionNoColumn ? "pl-0 pr-3" : "px-3"} ${headerAlignClass}`}
                         >
-                          {column}
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 text-left"
+                            onClick={() => onSortColumn(column)}
+                          >
+                            {column}
+                            {sortColumn === column ? (sortDirection === "asc" ? "▲" : "▼") : ""}
+                          </button>
                         </th>
                       );
                     })}
