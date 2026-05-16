@@ -119,6 +119,16 @@ function buildDateTimeRange(from: string, to: string) {
   return { fromIso, toIso };
 }
 
+const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidDateInput(value: string) {
+  if (!datePattern.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (!Number.isFinite(date.getTime())) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  return date.getUTCFullYear() === year && date.getUTCMonth() + 1 === month && date.getUTCDate() === day;
+}
+
 function splitDepartmentCategory(rawCategory: string | null | undefined): { department: string; subcategory: string } {
   const text = String(rawCategory || "").trim();
   if (!text) return { department: "Uncategorized", subcategory: "General" };
@@ -144,6 +154,9 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
   if (!canViewReports(access.profile)) return { success: false, error: "You do not have permission to view reports" };
 
   if (!input.from || !input.to) return { success: false, error: "Date range is required" };
+  if (!isValidDateInput(input.from) || !isValidDateInput(input.to)) {
+    return { success: false, error: "Invalid date range" };
+  }
   if (input.from > input.to) return { success: false, error: "From date must be earlier than To date" };
 
   const { fromIso, toIso: toDateIso } = buildDateTimeRange(input.from, input.to);
@@ -257,7 +270,7 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         data: {
           columns: ["Cancelled At", "Invoice Number", "Product Qty", "Free Qty"],
           rows: (data ?? []).map((r: any) => ({
-            __cancelledInvoiceReportId: r.id ?? "",
+            __cancelledInvoiceReportId: String(r.old_data?.invoice_id ?? ""),
             "Cancelled At": String(r.created_at).slice(0, 10),
             "Invoice Number": Number(r.old_data?.invoice_number) || 0,
             "Product Qty": Number(r.old_data?.qty) || 0,
@@ -269,9 +282,10 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
     case "sales/department-wise-sales-invoice": {
       const { data, error } = await adminClient
         .from("invoice_items")
-        .select("qty, free_qty, unit_price, discount_type, discount_value, created_at, product:products(category), invoice:invoices!invoice_items_invoice_id_fkey(status, created_at)")
-        .gte("created_at", fromIso)
-        .lte("created_at", toIso);
+        .select("qty, free_qty, unit_price, discount_type, discount_value, product:products(category), invoice:invoices!inner(status, created_at)")
+        .in("invoice.status", ["approved", "issued", "paid"])
+        .gte("invoice.created_at", fromIso)
+        .lte("invoice.created_at", toIso);
       if (error) return { success: false, error: error.message };
       const map = new Map<string, number>();
       for (const row of data ?? []) {
@@ -295,9 +309,10 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
     case "sales/customer-wise-sales-and-quantity-summary": {
       const { data, error } = await adminClient
         .from("invoice_items")
-        .select("qty, free_qty, unit_price, created_at, invoice:invoices!invoice_items_invoice_id_fkey(status, customer:customers(name))")
-        .gte("created_at", fromIso)
-        .lte("created_at", toIso);
+        .select("qty, free_qty, unit_price, discount_type, discount_value, invoice:invoices!inner(status, created_at, customer:customers(name))")
+        .in("invoice.status", ["approved", "issued", "paid"])
+        .gte("invoice.created_at", fromIso)
+        .lte("invoice.created_at", toIso);
       if (error) return { success: false, error: error.message };
       const map = new Map<string, { qty: number; amount: number }>();
       for (const row of data ?? []) {
@@ -307,7 +322,12 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         if (!["approved", "issued", "paid"].includes(String(status))) continue;
         const customerName = customer?.name || "Unknown";
         const qty = (Number(row.qty) || 0) + (Number(row.free_qty) || 0);
-        const amount = (Number(row.qty) || 0) * (Number(row.unit_price) || 0);
+        const soldQty = Number(row.qty) || 0;
+        const unitPrice = Number(row.unit_price) || 0;
+        const discountValue = Number(row.discount_value) || 0;
+        const discountType = row.discount_type === "percent" ? "percent" : "amount";
+        const perUnitDiscount = discountType === "percent" ? (unitPrice * discountValue) / 100 : discountValue;
+        const amount = Math.max(0, (unitPrice - perUnitDiscount) * soldQty);
         const prev = map.get(customerName) || { qty: 0, amount: 0 };
         map.set(customerName, { qty: prev.qty + qty, amount: prev.amount + amount });
       }
@@ -347,9 +367,10 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
     case "sales/product-wise-sales-qty-reports": {
       const { data, error } = await adminClient
         .from("invoice_items")
-        .select("qty, free_qty, created_at, product:products(name)")
-        .gte("created_at", fromIso)
-        .lte("created_at", toIso);
+        .select("qty, free_qty, product:products(name), invoice:invoices!inner(status, created_at)")
+        .in("invoice.status", ["approved", "issued", "paid"])
+        .gte("invoice.created_at", fromIso)
+        .lte("invoice.created_at", toIso);
       if (error) return { success: false, error: error.message };
       const map = new Map<string, number>();
       for (const row of data ?? []) {

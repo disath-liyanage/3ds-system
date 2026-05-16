@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select";
 import { Select } from "@/components/ui/select";
+import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { ReportPdfTemplate } from "@/lib/pdf/report-template";
 import { getReportItem, getReportSection } from "../../reports-data";
 
@@ -63,6 +64,9 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [reportUser, setReportUser] = useState("ALL");
   const previewFrameRef = useRef<HTMLIFrameElement>(null);
+  const { permissions, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
+  const canExportReports = Boolean(permissions?.canExportReports);
+  const exportDisabled = isPermissionsLoading || !canExportReports;
 
   const reportTitle = report?.title ?? "Report";
   const sectionTitle = section?.title ?? "Reports";
@@ -300,7 +304,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   }
 
   const downloadPdf = async () => {
-    if (!activeResult || !section || !report) return;
+    if (exportDisabled || !activeResult || !section || !report) return;
 
     setIsExportingPdf(true);
     try {
@@ -321,7 +325,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   };
 
   const printPdf = () => {
-    if (!previewFrameRef.current) return;
+    if (exportDisabled || !previewFrameRef.current) return;
     previewFrameRef.current.contentWindow?.focus();
     previewFrameRef.current.contentWindow?.print();
   };
@@ -390,7 +394,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [activeResult, section, report, activeMode, dateRangeLabel]);
+  }, [activeResult, section, report, activeMode, dateRangeLabel, reportUser]);
 
   if (!section || !report) {
     return (
@@ -541,11 +545,16 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
             <Button type="button" onClick={runReport} disabled={isPending}>
               {isPending ? "Running..." : "Run Report"}
             </Button>
-            <Button type="button" variant="outline" onClick={downloadPdf} disabled={!activeResult || isExportingPdf}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={downloadPdf}
+              disabled={!activeResult || isExportingPdf || exportDisabled}
+            >
               <Download className="mr-2 h-4 w-4" />
               {isExportingPdf ? "Exporting PDF..." : "Export PDF"}
             </Button>
-            <Button type="button" variant="outline" onClick={printPdf} disabled={!previewUrl}>
+            <Button type="button" variant="outline" onClick={printPdf} disabled={!previewUrl || exportDisabled}>
               <Printer className="mr-2 h-4 w-4" />
               Print PDF
             </Button>
