@@ -120,6 +120,7 @@ function buildDateTimeRange(from: string, to: string) {
 }
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+const reportPageSize = 1000;
 
 function isValidDateInput(value: string) {
   if (!datePattern.test(value)) return false;
@@ -148,6 +149,27 @@ function splitDepartmentCategory(rawCategory: string | null | undefined): { depa
   return { department: text, subcategory: "General" };
 }
 
+async function fetchDateWiseSalesRows(fromIso: string, toIso: string) {
+  const rows: Array<{ created_at: string; total_amount: number }> = [];
+  for (let offset = 0; ; offset += reportPageSize) {
+    const { data, error } = await adminClient
+      .from("invoices")
+      .select("created_at, total_amount")
+      .in("status", ["approved", "issued", "paid"])
+      .gte("created_at", fromIso)
+      .lte("created_at", toIso)
+      .order("created_at", { ascending: true })
+      .range(offset, offset + reportPageSize - 1);
+
+    if (error) return { error };
+    if (!data || data.length === 0) break;
+    rows.push(...(data as Array<{ created_at: string; total_amount: number }>));
+    if (data.length < reportPageSize) break;
+  }
+
+  return { data: rows };
+}
+
 export async function getReportData(input: ReportQueryInput): Promise<ReportResponse> {
   const access = await getCurrentUserProfile();
   if ("error" in access) return { success: false, error: access.error };
@@ -169,13 +191,7 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
 
   switch (reportKey) {
     case "sales/date-wise-sales-report": {
-      const { data, error } = await adminClient
-        .from("invoices")
-        .select("created_at, total_amount")
-        .in("status", ["approved", "issued", "paid"])
-        .gte("created_at", fromIso)
-        .lte("created_at", toIso)
-        .order("created_at", { ascending: true });
+      const { data, error } = await fetchDateWiseSalesRows(fromIso, toIso);
       if (error) return { success: false, error: error.message };
       const map = new Map<string, number>();
       for (const row of data ?? []) {

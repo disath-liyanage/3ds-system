@@ -587,7 +587,7 @@ export async function deleteCollectionEntry(collectionId: string): Promise<Actio
   const customerRelation = collection.customer;
   const customer = Array.isArray(customerRelation) ? customerRelation[0] : customerRelation;
 
-  await adminClient.from("audit_log").insert({
+  const { error: auditError } = await adminClient.from("audit_log").insert({
     table_name: "collections",
     record_id: collectionId,
     action: "delete",
@@ -600,6 +600,8 @@ export async function deleteCollectionEntry(collectionId: string): Promise<Actio
       customer_name: customer?.name ?? "Unknown"
     }
   });
+
+  if (auditError) return { success: false, error: auditError.message };
 
   const { error: deleteError } = await adminClient.from("collections").delete().eq("id", collectionId);
   if (deleteError) return { success: false, error: deleteError.message };

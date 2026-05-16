@@ -33,7 +33,9 @@ export const REPORT_SECTIONS: ReportSection[] = [
       { key: "customer-outstanding-reports", title: "Customer outstanding reports" },
       { key: "daily-revenue-report", title: "Daily revenue report" },
       { key: "date-wise-cheque-payment-details", title: "Date Wise Cheque Payment Details" },
-      { key: "customer-details", title: "Customer Details" }
+      { key: "customer-details", title: "Customer Details" },
+      { key: "customer-payment-details", title: "Customer Payment Details" },
+      { key: "available-credit-invoices", title: "Available Credit Invoices" }
     ]
   },
   {
