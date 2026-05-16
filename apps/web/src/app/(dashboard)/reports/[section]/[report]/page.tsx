@@ -9,6 +9,7 @@ import { pdf } from "@react-pdf/renderer";
 import "react-day-picker/dist/style.css";
 
 import {
+  getCustomerFilterOptions,
   getCustomerOutstandingFilterOptions,
   getReportData,
   getSalesDepartmentSubcategoryOptions,
@@ -69,6 +70,8 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const isRouteWiseSalesReport = reportKey === "sales/route-wise-sales-report";
   const isDepartmentWiseSalesReport = reportKey === "sales/department-wise-sales-invoice";
   const isCustomerOutstandingReport = reportKey === "customer/customer-outstanding-reports";
+  const isCustomerDetailsReport = reportKey === "customer/customer-details";
+  const isOutstandingStyleCustomerFilterReport = isCustomerOutstandingReport || isCustomerDetailsReport;
   const isCustomerPaymentDetailsReport = reportKey === "customer/customer-payment-details";
   const totalRows = result?.rows.length ?? 0;
   const [routeFilter, setRouteFilter] = useState("ALL");
@@ -151,11 +154,13 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   }, [isDepartmentWiseSalesReport, subcategoryFilter, subcategoryOptions]);
 
   useEffect(() => {
-    if (!isCustomerOutstandingReport) return;
+    if (!isOutstandingStyleCustomerFilterReport) return;
     let active = true;
 
-    const loadOutstandingFilters = async () => {
-      const response = await getCustomerOutstandingFilterOptions();
+    const loadFilters = async () => {
+      const response = isCustomerDetailsReport
+        ? await getCustomerFilterOptions()
+        : await getCustomerOutstandingFilterOptions();
       if (!active || !response.success) return;
       setRouteOptions([
         { value: "ALL", label: "All routes" },
@@ -164,11 +169,11 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       setCustomerOptions((response.customers || []).map((customer) => ({ value: customer, label: customer })));
     };
 
-    void loadOutstandingFilters();
+    void loadFilters();
     return () => {
       active = false;
     };
-  }, [isCustomerOutstandingReport]);
+  }, [isCustomerDetailsReport, isOutstandingStyleCustomerFilterReport]);
 
   const dateRangeLabel = useMemo(() => {
     if (dateRange?.from && dateRange?.to) {
@@ -218,22 +223,28 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       return;
     }
 
-    if (!isCustomerOutstandingReport && (!dateRange?.from || !dateRange?.to)) {
+    if (!isOutstandingStyleCustomerFilterReport && (!dateRange?.from || !dateRange?.to)) {
       setError("Please select a complete date range");
       return;
     }
 
     startTransition(async () => {
       setError("");
-      const reportFromDate = isCustomerOutstandingReport ? today : (dateRange?.from ?? today);
-      const reportToDate = isCustomerOutstandingReport ? today : (dateRange?.to ?? reportFromDate);
+      const runTimestamp = new Date().toISOString();
+      const reportFromDate = isCustomerDetailsReport
+        ? new Date("1970-01-01T00:00:00.000Z")
+        : isCustomerOutstandingReport
+          ? today
+          : (dateRange?.from ?? today);
+      const reportToDate = isOutstandingStyleCustomerFilterReport ? today : (dateRange?.to ?? reportFromDate);
       const response = await getReportData({
         section: section.key,
         report: report.key,
         from: ymd(reportFromDate),
         to: ymd(reportToDate),
-        route: isRouteWiseSalesReport || isCustomerOutstandingReport ? routeFilter : undefined,
-        customer: isCustomerOutstandingReport ? customerFilter : undefined,
+        toTimestamp: isCustomerDetailsReport ? runTimestamp : undefined,
+        route: isRouteWiseSalesReport || isOutstandingStyleCustomerFilterReport ? routeFilter : undefined,
+        customer: isOutstandingStyleCustomerFilterReport ? customerFilter : undefined,
         department: isDepartmentWiseSalesReport ? departmentFilter : undefined,
         subcategory: isDepartmentWiseSalesReport ? subcategoryFilter : undefined
       });
@@ -348,7 +359,11 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       <header className="space-y-2">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">{sectionTitle}</p>
         <h1 className="text-2xl font-bold">{reportTitle}</h1>
-        <p className="text-sm text-muted-foreground">Select a date range and run the report.</p>
+        <p className="text-sm text-muted-foreground">
+          {isOutstandingStyleCustomerFilterReport
+            ? "Select a route or customer and run the report."
+            : "Select a date range and run the report."}
+        </p>
       </header>
 
       <Card>
@@ -358,7 +373,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          {isCustomerOutstandingReport ? (
+          {isOutstandingStyleCustomerFilterReport ? (
             <div className="space-y-1">
               <label className="text-sm font-medium">Route or Customer</label>
               <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto] md:items-center">
@@ -424,7 +439,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
             </div>
           ) : null}
 
-          {isCustomerOutstandingReport ? null : (
+          {isOutstandingStyleCustomerFilterReport ? null : (
             <div className="space-y-1" ref={datePickerRef}>
               <label className="text-sm font-medium">Date Range</label>
               <div className="flex flex-wrap items-center gap-2">
