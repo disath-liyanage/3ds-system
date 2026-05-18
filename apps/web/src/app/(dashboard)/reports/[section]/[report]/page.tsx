@@ -11,6 +11,7 @@ import "react-day-picker/dist/style.css";
 import {
   getCustomerFilterOptions,
   getCustomerOutstandingFilterOptions,
+  getExpenseUserOptions,
   getReportData,
   getSalaryWorkerOptions,
   getSalesDepartmentSubcategoryOptions,
@@ -81,6 +82,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const isCustomerPaymentDetailsReport = reportKey === "customer/customer-payment-details";
   const isProductStockSummaryReport = reportKey === "stock/product-stock-summary";
   const isSalarySlipReport = reportKey === "salary/salary-slip";
+  const isExpensesByUserReport = reportKey === "expenses/expenses-by-user";
   const isDepartmentSubdepartmentFilterReport = isDepartmentWiseSalesReport || isProductStockSummaryReport;
   const [routeFilter, setRouteFilter] = useState("ALL");
   const [routeOptions, setRouteOptions] = useState<Array<{ value: string; label: string }>>([
@@ -101,6 +103,10 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const [salaryWorkerId, setSalaryWorkerId] = useState("");
   const [salaryWorkerOptions, setSalaryWorkerOptions] = useState<SearchableSelectOption[]>([]);
   const [salaryMonth, setSalaryMonth] = useState(format(new Date(), "yyyy-MM"));
+  const [expenseUserId, setExpenseUserId] = useState("ALL");
+  const [expenseUserOptions, setExpenseUserOptions] = useState<Array<{ value: string; label: string }>>([
+    { value: "ALL", label: "All users" }
+  ]);
 
   const activeMode: "detail" = "detail";
 
@@ -180,6 +186,23 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       active = false;
     };
   }, [isSalarySlipReport]);
+
+  useEffect(() => {
+    if (!isExpensesByUserReport) return;
+    let active = true;
+    const loadExpenseUsers = async () => {
+      const response = await getExpenseUserOptions();
+      if (!active || !response.success || !response.users) return;
+      setExpenseUserOptions([
+        { value: "ALL", label: "All users" },
+        ...response.users.map((user) => ({ value: user.id, label: user.full_name }))
+      ]);
+    };
+    void loadExpenseUsers();
+    return () => {
+      active = false;
+    };
+  }, [isExpensesByUserReport]);
 
   useEffect(() => {
     if (!isOutstandingStyleCustomerFilterReport) return;
@@ -287,7 +310,8 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
         route: isRouteWiseSalesReport || isOutstandingStyleCustomerFilterReport ? routeFilter : undefined,
         customer: isOutstandingStyleCustomerFilterReport ? customerFilter : undefined,
         department: isDepartmentSubdepartmentFilterReport ? departmentFilter : undefined,
-        subcategory: isDepartmentSubdepartmentFilterReport ? subcategoryFilter : undefined
+        subcategory: isDepartmentSubdepartmentFilterReport ? subcategoryFilter : undefined,
+        expenseUserId: isExpensesByUserReport ? expenseUserId : undefined
       });
       if (!response.success || !response.data) {
         setResult(null);
@@ -330,8 +354,8 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       <ReportPdfTemplate
         reportTitle={report.title}
         reportKey={reportKey}
-        fromDate={dateRange?.from ? ymd(dateRange.from as Date) : ""}
-        toDate={dateRange?.to ? ymd(dateRange.to as Date) : ""}
+        fromDate={isSalarySlipReport ? `${salaryMonth}-01` : dateRange?.from ? ymd(dateRange.from as Date) : ""}
+        toDate={isSalarySlipReport ? `${salaryMonth}-01` : dateRange?.to ? ymd(dateRange.to as Date) : ""}
         reportDate={format(new Date(), "dd-MM-yyyy")}
         userName={reportUser}
         mode={activeMode}
@@ -387,6 +411,10 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     if (reportKey === "sales/return-invoice-report") {
       const total = activeResult.rows.reduce((sum, row) => sum + (Number(row["Return Amount"]) || 0), 0);
       return { labelColumn: "Return No", amountColumn: "Return Amount", total, label: "Total" };
+    }
+    if (reportKey === "expenses/expenses-by-user") {
+      const total = activeResult.rows.reduce((sum, row) => sum + (Number(row.Amount) || 0), 0);
+      return { labelColumn: "Category", amountColumn: "Amount", total, label: "Total" };
     }
     return null;
   }, [activeResult, reportKey, activeMode]);
@@ -581,6 +609,15 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                 <Button type="button" variant="outline" size="sm" onClick={() => setDateRange(getMonthRange(2))}>
                   Month Before Last
                 </Button>
+                {isExpensesByUserReport ? (
+                  <div className="min-w-[220px] flex-1 md:max-w-[320px]">
+                    <Select
+                      value={expenseUserId}
+                      options={expenseUserOptions}
+                      onChange={(event) => setExpenseUserId(event.target.value)}
+                    />
+                  </div>
+                ) : null}
               </div>
               {isDatePickerOpen ? (
                 <div className="relative">

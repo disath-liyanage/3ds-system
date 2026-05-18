@@ -39,6 +39,7 @@ export type ReportQueryInput = {
   customer?: string;
   department?: string;
   subcategory?: string;
+  expenseUserId?: string;
 };
 
 export type SalesRouteOptionsResponse = {
@@ -77,6 +78,12 @@ export type SalaryWorkerOptionsResponse = {
   success: boolean;
   error?: string;
   workers?: Array<{ id: string; name: string }>;
+};
+
+export type ExpenseUserOptionsResponse = {
+  success: boolean;
+  error?: string;
+  users?: Array<{ id: string; full_name: string }>;
 };
 
 function one<T>(value: T | T[] | null | undefined): T | null {
@@ -1176,13 +1183,17 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
       };
     }
     case "expenses/expenses-by-user": {
-      const { data: expenseRows, error: expenseError } = await adminClient
+      let query = adminClient
         .from("collection_expenses")
         .select("id, category, amount, notes, status, created_at, user:users_profile!collection_expenses_sales_rep_id_fkey(full_name, role)")
         .in("status", ["pending", "approved"])
         .gte("created_at", fromIso)
         .lte("created_at", toIso)
         .order("created_at", { ascending: false });
+      if (input.expenseUserId && input.expenseUserId !== "ALL") {
+        query = query.eq("sales_rep_id", input.expenseUserId);
+      }
+      const { data: expenseRows, error: expenseError } = await query;
       if (expenseError) return { success: false, error: expenseError.message };
 
       return {
@@ -1339,4 +1350,22 @@ export async function getSalaryWorkerOptions(): Promise<SalaryWorkerOptionsRespo
     success: true,
     workers: (data ?? []).map((worker: any) => ({ id: String(worker.id), name: String(worker.name || "") }))
   };
+}
+
+export async function getExpenseUserOptions(): Promise<ExpenseUserOptionsResponse> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+  if (!canViewReports(access.profile)) return { success: false, error: "You do not have permission to view reports" };
+
+  const { data, error } = await adminClient
+    .from("users_profile")
+    .select("id, full_name")
+    .order("full_name", { ascending: true });
+  if (error) return { success: false, error: error.message };
+
+  const users = (data ?? [])
+    .map((row: any) => ({ id: String(row.id || ""), full_name: String(row.full_name || "").trim() }))
+    .filter((row) => row.id && row.full_name);
+
+  return { success: true, users };
 }

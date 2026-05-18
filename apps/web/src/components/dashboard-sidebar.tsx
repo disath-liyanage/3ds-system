@@ -81,7 +81,12 @@ export function DashboardSidebar({ isAdmin, isManager, user }: DashboardSidebarP
   const navItems = useMemo(() => {
     const withAttendance =
       user.role === "admin" || user.role === "manager"
-        ? [...baseNavItems, { href: "/attendance", label: "Attendance", icon: CalendarCheck2 }]
+        ? [
+            ...baseNavItems,
+            { href: "/attendance", label: "Attendance", icon: CalendarCheck2 },
+            { href: "/targets", label: "Targets", icon: ClipboardList },
+            { href: "/expenses", label: "Expenses", icon: HandCoins }
+          ]
         : baseNavItems;
 
     return withAttendance.map((item) =>
