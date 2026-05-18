@@ -931,6 +931,9 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
       };
     }
     case "salary/salary-slip": {
+      if (access.profile.role !== "admin" && access.profile.role !== "manager") {
+        return { success: false, error: "You do not have permission to view salary slips" };
+      }
       if (!input.workerId) return { success: false, error: "Worker is required" };
       const { monthStart, monthEnd, year } = getMonthRangeFromYmd(input.from);
       const fromMonthIso = monthStart.toISOString();
@@ -968,16 +971,23 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         );
         const rateMap = new Map<string, number>();
         if (productIds.length > 0) {
-          const { data: rateRows, error: rateError } = await adminClient
-            .from("receive_note_items")
-            .select("product_id, rep_sales_discount, created_at")
-            .in("product_id", productIds)
-            .order("created_at", { ascending: false });
-          if (rateError) return { success: false, error: rateError.message };
-          for (const row of rateRows ?? []) {
-            const productId = String((row as any).product_id || "");
-            if (!productId || rateMap.has(productId)) continue;
-            rateMap.set(productId, Number((row as any).rep_sales_discount) || 0);
+          const rateResults = await Promise.all(
+            productIds.map(async (productId) => {
+              const { data, error } = await adminClient
+                .from("receive_note_items")
+                .select("product_id, rep_sales_discount, created_at")
+                .eq("product_id", productId)
+                .order("created_at", { ascending: false })
+                .limit(1);
+              return { productId, data, error };
+            })
+          );
+          for (const result of rateResults) {
+            if (result.error) return { success: false, error: result.error.message };
+            const row = result.data?.[0];
+            const productId = String((row as any)?.product_id || result.productId || "");
+            if (!productId) continue;
+            rateMap.set(productId, Number((row as any)?.rep_sales_discount) || 0);
           }
         }
         for (const item of invoiceItems ?? []) {
@@ -1346,6 +1356,9 @@ export async function getSalaryWorkerOptions(): Promise<SalaryWorkerOptionsRespo
   const access = await getCurrentUserProfile();
   if ("error" in access) return { success: false, error: access.error };
   if (!canViewReports(access.profile)) return { success: false, error: "You do not have permission to view reports" };
+  if (access.profile.role !== "admin" && access.profile.role !== "manager") {
+    return { success: false, error: "You do not have permission to view salary slips" };
+  }
 
   const { data, error } = await adminClient.from("workers").select("id, name").order("name", { ascending: true });
   if (error) return { success: false, error: error.message };
