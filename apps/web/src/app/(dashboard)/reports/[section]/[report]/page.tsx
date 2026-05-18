@@ -432,6 +432,20 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     return out;
   }, [activeResult, isGrnReport]);
 
+  const expenseUserShadeMap = useMemo(() => {
+    const out = new Map<string, string>();
+    if (!isExpensesByUserReport || !activeResult) return out;
+    const shades = ["bg-slate-50", "bg-amber-50", "bg-emerald-50", "bg-sky-50"];
+    let colorIndex = 0;
+    for (const row of activeResult.rows) {
+      const userName = String(row["User / Worker"] ?? "").trim();
+      if (!userName || out.has(userName)) continue;
+      out.set(userName, shades[colorIndex % shades.length]);
+      colorIndex += 1;
+    }
+    return out;
+  }, [activeResult, isExpensesByUserReport]);
+
   const onSortColumn = (column: string) => {
     if (sortColumn !== column) {
       setSortColumn(column);
@@ -800,12 +814,16 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                     const grnNo = String(row["GRN No"] ?? "");
                     const grnRowType = String(row.__rowType || "");
                     const grnShadeClass = grnShadeMap.get(grnNo) ?? "";
+                    const expenseUser = String(row["User / Worker"] ?? "").trim();
+                    const expenseShadeClass = expenseUserShadeMap.get(expenseUser) ?? "";
                     const rowClassName = isOutstanding
                       ? rowType === "customer"
                         ? "bg-muted/30 border-b border-border"
                         : Number(row.__isLastInvoice) === 1
                           ? ""
                           : "border-b border-border"
+                      : isExpensesByUserReport
+                        ? `${expenseShadeClass} border-b border-border`
                       : isGrnReport
                         ? grnRowType === "grn-total"
                           ? `${grnShadeClass} border-b-2 border-slate-500 font-semibold`
@@ -928,6 +946,16 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                                   ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
                                   : String(value ?? "")}
                               </Link>
+                            ) : isExpensesByUserReport && colLower === "status" ? (
+                              <span
+                                className={
+                                  String(value ?? "").toLowerCase() === "approved"
+                                    ? "inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700"
+                                    : "inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700"
+                                }
+                              >
+                                {String(value ?? "")}
+                              </span>
                             ) : typeof value === "number" ? (
                               value.toLocaleString(undefined, { maximumFractionDigits: 2 })
                             ) : (
@@ -940,7 +968,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                     );
                   })}
                   {totalRowConfig ? (
-                    <tr className="border-b border-border font-semibold">
+                    <tr className={`${isExpensesByUserReport ? "bg-slate-200 border-b-2 border-slate-500" : "border-b border-border"} font-semibold`}>
                       {activeResult.columns.map((column) => {
                         const colLower = column.trim().toLowerCase();
                         const isInvoiceColumn = /invoice\s*(no|number)/i.test(column);

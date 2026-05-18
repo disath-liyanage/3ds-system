@@ -93,6 +93,15 @@ export default function CollectionExpensesPage() {
         <CardContent className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1">
+              <label className="text-sm font-medium">Amount</label>
+              <Input
+                type="number"
+                step="0.01"
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
               <label className="text-sm font-medium">Category</label>
               <Select
                 value={category}
@@ -111,15 +120,6 @@ export default function CollectionExpensesPage() {
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
                 placeholder="Optional note"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium">Amount</label>
-              <Input
-                type="number"
-                step="0.01"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
               />
             </div>
           </div>
