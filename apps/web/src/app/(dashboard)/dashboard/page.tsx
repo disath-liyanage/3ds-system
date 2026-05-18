@@ -16,6 +16,15 @@ function getProgressBarColorClass(percentage: number) {
   return "bg-red-500";
 }
 
+function getMotivationMessage(percentage: number) {
+  if (percentage >= 100) return "Excellent work, Target achieved.";
+  if (percentage > 90) return "Final push, you are right at the finish line.";
+  if (percentage > 75) return "You are almost there, keep going strong.";
+  if (percentage >= 50) return "You're halfway there, you can do it.";
+  if (percentage > 25) return "Great momentum, keep pushing.";
+  return "Good start, keep moving forward.";
+}
+
 export default async function DashboardPage() {
   const supabase = createClient();
   const {
@@ -117,9 +126,14 @@ export default async function DashboardPage() {
             <CardTitle className="text-base">Monthly Sales Progress</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span>Current Sales: {salesProgress.sales.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
-              <span>Target: {salesProgress.target.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+            <div className="grid grid-cols-3 items-center gap-2 text-sm">
+              <span className="text-left font-bold">
+                Current Sales: {salesProgress.sales.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </span>
+              <span className="text-center font-bold">{getMotivationMessage(salesProgress.percentage)}</span>
+              <span className="text-right font-bold">
+                Target: {salesProgress.target.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </span>
             </div>
             <div className="h-3 w-full rounded-full bg-slate-200">
               <div

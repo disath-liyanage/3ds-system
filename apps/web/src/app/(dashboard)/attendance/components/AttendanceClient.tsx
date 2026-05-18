@@ -84,7 +84,7 @@ export function AttendanceClient({
   });
   const [isPending, startTransition] = useTransition();
   const [deductionWorkerId, setDeductionWorkerId] = useState("");
-  const [deductionType, setDeductionType] = useState<"advance" | "loan">("advance");
+  const [deductionType, setDeductionType] = useState<"advance" | "loan" | "">("");
   const [deductionAmount, setDeductionAmount] = useState("");
   const [deductionMonths, setDeductionMonths] = useState("");
   const [deductionNote, setDeductionNote] = useState("");
@@ -362,6 +362,10 @@ export function AttendanceClient({
                 toast({ title: "Missing worker", description: "Please select a worker.", variant: "error" });
                 return;
               }
+              if (!deductionType) {
+                toast({ title: "Missing type", description: "Please select advance or loan.", variant: "error" });
+                return;
+              }
               if (!Number.isFinite(amount) || amount <= 0) {
                 toast({ title: "Invalid amount", description: "Enter a valid amount.", variant: "error" });
                 return;
@@ -387,6 +391,7 @@ export function AttendanceClient({
               setDeductionAmount("");
               setDeductionMonths("");
               setDeductionNote("");
+              setDeductionType("");
             }}
           >
             <div className="space-y-1">
@@ -406,12 +411,17 @@ export function AttendanceClient({
                   { value: "advance", label: "Advance" },
                   { value: "loan", label: "Loan" }
                 ]}
-                onChange={(value) => setDeductionType(value === "loan" ? "loan" : "advance")}
+                placeholder="Select type"
+                onChange={(value) => setDeductionType(value === "loan" ? "loan" : value === "advance" ? "advance" : "")}
               />
             </div>
             <div className="space-y-1">
               <label className="text-sm font-medium">Amount</label>
               <Input type="number" min={0.01} step="0.01" value={deductionAmount} onChange={(e) => setDeductionAmount(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Note</label>
+              <Input value={deductionNote} onChange={(e) => setDeductionNote(e.target.value)} placeholder="Optional note" />
             </div>
             {deductionType === "loan" ? (
               <div className="space-y-1">
@@ -419,10 +429,6 @@ export function AttendanceClient({
                 <Input type="number" min={1} step={1} value={deductionMonths} onChange={(e) => setDeductionMonths(e.target.value)} />
               </div>
             ) : null}
-            <div className="space-y-1 md:col-span-2">
-              <label className="text-sm font-medium">Note</label>
-              <Input value={deductionNote} onChange={(e) => setDeductionNote(e.target.value)} placeholder="Optional note" />
-            </div>
             <div className="md:col-span-2">
               <Button type="submit" disabled={deductionSaving}>
                 {deductionSaving ? "Saving..." : "Save Advance / Loan"}
