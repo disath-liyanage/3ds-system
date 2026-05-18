@@ -14,6 +14,7 @@ export default function TargetsPage() {
   const [targetRepId, setTargetRepId] = useState("");
   const [targetMonth, setTargetMonth] = useState(new Date().toISOString().slice(0, 7));
   const [targetAmount, setTargetAmount] = useState("");
+  const [targetIncentive, setTargetIncentive] = useState("");
   const [targetSaving, setTargetSaving] = useState(false);
   const [managerTargetMonth, setManagerTargetMonth] = useState(new Date().toISOString().slice(0, 7));
   const [managerTargetAmount, setManagerTargetAmount] = useState("");
@@ -50,6 +51,7 @@ export default function TargetsPage() {
             onSubmit={async (event) => {
               event.preventDefault();
               const parsedTarget = Number(targetAmount);
+              const parsedIncentive = Number(targetIncentive || 0);
               if (!targetRepId) {
                 toast({ title: "Missing rep", description: "Please select a sales rep.", variant: "error" });
                 return;
@@ -58,13 +60,17 @@ export default function TargetsPage() {
                 toast({ title: "Invalid target", description: "Enter valid target amount.", variant: "error" });
                 return;
               }
+              if (!Number.isFinite(parsedIncentive) || parsedIncentive < 0) {
+                toast({ title: "Invalid incentive", description: "Enter valid incentive amount.", variant: "error" });
+                return;
+              }
 
               setTargetSaving(true);
               const result = await upsertSalesRepMonthlyTarget({
                 salesRepId: targetRepId,
                 month: targetMonth,
                 targetAmount: parsedTarget,
-                incentiveAmount: 0
+                incentiveAmount: parsedIncentive
               });
               setTargetSaving(false);
 
@@ -91,6 +97,16 @@ export default function TargetsPage() {
             <div className="space-y-1">
               <label className="text-sm font-medium">Monthly Sales Target</label>
               <Input type="number" min={0} step="0.01" value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Incentive (if target achieved)</label>
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                value={targetIncentive}
+                onChange={(e) => setTargetIncentive(e.target.value)}
+              />
             </div>
             <div className="md:col-span-2">
               <Button type="submit" disabled={targetSaving}>
