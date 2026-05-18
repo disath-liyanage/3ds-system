@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { listSalesReps, upsertSalesRepMonthlyTarget } from "@/app/actions/attendance";
+import { listSalesReps, upsertManagerMonthlySalesTarget, upsertSalesRepMonthlyTarget } from "@/app/actions/attendance";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,9 @@ export default function TargetsPage() {
   const [targetMonth, setTargetMonth] = useState(new Date().toISOString().slice(0, 7));
   const [targetAmount, setTargetAmount] = useState("");
   const [targetSaving, setTargetSaving] = useState(false);
+  const [managerTargetMonth, setManagerTargetMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [managerTargetAmount, setManagerTargetAmount] = useState("");
+  const [managerTargetSaving, setManagerTargetSaving] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -38,7 +41,7 @@ export default function TargetsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Set Monthly Sales Target</CardTitle>
+          <CardTitle>Set Monthly Sales Target for Reps</CardTitle>
           <CardDescription>Managers and admins can assign a monthly sales target to each sales rep.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -92,6 +95,59 @@ export default function TargetsPage() {
             <div className="md:col-span-2">
               <Button type="submit" disabled={targetSaving}>
                 {targetSaving ? "Saving..." : "Save Target"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Set Monthly Sales Target</CardTitle>
+          <CardDescription>Set the overall monthly sales target based on combined sales of all users.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            className="grid gap-3 md:grid-cols-2"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const parsedTarget = Number(managerTargetAmount);
+              if (!Number.isFinite(parsedTarget) || parsedTarget < 0) {
+                toast({ title: "Invalid target", description: "Enter valid target amount.", variant: "error" });
+                return;
+              }
+
+              setManagerTargetSaving(true);
+              const result = await upsertManagerMonthlySalesTarget({
+                month: managerTargetMonth,
+                targetAmount: parsedTarget
+              });
+              setManagerTargetSaving(false);
+
+              if (!result.success) {
+                toast({ title: "Save failed", description: result.error || "Could not save target", variant: "error" });
+                return;
+              }
+              toast({ title: "Saved", description: "Overall monthly sales target saved.", variant: "success" });
+            }}
+          >
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Month</label>
+              <Input type="month" value={managerTargetMonth} onChange={(e) => setManagerTargetMonth(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Monthly Sales Target</label>
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                value={managerTargetAmount}
+                onChange={(e) => setManagerTargetAmount(e.target.value)}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Button type="submit" disabled={managerTargetSaving}>
+                {managerTargetSaving ? "Saving..." : "Save Target"}
               </Button>
             </div>
           </form>

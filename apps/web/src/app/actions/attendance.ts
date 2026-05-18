@@ -31,6 +31,11 @@ type UpsertSalesTargetInput = {
   incentiveAmount: number;
 };
 
+type UpsertManagerSalesTargetInput = {
+  month: string;
+  targetAmount: number;
+};
+
 async function requireAdminOrManager() {
   const supabase = createClient();
   const {
@@ -190,6 +195,40 @@ export async function upsertSalesRepMonthlyTarget(input: UpsertSalesTargetInput)
       updated_at: new Date().toISOString()
     },
     { onConflict: "sales_rep_id,target_month" }
+  );
+
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+export async function upsertManagerMonthlySalesTarget(input: UpsertManagerSalesTargetInput): Promise<ActionResult> {
+  const auth = await requireAdminOrManager();
+  if ("error" in auth) return { success: false, error: auth.error };
+
+  if (!input.month) {
+    return { success: false, error: "Month is required" };
+  }
+
+  const targetAmount = Number(input.targetAmount);
+  if (!Number.isFinite(targetAmount) || targetAmount < 0) {
+    return { success: false, error: "Target amount must be valid" };
+  }
+
+  const targetMonth = new Date(`${input.month}-01T00:00:00.000Z`);
+  if (!Number.isFinite(targetMonth.getTime())) {
+    return { success: false, error: "Invalid month" };
+  }
+  const monthDate = targetMonth.toISOString().slice(0, 10);
+
+  const { error } = await auth.supabase.from("manager_monthly_sales_targets").upsert(
+    {
+      manager_id: auth.userId,
+      target_month: monthDate,
+      target_amount: targetAmount,
+      created_by: auth.userId,
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: "manager_id,target_month" }
   );
 
   if (error) return { success: false, error: error.message };
