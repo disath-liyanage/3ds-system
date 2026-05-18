@@ -182,20 +182,43 @@ export async function upsertSalesRepMonthlyTarget(input: UpsertSalesTargetInput)
 
   const currentSales = (salesInvoices ?? []).reduce((sum, row: any) => sum + (Number(row.total_amount) || 0), 0);
   const achieved = currentSales >= targetAmount;
+  const updatedAt = new Date().toISOString();
 
-  const { error } = await auth.supabase.from("sales_rep_monthly_targets").upsert(
-    {
-      sales_rep_id: input.salesRepId,
-      target_month: monthDate,
-      target_amount: targetAmount,
-      incentive_amount: incentiveAmount,
-      incentive_given_by: achieved && incentiveAmount > 0 ? auth.userId : null,
-      incentive_given_at: achieved && incentiveAmount > 0 ? new Date().toISOString() : null,
-      created_by: auth.userId,
-      updated_at: new Date().toISOString()
-    },
-    { onConflict: "sales_rep_id,target_month" }
-  );
+  const { data: existingTarget, error: existingTargetError } = await auth.supabase
+    .from("sales_rep_monthly_targets")
+    .select("id, incentive_given_by, incentive_given_at")
+    .eq("sales_rep_id", input.salesRepId)
+    .eq("target_month", monthDate)
+    .maybeSingle();
+  if (existingTargetError) return { success: false, error: existingTargetError.message };
+
+  const incentiveAlreadyGiven = Boolean((existingTarget as any)?.incentive_given_by || (existingTarget as any)?.incentive_given_at);
+  const shouldSetIncentive = achieved && incentiveAmount > 0 && !incentiveAlreadyGiven;
+  const incentiveFields = shouldSetIncentive
+    ? { incentive_given_by: auth.userId, incentive_given_at: updatedAt }
+    : {};
+
+  const { error } = existingTarget
+    ? await auth.supabase
+        .from("sales_rep_monthly_targets")
+        .update({
+          target_amount: targetAmount,
+          incentive_amount: incentiveAmount,
+          updated_at: updatedAt,
+          ...incentiveFields
+        })
+        .eq("sales_rep_id", input.salesRepId)
+        .eq("target_month", monthDate)
+    : await auth.supabase.from("sales_rep_monthly_targets").insert({
+        sales_rep_id: input.salesRepId,
+        target_month: monthDate,
+        target_amount: targetAmount,
+        incentive_amount: incentiveAmount,
+        created_by: auth.userId,
+        updated_at: updatedAt,
+        incentive_given_by: achieved && incentiveAmount > 0 ? auth.userId : null,
+        incentive_given_at: achieved && incentiveAmount > 0 ? updatedAt : null
+      });
 
   if (error) return { success: false, error: error.message };
   return { success: true };
@@ -219,17 +242,32 @@ export async function upsertManagerMonthlySalesTarget(input: UpsertManagerSalesT
     return { success: false, error: "Invalid month" };
   }
   const monthDate = targetMonth.toISOString().slice(0, 10);
+  const updatedAt = new Date().toISOString();
 
-  const { error } = await auth.supabase.from("manager_monthly_sales_targets").upsert(
-    {
-      manager_id: auth.userId,
-      target_month: monthDate,
-      target_amount: targetAmount,
-      created_by: auth.userId,
-      updated_at: new Date().toISOString()
-    },
-    { onConflict: "manager_id,target_month" }
-  );
+  const { data: existingTarget, error: existingTargetError } = await auth.supabase
+    .from("manager_monthly_sales_targets")
+    .select("id")
+    .eq("manager_id", auth.userId)
+    .eq("target_month", monthDate)
+    .maybeSingle();
+  if (existingTargetError) return { success: false, error: existingTargetError.message };
+
+  const { error } = existingTarget
+    ? await auth.supabase
+        .from("manager_monthly_sales_targets")
+        .update({
+          target_amount: targetAmount,
+          updated_at: updatedAt
+        })
+        .eq("manager_id", auth.userId)
+        .eq("target_month", monthDate)
+    : await auth.supabase.from("manager_monthly_sales_targets").insert({
+        manager_id: auth.userId,
+        target_month: monthDate,
+        target_amount: targetAmount,
+        created_by: auth.userId,
+        updated_at: updatedAt
+      });
 
   if (error) return { success: false, error: error.message };
   return { success: true };

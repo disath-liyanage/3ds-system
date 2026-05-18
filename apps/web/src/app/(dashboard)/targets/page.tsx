@@ -96,14 +96,14 @@ export default function TargetsPage() {
             </div>
             <div className="space-y-1">
               <label className="text-sm font-medium">Monthly Sales Target</label>
-              <Input type="number" min={0} step="0.01" value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} />
+              <Input type="number" min={0} step="100000" value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} />
             </div>
             <div className="space-y-1">
               <label className="text-sm font-medium">Incentive (if target achieved)</label>
               <Input
                 type="number"
                 min={0}
-                step="0.01"
+                step="1000"
                 value={targetIncentive}
                 onChange={(e) => setTargetIncentive(e.target.value)}
               />
@@ -156,7 +156,7 @@ export default function TargetsPage() {
               <Input
                 type="number"
                 min={0}
-                step="0.01"
+                step="1000000"
                 value={managerTargetAmount}
                 onChange={(e) => setManagerTargetAmount(e.target.value)}
               />

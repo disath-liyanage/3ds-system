@@ -231,9 +231,9 @@ export function ReportPdfTemplate({ reportTitle, reportKey, fromDate, toDate, re
                   </View>
                 ))}
               {result.rows
-                .filter((row) => String(row.Item || "") === "Employer ETF (3%)")
+                .filter((row) => String(row.__bucket || "") === "stat")
                 .map((row, index) => (
-                  <View key={`etf-${index}`} style={styles.salaryFooterRow}>
+                  <View key={`stat-${index}`} style={styles.salaryFooterRow}>
                     <Text>{String(row.Item || "")}</Text>
                     <Text>{Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
                   </View>

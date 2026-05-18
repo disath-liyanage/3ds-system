@@ -803,9 +803,19 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
               </div>
               <div className="space-y-1 border-t border-border pt-2">
                 {activeResult.rows
-                  .filter((row) => String(row.Item || "") === "Employee EPF (8%)" || String(row.Item || "") === "Employer ETF (3%)")
+                  .filter((row) => String(row.Item || "") === "Employee EPF (8%)")
                   .map((row, index) => (
                     <div key={`foot-${index}`} className="flex items-center justify-between">
+                      <span>{String(row.Item || "")}</span>
+                      <span className="font-medium">
+                        {Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  ))}
+                {activeResult.rows
+                  .filter((row) => String(row.__bucket || "") === "stat")
+                  .map((row, index) => (
+                    <div key={`stat-${index}`} className="flex items-center justify-between">
                       <span>{String(row.Item || "")}</span>
                       <span className="font-medium">
                         {Number(row.Amount || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}

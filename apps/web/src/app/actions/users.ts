@@ -574,7 +574,8 @@ export async function createWorkerDeduction(data: WorkerDeductionInput): Promise
     return { success: false, error: "Loan months must be a valid positive number" };
   }
 
-  const monthlyAmount = deductionType === "loan" ? amount / Number(months) : amount;
+  const monthlyAmount =
+    deductionType === "loan" ? Math.round((amount / Number(months)) * 100) / 100 : amount;
 
   const { data: worker, error: workerError } = await access.supabase
     .from("workers")
