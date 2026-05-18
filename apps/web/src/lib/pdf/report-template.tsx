@@ -85,11 +85,18 @@ const styles = StyleSheet.create({
     paddingTop: 5
   },
   salaryFooterRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 4, fontSize: 14 },
-  salaryFooterNetRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 2, fontSize: 15, fontWeight: 700 }
+  salaryFooterNetRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 2, fontSize: 15, fontWeight: 700 },
+  salaryMonthYearTopRight: { fontSize: 12, textAlign: "right", marginBottom: 4, fontWeight: 700 }
 });
 
 export function ReportPdfTemplate({ reportTitle, reportKey, fromDate, toDate, reportDate, userName, mode, result }: ReportPdfTemplateProps) {
   const isSalarySlip = reportKey === "salary/salary-slip";
+  const salaryMonthYear = (() => {
+    if (!isSalarySlip || !fromDate) return "";
+    const date = new Date(`${fromDate}T00:00:00.000Z`);
+    if (!Number.isFinite(date.getTime())) return fromDate;
+    return new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(date);
+  })();
   const isOutstandingLayout =
     result.columns.length === 3 &&
     result.columns[0] === "Customer / Invoice" &&
@@ -150,6 +157,7 @@ export function ReportPdfTemplate({ reportTitle, reportKey, fromDate, toDate, re
         <Text style={styles.companyAddress}>No : 44/1,Tharanga Place, Panagoda, Homagama</Text>
         <Text style={styles.companyContact}>070 321 5756/ 011 208 3773</Text>
         <View style={styles.divider} />
+        {isSalarySlip ? <Text style={styles.salaryMonthYearTopRight}>{salaryMonthYear}</Text> : null}
 
         <Text style={styles.reportTitle}>
           {isSalarySlip ? `Salary Slip - ${String(result.rows[0]?.__workerName || "").trim()}` : reportTitle}

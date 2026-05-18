@@ -54,6 +54,40 @@ export default async function DashboardPage() {
       const sales = (invoices ?? []).reduce((sum, row: any) => sum + (Number(row.total_amount) || 0), 0);
       const percentage = target > 0 ? Math.min(100, (sales / target) * 100) : 0;
       salesProgress = { target, sales, percentage };
+    } else if (profile?.role === "manager" || profile?.role === "admin") {
+      const now = new Date();
+      const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+      const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+
+      const [{ data: targets }, { data: salesReps }] = await Promise.all([
+        adminClient
+          .from("sales_rep_monthly_targets")
+          .select("sales_rep_id, target_amount")
+          .eq("target_month", monthStart.toISOString().slice(0, 10)),
+        adminClient
+          .from("users_profile")
+          .select("id")
+          .eq("role", "sales_rep")
+      ]);
+
+      const repIds = (salesReps ?? []).map((row: any) => String(row.id || "")).filter(Boolean);
+      const targetRows = (targets ?? []).filter((row: any) => repIds.includes(String(row.sales_rep_id || "")));
+      const target = targetRows.reduce((sum: number, row: any) => sum + (Number(row.target_amount) || 0), 0);
+
+      let sales = 0;
+      if (repIds.length > 0) {
+        const { data: invoices } = await adminClient
+          .from("invoices")
+          .select("total_amount")
+          .in("issued_by", repIds)
+          .in("status", ["approved", "issued", "paid"])
+          .gte("created_at", monthStart.toISOString())
+          .lte("created_at", monthEnd.toISOString());
+        sales = (invoices ?? []).reduce((sum: number, row: any) => sum + (Number(row.total_amount) || 0), 0);
+      }
+
+      const percentage = target > 0 ? Math.min(100, (sales / target) * 100) : 0;
+      salesProgress = { target, sales, percentage };
     }
   }
 
