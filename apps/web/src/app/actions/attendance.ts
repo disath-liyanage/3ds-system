@@ -188,7 +188,7 @@ export async function upsertSalesRepMonthlyTarget(input: UpsertSalesTargetInput)
       sales_rep_id: input.salesRepId,
       target_month: monthDate,
       target_amount: targetAmount,
-      incentive_amount: achieved ? incentiveAmount : 0,
+      incentive_amount: incentiveAmount,
       incentive_given_by: achieved && incentiveAmount > 0 ? auth.userId : null,
       incentive_given_at: achieved && incentiveAmount > 0 ? new Date().toISOString() : null,
       created_by: auth.userId,
