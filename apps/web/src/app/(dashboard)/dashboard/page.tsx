@@ -8,6 +8,14 @@ const summary = [
   { label: "Low Stock Items", value: "7" }
 ];
 
+function getProgressBarColorClass(percentage: number) {
+  if (percentage >= 100) return "bg-emerald-600";
+  if (percentage > 75) return "bg-lime-500";
+  if (percentage > 50) return "bg-yellow-400";
+  if (percentage > 25) return "bg-orange-500";
+  return "bg-red-500";
+}
+
 export default async function DashboardPage() {
   const supabase = createClient();
   const {
@@ -114,7 +122,10 @@ export default async function DashboardPage() {
               <span>Target: {salesProgress.target.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
             </div>
             <div className="h-3 w-full rounded-full bg-slate-200">
-              <div className="h-3 rounded-full bg-emerald-500" style={{ width: `${salesProgress.percentage}%` }} />
+              <div
+                className={`h-3 rounded-full ${getProgressBarColorClass(salesProgress.percentage)}`}
+                style={{ width: `${salesProgress.percentage}%` }}
+              />
             </div>
             <p className="text-sm font-medium">{salesProgress.percentage.toFixed(1)}%</p>
           </CardContent>
