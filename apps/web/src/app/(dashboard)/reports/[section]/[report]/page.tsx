@@ -104,9 +104,17 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const [salaryWorkerOptions, setSalaryWorkerOptions] = useState<SearchableSelectOption[]>([]);
   const [salaryMonth, setSalaryMonth] = useState(format(new Date(), "yyyy-MM"));
   const [expenseUserId, setExpenseUserId] = useState("ALL");
+  const [expenseCategory, setExpenseCategory] = useState("ALL");
   const [expenseUserOptions, setExpenseUserOptions] = useState<Array<{ value: string; label: string }>>([
     { value: "ALL", label: "All users" }
   ]);
+  const expenseCategoryOptions: Array<{ value: string; label: string }> = [
+    { value: "ALL", label: "All categories" },
+    { value: "Fuel", label: "Fuel" },
+    { value: "Food", label: "Food" },
+    { value: "Parking", label: "Parking" },
+    { value: "Other", label: "Other" }
+  ];
 
   const activeMode: "detail" = "detail";
 
@@ -311,7 +319,8 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
         customer: isOutstandingStyleCustomerFilterReport ? customerFilter : undefined,
         department: isDepartmentSubdepartmentFilterReport ? departmentFilter : undefined,
         subcategory: isDepartmentSubdepartmentFilterReport ? subcategoryFilter : undefined,
-        expenseUserId: isExpensesByUserReport ? expenseUserId : undefined
+        expenseUserId: isExpensesByUserReport ? expenseUserId : undefined,
+        expenseCategory: isExpensesByUserReport ? expenseCategory : undefined
       });
       if (!response.success || !response.data) {
         setResult(null);
@@ -502,6 +511,20 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <CardTitle>Filters</CardTitle>
+            {isExpensesByUserReport ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const today = todayDate();
+                  setExpenseUserId("ALL");
+                  setExpenseCategory("ALL");
+                  setDateRange({ from: today, to: today });
+                }}
+              >
+                Reset
+              </Button>
+            ) : null}
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -602,7 +625,57 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
             </div>
           ) : null}
 
-          {isOutstandingStyleCustomerFilterReport || isProductStockSummaryReport || isSalarySlipReport ? null : (
+          {isExpensesByUserReport ? (
+            <div className="space-y-3" ref={datePickerRef}>
+              <div className="grid gap-2 md:grid-cols-2 md:items-center">
+                <Select
+                  value={expenseUserId}
+                  options={expenseUserOptions}
+                  onChange={(event) => setExpenseUserId(event.target.value)}
+                />
+                <Select
+                  value={expenseCategory}
+                  options={expenseCategoryOptions}
+                  onChange={(event) => setExpenseCategory(event.target.value)}
+                />
+              </div>
+              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                <button
+                  type="button"
+                  onClick={() => setIsDatePickerOpen((prev) => !prev)}
+                  className="flex h-10 min-w-[260px] items-center justify-between rounded-md border border-input bg-background px-3 text-sm text-foreground transition focus:outline-none focus:ring-2 focus:ring-primary/40"
+                >
+                  <span className={dateRange?.from ? "text-foreground" : "text-muted-foreground"}>{dateRangeLabel}</span>
+                  <span className="text-xs text-muted-foreground">Pick</span>
+                </button>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setDateRange(getMonthRange(0))}>
+                    This Month
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setDateRange(getMonthRange(1))}>
+                    Last Month
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setDateRange(getMonthRange(2))}>
+                    Month Before Last
+                  </Button>
+                </div>
+              </div>
+              {isDatePickerOpen ? (
+                <div className="relative">
+                  <div className="absolute z-20 mt-2 rounded-md border border-border bg-white p-3 shadow-lg">
+                    <DayPicker
+                      mode="range"
+                      selected={dateRange}
+                      onSelect={setDateRange}
+                      numberOfMonths={2}
+                      defaultMonth={dateRange?.from}
+                      className="rounded-md"
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : isOutstandingStyleCustomerFilterReport || isProductStockSummaryReport || isSalarySlipReport ? null : (
             <div className="space-y-1" ref={datePickerRef}>
               <label className="text-sm font-medium">Date Range</label>
               <div className="flex flex-wrap items-center gap-2">
@@ -623,15 +696,6 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                 <Button type="button" variant="outline" size="sm" onClick={() => setDateRange(getMonthRange(2))}>
                   Month Before Last
                 </Button>
-                {isExpensesByUserReport ? (
-                  <div className="min-w-[220px] flex-1 md:max-w-[320px]">
-                    <Select
-                      value={expenseUserId}
-                      options={expenseUserOptions}
-                      onChange={(event) => setExpenseUserId(event.target.value)}
-                    />
-                  </div>
-                ) : null}
               </div>
               {isDatePickerOpen ? (
                 <div className="relative">

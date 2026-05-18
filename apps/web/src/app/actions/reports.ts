@@ -40,6 +40,7 @@ export type ReportQueryInput = {
   department?: string;
   subcategory?: string;
   expenseUserId?: string;
+  expenseCategory?: string;
 };
 
 export type SalesRouteOptionsResponse = {
@@ -1192,6 +1193,9 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         .order("created_at", { ascending: false });
       if (input.expenseUserId && input.expenseUserId !== "ALL") {
         query = query.eq("sales_rep_id", input.expenseUserId);
+      }
+      if (input.expenseCategory && input.expenseCategory !== "ALL") {
+        query = query.eq("category", input.expenseCategory);
       }
       const { data: expenseRows, error: expenseError } = await query;
       if (expenseError) return { success: false, error: expenseError.message };
