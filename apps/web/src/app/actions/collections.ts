@@ -890,10 +890,16 @@ export async function listMyCollectionExpenses(): Promise<{
     return { success: false, error: "You do not have permission to view expenses" };
   }
 
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+  const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999)).toISOString();
+
   const { data, error } = await adminClient
     .from("collection_expenses")
     .select("id, sales_rep_id, title, category, amount, notes, status, created_at")
     .eq("sales_rep_id", access.profile.id)
+    .gte("created_at", monthStart)
+    .lte("created_at", monthEnd)
     .order("created_at", { ascending: false })
     .returns<CollectionExpenseRow[]>();
 
@@ -931,17 +937,21 @@ export async function addCollectionExpense(input: {
     return { success: false, error: "Amount must be greater than 0" };
   }
 
+  const expenseStatus = access.profile.role === "manager" || access.profile.role === "admin" ? "approved" : "pending";
+
   const { error } = await adminClient.from("collection_expenses").insert({
     sales_rep_id: access.profile.id,
     title: input.category,
     category: input.category,
     amount,
-    notes: notes || null
+    notes: notes || null,
+    status: expenseStatus
   });
 
   if (error) return { success: false, error: error.message };
 
   revalidatePath("/collections/expenses");
+  revalidatePath("/expenses");
   revalidatePath("/collections/approvals");
 
   return { success: true, message: "Expense added" };
