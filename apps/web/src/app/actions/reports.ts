@@ -4,6 +4,7 @@ import type { UserRole } from "@paintdist/shared";
 
 import { adminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { categoryOptions } from "@/lib/product-category-options";
 
 type CustomRolePermissionSummary = {
   perm_view_reports: boolean;
@@ -38,6 +39,7 @@ export type ReportQueryInput = {
   route?: string;
   customer?: string;
   department?: string;
+  category?: string;
   subcategory?: string;
   expenseUserId?: string;
   expenseCategory?: string;
@@ -59,6 +61,18 @@ export type SalesDepartmentSubcategoryOptionsResponse = {
   success: boolean;
   error?: string;
   pairs?: Array<{ department: string; subcategory: string }>;
+};
+
+export type SalesDepartmentCategorySubcategoryOptionsResponse = {
+  success: boolean;
+  error?: string;
+  pairs?: Array<{ department: string; category: string; subcategory: string }>;
+};
+
+export type ProductCategoryOptionsResponse = {
+  success: boolean;
+  error?: string;
+  options?: Array<{ value: string; label: string }>;
 };
 
 export type CustomerOutstandingFilterOptionsResponse = {
@@ -162,6 +176,36 @@ function splitDepartmentCategory(rawCategory: string | null | undefined): { depa
   }
 
   return { department: text, subcategory: "General" };
+}
+
+function splitDepartmentCategorySubcategory(
+  rawCategory: string | null | undefined
+): { department: string; category: string; subcategory: string } {
+  const text = String(rawCategory || "").trim();
+  if (!text) return { department: "Uncategorized", category: "General", subcategory: "General" };
+
+  const parts = text
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length >= 3) {
+    return {
+      department: parts[0] || "Uncategorized",
+      category: parts[1] || "General",
+      subcategory: parts.slice(2).join(" / ").trim() || "General"
+    };
+  }
+
+  if (parts.length === 2) {
+    return {
+      department: parts[0] || "Uncategorized",
+      category: parts[1] || "General",
+      subcategory: "General"
+    };
+  }
+
+  return { department: parts[0] || "Uncategorized", category: "General", subcategory: "General" };
 }
 
 function getMonthRangeFromYmd(value: string) {
@@ -422,8 +466,9 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         const product = one((row as any).product);
         const status = invoice?.status;
         if (!["approved", "issued", "paid"].includes(String(status))) continue;
-        const categoryParts = splitDepartmentCategory(product?.category);
+        const categoryParts = splitDepartmentCategorySubcategory(product?.category);
         if (input.department && input.department !== "ALL" && categoryParts.department !== input.department) continue;
+        if (input.category && input.category !== "ALL" && categoryParts.category !== input.category) continue;
         if (input.subcategory && input.subcategory !== "ALL" && categoryParts.subcategory !== input.subcategory) continue;
         const qty = Number(row.qty) || 0;
         const unitPrice = Number(row.unit_price) || 0;
@@ -1261,15 +1306,18 @@ export async function getSalesDepartmentOptions(): Promise<SalesDepartmentOption
   const { data, error } = await adminClient.from("products").select("category").order("category", { ascending: true });
   if (error) return { success: false, error: error.message };
 
-  const departmentSet = new Set<string>();
+  const departmentSet = new Set<string>(["Import", "local", "JB", "Dubai"]);
   for (const row of data ?? []) {
     const categoryParts = splitDepartmentCategory(row.category);
     const department = categoryParts.department;
     if (!department) continue;
-    departmentSet.add(department);
+    if (department === "Import" || department === "local" || department === "JB" || department === "Dubai") {
+      departmentSet.add(department);
+    }
   }
 
-  const departments = ["ALL", ...Array.from(departmentSet)];
+  const preferredOrder = ["Import", "local", "JB", "Dubai"];
+  const departments = ["ALL", ...preferredOrder.filter((department) => departmentSet.has(department))];
   return { success: true, departments };
 }
 
@@ -1299,6 +1347,39 @@ export async function getSalesDepartmentSubcategoryOptions(): Promise<SalesDepar
   }
 
   return { success: true, pairs };
+}
+
+export async function getSalesDepartmentCategorySubcategoryOptions(): Promise<SalesDepartmentCategorySubcategoryOptionsResponse> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+  if (!canViewReports(access.profile)) return { success: false, error: "You do not have permission to view reports" };
+
+  const { data, error } = await adminClient
+    .from("products")
+    .select("category")
+    .order("category", { ascending: true });
+  if (error) return { success: false, error: error.message };
+
+  const pairs: Array<{ department: string; category: string; subcategory: string }> = [];
+  const seen = new Set<string>();
+  for (const row of data ?? []) {
+    const parts = splitDepartmentCategorySubcategory(row.category);
+    if (!parts.department || !parts.category || !parts.subcategory) continue;
+    const key = `${parts.department}::${parts.category}::${parts.subcategory}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    pairs.push(parts);
+  }
+
+  return { success: true, pairs };
+}
+
+export async function getProductCategoryOptions(): Promise<ProductCategoryOptionsResponse> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+  if (!canViewReports(access.profile)) return { success: false, error: "You do not have permission to view reports" };
+
+  return { success: true, options: categoryOptions };
 }
 
 export async function getCustomerOutstandingFilterOptions(): Promise<CustomerOutstandingFilterOptionsResponse> {

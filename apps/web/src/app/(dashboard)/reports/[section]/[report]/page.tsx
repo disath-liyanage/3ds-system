@@ -11,6 +11,8 @@ import "react-day-picker/dist/style.css";
 import {
   getCustomerFilterOptions,
   getCustomerOutstandingFilterOptions,
+  getProductCategoryOptions,
+  getSalesDepartmentCategorySubcategoryOptions,
   getExpenseUserOptions,
   getReportData,
   getSalaryWorkerOptions,
@@ -83,7 +85,8 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const isProductStockSummaryReport = reportKey === "stock/product-stock-summary";
   const isSalarySlipReport = reportKey === "salary/salary-slip";
   const isExpensesByUserReport = reportKey === "expenses/expenses-by-user";
-  const isDepartmentSubdepartmentFilterReport = isDepartmentWiseSalesReport || isProductStockSummaryReport;
+  const isDepartmentCategorySubcategoryFilterReport = isDepartmentWiseSalesReport;
+  const isDepartmentSubdepartmentFilterReport = isProductStockSummaryReport;
   const [routeFilter, setRouteFilter] = useState("ALL");
   const [routeOptions, setRouteOptions] = useState<Array<{ value: string; label: string }>>([
     { value: "ALL", label: "All routes" }
@@ -92,11 +95,18 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const [departmentOptions, setDepartmentOptions] = useState<Array<{ value: string; label: string }>>([
     { value: "ALL", label: "All departments" }
   ]);
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
+  const [categoryOptions, setCategoryOptions] = useState<Array<{ value: string; label: string }>>([
+    { value: "ALL", label: "All categories" }
+  ]);
   const [subcategoryFilter, setSubcategoryFilter] = useState("ALL");
   const [customerFilter, setCustomerFilter] = useState("");
   const [customerOptions, setCustomerOptions] = useState<SearchableSelectOption[]>([]);
   const [departmentSubcategoryPairs, setDepartmentSubcategoryPairs] = useState<
     Array<{ department: string; subcategory: string }>
+  >([]);
+  const [departmentCategorySubcategoryPairs, setDepartmentCategorySubcategoryPairs] = useState<
+    Array<{ department: string; category: string; subcategory: string }>
   >([]);
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -164,6 +174,51 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     };
   }, [isDepartmentSubdepartmentFilterReport]);
 
+  useEffect(() => {
+    if (!isDepartmentCategorySubcategoryFilterReport) return;
+    let active = true;
+
+    const loadDepartmentCategorySubcategoryOptions = async () => {
+      const response = await getSalesDepartmentOptions();
+      if (!active || !response.success || !response.departments) return;
+
+      const options = response.departments.map((department) => ({
+        value: department,
+        label: department === "ALL" ? "All departments" : department
+      }));
+      setDepartmentOptions(options);
+
+      const pairsResponse = await getSalesDepartmentCategorySubcategoryOptions();
+      if (!active || !pairsResponse.success || !pairsResponse.pairs) return;
+      setDepartmentCategorySubcategoryPairs(pairsResponse.pairs);
+
+      const categoryOptionsResponse = await getProductCategoryOptions();
+      if (!active || !categoryOptionsResponse.success || !categoryOptionsResponse.options) return;
+      setCategoryOptions([{ value: "ALL", label: "All categories" }, ...categoryOptionsResponse.options]);
+    };
+
+    void loadDepartmentCategorySubcategoryOptions();
+    return () => {
+      active = false;
+    };
+  }, [isDepartmentCategorySubcategoryFilterReport]);
+
+  const departmentWiseSubcategoryOptions = useMemo(() => {
+    const filtered = departmentCategorySubcategoryPairs.filter(
+      (pair) =>
+        (departmentFilter === "ALL" || pair.department === departmentFilter) &&
+        (categoryFilter === "ALL" || pair.category === categoryFilter)
+    );
+    const names = Array.from(
+      new Set(
+        filtered
+          .map((pair) => pair.subcategory)
+          .filter((name) => Boolean(name) && name !== "General")
+      )
+    );
+    return [{ value: "ALL", label: "All subcategories" }, ...names.map((name) => ({ value: name, label: name }))];
+  }, [categoryFilter, departmentCategorySubcategoryPairs, departmentFilter]);
+
   const subcategoryOptions = useMemo(() => {
     const filtered = departmentSubcategoryPairs.filter(
       (pair) => departmentFilter === "ALL" || pair.department === departmentFilter
@@ -178,6 +233,20 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       setSubcategoryFilter("ALL");
     }
   }, [isDepartmentSubdepartmentFilterReport, subcategoryFilter, subcategoryOptions]);
+
+  useEffect(() => {
+    if (!isDepartmentCategorySubcategoryFilterReport) return;
+    if (!categoryOptions.some((option) => option.value === categoryFilter)) {
+      setCategoryFilter("ALL");
+    }
+  }, [categoryFilter, categoryOptions, isDepartmentCategorySubcategoryFilterReport]);
+
+  useEffect(() => {
+    if (!isDepartmentCategorySubcategoryFilterReport) return;
+    if (!departmentWiseSubcategoryOptions.some((option) => option.value === subcategoryFilter)) {
+      setSubcategoryFilter("ALL");
+    }
+  }, [departmentWiseSubcategoryOptions, isDepartmentCategorySubcategoryFilterReport, subcategoryFilter]);
 
   useEffect(() => {
     if (!isSalarySlipReport) return;
@@ -317,8 +386,9 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
         toTimestamp: isCustomerDetailsReport ? runTimestamp : undefined,
         route: isRouteWiseSalesReport || isOutstandingStyleCustomerFilterReport ? routeFilter : undefined,
         customer: isOutstandingStyleCustomerFilterReport ? customerFilter : undefined,
-        department: isDepartmentSubdepartmentFilterReport ? departmentFilter : undefined,
-        subcategory: isDepartmentSubdepartmentFilterReport ? subcategoryFilter : undefined,
+        category: isDepartmentCategorySubcategoryFilterReport ? categoryFilter : undefined,
+        subcategory: isDepartmentSubdepartmentFilterReport || isDepartmentCategorySubcategoryFilterReport ? subcategoryFilter : undefined,
+        department: isDepartmentSubdepartmentFilterReport || isDepartmentCategorySubcategoryFilterReport ? departmentFilter : undefined,
         expenseUserId: isExpensesByUserReport ? expenseUserId : undefined,
         expenseCategory: isExpensesByUserReport ? expenseCategory : undefined
       });
@@ -597,7 +667,39 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
             </div>
           ) : null}
 
-          {isDepartmentSubdepartmentFilterReport ? (
+          {isDepartmentCategorySubcategoryFilterReport ? (
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Department / Category / Sub category</label>
+              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center">
+                <Select
+                  value={departmentFilter}
+                  options={departmentOptions}
+                  onChange={(event) => setDepartmentFilter(event.target.value)}
+                />
+                <Select
+                  value={categoryFilter}
+                  options={categoryOptions}
+                  onChange={(event) => setCategoryFilter(event.target.value)}
+                />
+                <Select
+                  value={subcategoryFilter}
+                  options={departmentWiseSubcategoryOptions}
+                  onChange={(event) => setSubcategoryFilter(event.target.value)}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setDepartmentFilter("ALL");
+                    setCategoryFilter("ALL");
+                    setSubcategoryFilter("ALL");
+                  }}
+                >
+                  Reset
+                </Button>
+              </div>
+            </div>
+          ) : isDepartmentSubdepartmentFilterReport ? (
             <div className="space-y-1">
               <label className="text-sm font-medium">Department / Sub Department</label>
               <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-center">
