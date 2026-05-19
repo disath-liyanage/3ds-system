@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useProducts } from "@/hooks/useProducts";
 import { useProductStockByPrice } from "@/hooks/useProductStockByPrice";
@@ -46,10 +47,50 @@ function getStockStatus(stockQty: number | string, lowStockThreshold: number | s
   return { label: "In Stock", variant: "success" as const };
 }
 
+function splitCategory(value: string) {
+  const trimmedValue = value.trim();
+  const parts = trimmedValue.split("/").map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 0) {
+    return { department: "", category: "", subCategory: "" };
+  }
+
+  const knownDepartments = new Set(["Import", "local", "JB", "Dubai"]);
+  const head = parts[0] ?? "";
+
+  if (knownDepartments.has(head)) {
+    return {
+      department: head,
+      category: parts[1] ?? "",
+      subCategory: parts.slice(2).join(" / ").trim()
+    };
+  }
+
+  return {
+    department: "local",
+    category: head,
+    subCategory: parts.slice(1).join(" / ").trim()
+  };
+}
+
+function toMonthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function formatMonthLabel(monthKey: string) {
+  const [yearText, monthText] = monthKey.split("-");
+  const year = Number(yearText);
+  const monthIndex = Number(monthText) - 1;
+  if (!Number.isFinite(year) || !Number.isFinite(monthIndex)) return monthKey;
+  return new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric" }).format(
+    new Date(year, monthIndex, 1)
+  );
+}
+
 export default function ProductStockDetailPage() {
   const router = useRouter();
   const params = useParams();
   const productId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const [selectedMonth, setSelectedMonth] = useState(() => toMonthKey(new Date()));
   const { data: products, isLoading: isProductsLoading } = useProducts();
   const {
     data: stockByPrice,
@@ -60,7 +101,16 @@ export default function ProductStockDetailPage() {
     data: transactions,
     isLoading: isTransactionsLoading,
     isError: isTransactionsError
-  } = useProductTransactions(productId);
+  } = useProductTransactions(productId, selectedMonth);
+
+  const monthOptions = useMemo(() => {
+    const now = new Date();
+    return Array.from({ length: 12 }).map((_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - index, 1);
+      const key = toMonthKey(date);
+      return { value: key, label: formatMonthLabel(key) };
+    });
+  }, []);
 
   const product = useMemo(
     () => (products ?? []).find((item) => item.id === productId) ?? null,
@@ -68,6 +118,10 @@ export default function ProductStockDetailPage() {
   );
 
   const stockStatus = product ? getStockStatus(product.stock_qty, product.low_stock_threshold) : null;
+  const { department, category, subCategory } = useMemo(
+    () => (product ? splitCategory(product.category) : { department: "", category: "", subCategory: "" }),
+    [product]
+  );
 
   const isLoading = isProductsLoading || isStockLoading || isTransactionsLoading;
 
@@ -87,7 +141,7 @@ export default function ProductStockDetailPage() {
           <h1 className="text-2xl font-bold">Product stock</h1>
           <p className="text-sm text-muted-foreground">Track price-level inventory for a single product.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {product && (
             <Button
               variant="default"
@@ -111,13 +165,26 @@ export default function ProductStockDetailPage() {
         </div>
       ) : product ? (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-wrap items-start justify-between gap-2 pb-1">
             <CardTitle>{product.name}</CardTitle>
+            <Select
+              className="w-[120px]"
+              value={selectedMonth}
+              options={monthOptions}
+              onChange={(event) => setSelectedMonth(event.target.value)}
+            />
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          <CardContent className="space-y-2 text-sm pt-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">Department:</span>
+              <span>{department || "-"}</span>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">Category:</span>
-              <span>{product.category}</span>
+              <span>
+                {category || product.category}
+                {subCategory ? ` / ${subCategory}` : ""}
+              </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">Unit:</span>
