@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { ChevronRight } from "lucide-react";
 import { DayPicker, type DateRange } from "react-day-picker";
@@ -21,6 +22,7 @@ export default function InvoicesPage() {
   const { permissions, user, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
   const { data: invoices, isLoading: isInvoicesLoading, isError, error } = useInvoices();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -139,6 +141,22 @@ export default function InvoicesPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDatePickerOpen]);
+
+  useEffect(() => {
+    const fromParam = searchParams.get("from");
+    const toParam = searchParams.get("to");
+    if (!fromParam && !toParam) return;
+
+    const fromDate = fromParam ? new Date(fromParam) : undefined;
+    const toDate = toParam ? new Date(toParam) : fromDate;
+    if ((fromDate && Number.isNaN(fromDate.getTime())) || (toDate && Number.isNaN(toDate.getTime()))) return;
+
+    setDateRange({
+      from: fromDate,
+      to: toDate
+    });
+    setFiltersOpen(true);
+  }, [searchParams]);
 
   const dateRangeLabel = useMemo(() => {
     if (dateRange?.from && dateRange?.to) {

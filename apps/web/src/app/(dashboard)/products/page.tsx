@@ -3,7 +3,7 @@
 import type { FormEvent } from "react";
 import type { Product } from "@paintdist/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -1533,6 +1533,7 @@ function DuplicateProductDialog({ open, onOpenChange, product, onChooseRename, o
 
 export default function ProductsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { permissions, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
   const {
     data: products = [],
@@ -1618,6 +1619,14 @@ export default function ProductsPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isStatusDropdownOpen]);
+
+  useEffect(() => {
+    const statusParam = searchParams.get("status");
+    if (statusParam === "low_stock") {
+      setStatusFilter("low_stock");
+      setFiltersOpen(true);
+    }
+  }, [searchParams]);
 
   const sortedProducts = useMemo(() => {
     let list = [...products];
