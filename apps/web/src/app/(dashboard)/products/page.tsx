@@ -1502,6 +1502,8 @@ export default function ProductsPage() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
 
   const canManageProducts = permissions?.canManageProducts ?? false;
   const canAddProducts = canManageProducts;
@@ -1552,6 +1554,16 @@ export default function ProductsPage() {
       }
     }
   }, [isProductsLoading, products]);
+
+  useEffect(() => {
+    if (!isStatusDropdownOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!statusDropdownRef.current || statusDropdownRef.current.contains(event.target as Node)) return;
+      setIsStatusDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isStatusDropdownOpen]);
 
   const sortedProducts = useMemo(() => {
     let list = [...products];
@@ -1831,17 +1843,22 @@ export default function ProductsPage() {
   };
 
   const isLoading = isPermissionsLoading || isProductsLoading;
+  const statusOptions: Array<{ value: string; label: string; variant: "default" | "success" | "danger" | "warning" }> = [
+    { value: "all", label: "All", variant: "default" },
+    { value: "in_stock", label: "In Stock", variant: "success" },
+    { value: "out_of_stock", label: "Out of Stock", variant: "danger" },
+    { value: "low_stock", label: "Low Stock", variant: "warning" }
+  ];
+  const selectedStatusOption = statusOptions.find((option) => option.value === statusFilter) || statusOptions[0];
 
   return (
     <section className="space-y-4">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-bold">Products</h1>
-        <p className="text-sm text-muted-foreground">Track inventory levels and pricing in real time.</p>
-        {canAddProducts ? (
-          <Button className="mt-2" onClick={() => setIsAddMultiDialogOpen(true)}>
-            Add Product
-          </Button>
-        ) : null}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold">Products</h1>
+          <p className="text-sm text-muted-foreground">Track inventory levels and pricing in real time.</p>
+        </div>
+        {canAddProducts ? <Button onClick={() => setIsAddMultiDialogOpen(true)}>Add Product</Button> : null}
       </div>
 
       {error ? <p className="text-sm text-red-600">Failed to load products: {error.message}</p> : null}
@@ -1881,50 +1898,46 @@ export default function ProductsPage() {
             </div>
 
             {filtersOpen ? (
-              <div className="grid grid-cols-1 gap-4 rounded-md border border-border bg-muted/30 p-4 md:grid-cols-2 xl:grid-cols-4">
-                <div className="space-y-1 md:col-span-2 xl:col-span-4">
+              <div className="flex flex-wrap items-end gap-3 rounded-md border border-border bg-muted/30 p-4">
+                <div className="w-full space-y-1 sm:w-[170px]">
                   <label className="text-xs font-semibold text-muted-foreground">Status</label>
-                  <div className="flex flex-wrap gap-2">
+                  <div ref={statusDropdownRef} className="relative">
                     <Button
                       type="button"
-                      size="sm"
-                      variant={statusFilter === "all" ? "default" : "outline"}
-                      className="rounded-full"
-                      onClick={() => setStatusFilter("all")}
+                      variant="outline"
+                      className="flex h-10 w-full items-center justify-between px-3"
+                      onClick={() => setIsStatusDropdownOpen((prev) => !prev)}
                     >
-                      All
+                      <Badge variant={selectedStatusOption.variant}>{selectedStatusOption.label}</Badge>
+                      <ChevronRight
+                        className={
+                          isStatusDropdownOpen
+                            ? "h-4 w-4 rotate-90 transition-transform"
+                            : "h-4 w-4 rotate-0 transition-transform"
+                        }
+                      />
                     </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={statusFilter === "in_stock" ? "default" : "outline"}
-                      className="rounded-full"
-                      onClick={() => setStatusFilter("in_stock")}
-                    >
-                      In Stock
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={statusFilter === "out_of_stock" ? "default" : "outline"}
-                      className="rounded-full"
-                      onClick={() => setStatusFilter("out_of_stock")}
-                    >
-                      Out of Stock
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={statusFilter === "low_stock" ? "default" : "outline"}
-                      className="rounded-full"
-                      onClick={() => setStatusFilter("low_stock")}
-                    >
-                      Low Stock
-                    </Button>
+                    {isStatusDropdownOpen ? (
+                      <div className="absolute z-20 mt-2 w-full rounded-md border border-border bg-white py-1 shadow-lg">
+                        {statusOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            className="flex w-full items-center px-3 py-2 text-left hover:bg-muted"
+                            onClick={() => {
+                              setStatusFilter(option.value);
+                              setIsStatusDropdownOpen(false);
+                            }}
+                          >
+                            <Badge variant={option.variant}>{option.label}</Badge>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
-                <div className="space-y-1">
+                <div className="w-full space-y-1 sm:w-[240px]">
                   <label className="text-xs font-semibold text-muted-foreground">Department</label>
                   <select
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -1939,7 +1952,7 @@ export default function ProductsPage() {
                   </select>
                 </div>
 
-                <div className="space-y-1">
+                <div className="w-full space-y-1 sm:w-[240px]">
                   <label className="text-xs font-semibold text-muted-foreground">Category</label>
                   <select
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -1954,7 +1967,7 @@ export default function ProductsPage() {
                   </select>
                 </div>
 
-                <div className="space-y-1">
+                <div className="w-full space-y-1 sm:w-[120px]">
                   <label className="text-xs font-semibold text-muted-foreground">Min Price (LKR)</label>
                   <Input
                     type="number"
@@ -1966,7 +1979,7 @@ export default function ProductsPage() {
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="w-full space-y-1 sm:w-[120px]">
                   <label className="text-xs font-semibold text-muted-foreground">Max Price (LKR)</label>
                   <Input
                     type="number"
