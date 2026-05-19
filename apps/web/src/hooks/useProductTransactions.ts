@@ -44,12 +44,36 @@ export type ProductTransactions = {
   }>;
 };
 
-const productTransactionsKey = (productId: string) => ["product-transactions", productId] as const;
+const productTransactionsKey = (productId: string, monthKey: string) =>
+  ["product-transactions", productId, monthKey] as const;
+
+function toMonthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function getMonthRange(monthKey?: string) {
+  const now = new Date();
+  const fallbackKey = toMonthKey(now);
+  const [yearText, monthText] = (monthKey || fallbackKey).split("-");
+  const year = Number(yearText);
+  const monthIndex = Number(monthText) - 1;
+  if (!Number.isFinite(year) || !Number.isFinite(monthIndex) || monthIndex < 0 || monthIndex > 11) {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+    return { monthKey: fallbackKey, start, end };
+  }
+  const start = new Date(year, monthIndex, 1, 0, 0, 0, 0);
+  const end = new Date(year, monthIndex + 1, 1, 0, 0, 0, 0);
+  return { monthKey: `${yearText}-${monthText.padStart(2, "0")}`, start, end };
+}
 
 async function fetchProductTransactions(
   supabase: ReturnType<typeof createClient>,
-  productId: string
+  productId: string,
+  range: { start: Date; end: Date }
 ): Promise<ProductTransactions> {
+  const rangeStart = range.start.toISOString();
+  const rangeEnd = range.end.toISOString();
   const [
     { data: receivedRows, error: receivedError },
     { data: invoicedRows, error: invoicedError },
@@ -64,17 +88,23 @@ async function fetchProductTransactions(
           "id, receive_note_id, qty, free_qty, unit_cost, selling_price, created_at, receive_note:receive_notes(id, rn_number, supplier_name, invoice_number, created_at)"
         )
         .eq("product_id", productId)
+        .gte("created_at", rangeStart)
+        .lt("created_at", rangeEnd)
         .order("created_at", { ascending: false }),
       supabase
         .from("invoice_items")
         .select("id, invoice_id, qty, free_qty, unit_price, created_at, invoice:invoices(id, invoice_number, created_at)")
         .eq("product_id", productId)
+        .gte("created_at", rangeStart)
+        .lt("created_at", rangeEnd)
         .order("created_at", { ascending: false }),
       supabase
         .from("audit_log")
         .select("id, created_at, old_data, new_data")
         .eq("table_name", "invoice_cancellations")
         .eq("record_id", productId)
+        .gte("created_at", rangeStart)
+        .lt("created_at", rangeEnd)
         .order("created_at", { ascending: false }),
       supabase
         .from("return_invoice_items")
@@ -82,12 +112,16 @@ async function fetchProductTransactions(
           "id, qty, unit_price, created_at, return_invoice:return_invoices(id, return_number, invoice_id, created_at, source_invoice:invoices!return_invoices_invoice_id_fkey(invoice_number))"
         )
         .eq("product_id", productId)
+        .gte("created_at", rangeStart)
+        .lt("created_at", rangeEnd)
         .order("created_at", { ascending: false }),
       supabase
         .from("audit_log")
         .select("id, created_at, old_data, new_data")
         .eq("table_name", "product_stock_adjustments")
         .eq("record_id", productId)
+        .gte("created_at", rangeStart)
+        .lt("created_at", rangeEnd)
         .order("created_at", { ascending: false })
     ]);
 
@@ -175,12 +209,13 @@ async function fetchProductTransactions(
   return { received, invoiced, cancelled, stockAdjustments };
 }
 
-export function useProductTransactions(productId?: string) {
+export function useProductTransactions(productId?: string, monthKey?: string) {
   const supabase = useMemo(() => createClient(), []);
+  const { monthKey: resolvedMonthKey, start, end } = useMemo(() => getMonthRange(monthKey), [monthKey]);
 
   return useQuery({
-    queryKey: productId ? productTransactionsKey(productId) : ["product-transactions", "missing"],
-    queryFn: () => fetchProductTransactions(supabase, productId || ""),
+    queryKey: productId ? productTransactionsKey(productId, resolvedMonthKey) : ["product-transactions", "missing"],
+    queryFn: () => fetchProductTransactions(supabase, productId || "", { start, end }),
     enabled: Boolean(productId)
   });
 }
