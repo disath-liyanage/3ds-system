@@ -9,7 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select";
 import { Select } from "@/components/ui/select";
-import { createReceiveNote, getLatestReceiveNoteProductDefaults } from "@/app/actions/receive-notes";
+import {
+  createReceiveNote,
+  getLatestReceiveNoteProductCosts,
+  getLatestReceiveNoteProductDefaults
+} from "@/app/actions/receive-notes";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useProducts } from "@/hooks/useProducts";
 import { useSuppliers } from "@/hooks/useSuppliers";
@@ -53,6 +57,7 @@ export default function NewReceiveNotePage() {
   const [addAttempted, setAddAttempted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [discountInputMode, setDiscountInputMode] = useState<"percent" | "amount">("percent");
+  const [latestCostsByProduct, setLatestCostsByProduct] = useState<Record<string, number>>({});
   const { control, register, handleSubmit, setValue, trigger, getValues, resetField, formState } =
     useForm<ReceiveNoteForm>({
     defaultValues: {
@@ -89,9 +94,13 @@ export default function NewReceiveNotePage() {
     () =>
       (products ?? []).map((product) => ({
         value: product.id,
-        label: `${product.name} · ${product.unit}`
+        label: `${product.name} · ${product.unit}`,
+        subLabel:
+          product.id in latestCostsByProduct
+            ? `Cost: LKR ${Number(latestCostsByProduct[product.id] || 0).toFixed(2)}`
+            : undefined
       })),
-    [products]
+    [latestCostsByProduct, products]
   );
 
   const supplierOptions = useMemo<SearchableSelectOption[]>(
@@ -197,6 +206,27 @@ export default function NewReceiveNotePage() {
       setValue("draft.item_discount_amount", discountAmount, { shouldDirty: true });
     }
   };
+
+  useEffect(() => {
+    const productIds = (products ?? []).map((product) => product.id).filter(Boolean);
+    if (productIds.length === 0) {
+      setLatestCostsByProduct({});
+      return;
+    }
+
+    let isMounted = true;
+    const loadLatestCosts = async () => {
+      const result = await getLatestReceiveNoteProductCosts(productIds);
+      if (!isMounted) return;
+      if (!result.success) return;
+      setLatestCostsByProduct(result.data);
+    };
+
+    loadLatestCosts();
+    return () => {
+      isMounted = false;
+    };
+  }, [products]);
 
   useEffect(() => {
     const sellingPrice = normalizeNumber(watchedDraft?.selling_price);

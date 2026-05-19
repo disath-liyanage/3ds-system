@@ -449,3 +449,34 @@ export async function getLatestReceiveNoteProductDefaults(productId: string): Pr
     }
   };
 }
+
+export async function getLatestReceiveNoteProductCosts(
+  productIds: string[]
+): Promise<{ success: true; data: Record<string, number> } | { success: false; error: string }> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error || "Unauthorized" };
+
+  const uniqueIds = Array.from(new Set((productIds ?? []).filter(Boolean)));
+  if (uniqueIds.length === 0) {
+    return { success: true, data: {} };
+  }
+
+  const { data, error } = await adminClient
+    .from("receive_note_items")
+    .select("product_id, unit_cost, created_at")
+    .in("product_id", uniqueIds)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  const costsByProduct: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const productId = typeof row.product_id === "string" ? row.product_id : "";
+    if (!productId || productId in costsByProduct) continue;
+    costsByProduct[productId] = Number(row.unit_cost) || 0;
+  }
+
+  return { success: true, data: costsByProduct };
+}
