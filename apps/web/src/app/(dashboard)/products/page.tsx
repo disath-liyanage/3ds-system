@@ -857,8 +857,12 @@ function ProductFormDialog({
           ? "Update product details, pricing, and stock thresholds."
           : "Add a new product with pricing and stock details."
       }
+      className="max-w-5xl"
+      hideFooterClose
+      showTopClose
     >
       <form className="space-y-4" onSubmit={handleSubmit}>
+        <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-1">
           <label htmlFor={`${mode}-product-name`} className="text-sm font-medium">
             Name
@@ -910,9 +914,10 @@ function ProductFormDialog({
             placeholder="e.g. Screws"
           />
         </div>
+        </div>
 
         {!isEditMode ? (
-          <>
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
               <label htmlFor={`${mode}-product-unit`} className="text-sm font-medium">
                 Unit
@@ -955,7 +960,7 @@ function ProductFormDialog({
                 onChange={(event) => setForm((prev) => ({ ...prev, low_stock_threshold: event.target.value }))}
               />
             </div>
-          </>
+          </div>
         ) : null}
 
         {isEditMode ? (
@@ -1127,21 +1132,29 @@ function ProductFormDialog({
 
         {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
 
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting ? (isEditMode ? "Saving changes..." : "Adding product...") : isEditMode ? "Save changes" : "Add product"}
-        </Button>
-
         {isEditMode ? (
-          <Button
-            type="button"
-            variant="danger"
-            className="w-full"
-            onClick={() => setIsDeleteDialogOpen(true)}
-            disabled={isSubmitting}
-          >
-            Delete product
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => setIsDeleteDialogOpen(true)}
+              disabled={isSubmitting}
+            >
+              Delete product
+            </Button>
+            <Button
+              type="submit"
+              className="bg-orange-400 text-white hover:bg-orange-500"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? "Saving changes..." : "Save changes"}
+            </Button>
+          </div>
+        ) : (
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? "Adding product..." : "Add product"}
           </Button>
-        ) : null}
+        )}
       </form>
 
       {isEditMode ? (
@@ -1150,6 +1163,8 @@ function ProductFormDialog({
           onOpenChange={setIsDeleteDialogOpen}
           title="Delete product"
           description="This will permanently remove the product. This action cannot be undone."
+          hideFooterClose
+          showTopClose
         >
           <div className="space-y-3">
             {deleteError ? <p className="text-sm text-red-600">{deleteError}</p> : null}
@@ -1314,8 +1329,12 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
       onOpenChange={handleOpenChange}
       title="Add product"
       description="Add a product with one or more size and price variants."
+      className="max-w-5xl"
+      hideFooterClose
+      showTopClose
     >
       <form className="space-y-4" onSubmit={handleSubmit}>
+        <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-1">
           <label htmlFor="multi-product-name" className="text-sm font-medium">
             Name
@@ -1369,6 +1388,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
             onChange={(event) => setSubCategory(event.target.value)}
             placeholder="e.g. Screws"
           />
+        </div>
         </div>
 
         <div className="space-y-3">
