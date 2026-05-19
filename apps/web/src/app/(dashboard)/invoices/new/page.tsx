@@ -188,7 +188,7 @@ export default function NewInvoicePage() {
     () =>
       (products ?? []).map((product) => ({
         value: product.id,
-        label: `${product.name} · ${product.unit}`
+        label: `${product.name} · ${product.unit} · Min LKR ${Number(product.price || 0).toFixed(2)} · Stock ${Number(product.stock_qty || 0)}`
       })),
     [products]
   );
