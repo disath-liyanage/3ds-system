@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import type { Product } from "@paintdist/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ChevronRight } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1495,9 +1496,48 @@ export default function ProductsPage() {
   const [duplicateProduct, setDuplicateProduct] = useState<Product | null>(null);
   const [sortState, setSortState] = useState<SortState>(null);
   const [query, setQuery] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
 
   const canManageProducts = permissions?.canManageProducts ?? false;
   const canAddProducts = canManageProducts;
+
+  const hasFilters =
+    statusFilter !== "all" ||
+    departmentFilter !== "all" ||
+    categoryFilter !== "all" ||
+    minPrice !== "" ||
+    maxPrice !== "";
+
+  const resetFilters = () => {
+    setStatusFilter("all");
+    setDepartmentFilter("all");
+    setCategoryFilter("all");
+    setMinPrice("");
+    setMaxPrice("");
+  };
+
+  const departmentFilterOptions = useMemo(() => {
+    const departmentSet = new Set<string>();
+    for (const product of products) {
+      const { department } = splitCategory(product.category);
+      if (department) departmentSet.add(department);
+    }
+    return ["all", ...Array.from(departmentSet).sort((a, b) => a.localeCompare(b))];
+  }, [products]);
+
+  const categoryFilterOptions = useMemo(() => {
+    const categorySet = new Set<string>();
+    for (const product of products) {
+      const { category } = splitCategory(product.category);
+      if (category) categorySet.add(category);
+    }
+    return ["all", ...Array.from(categorySet).sort((a, b) => a.localeCompare(b))];
+  }, [products]);
 
   useEffect(() => {
     if (!isProductsLoading && products.length > 0) {
@@ -1519,6 +1559,32 @@ export default function ProductsPage() {
     if (query) {
       const q = query.toLowerCase();
       list = list.filter((p) => `${p.name} ${p.category} ${p.unit}`.toLowerCase().includes(q));
+    }
+
+    if (statusFilter !== "all") {
+      list = list.filter((product) => {
+        const status = getStockStatus(product.stock_qty, product.low_stock_threshold).label;
+        if (statusFilter === "in_stock") return status === "In Stock";
+        if (statusFilter === "out_of_stock") return status === "Out of Stock";
+        if (statusFilter === "low_stock") return status === "Low Stock";
+        return true;
+      });
+    }
+
+    if (departmentFilter !== "all") {
+      list = list.filter((product) => splitCategory(product.category).department === departmentFilter);
+    }
+
+    if (categoryFilter !== "all") {
+      list = list.filter((product) => splitCategory(product.category).category === categoryFilter);
+    }
+
+    if (minPrice !== "") {
+      list = list.filter((product) => toNumber(product.price) >= Number(minPrice));
+    }
+
+    if (maxPrice !== "") {
+      list = list.filter((product) => toNumber(product.price) <= Number(maxPrice));
     }
 
     if (!sortState) {
@@ -1546,7 +1612,7 @@ export default function ProductsPage() {
           return 0;
       }
     });
-  }, [products, sortState, query]);
+  }, [products, sortState, query, statusFilter, departmentFilter, categoryFilter, minPrice, maxPrice]);
 
   const handleSort = (key: SortKey) => {
     setSortState((prev) => {
@@ -1768,14 +1834,14 @@ export default function ProductsPage() {
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-bold">Products</h1>
-            {canAddProducts ? <Button onClick={() => setIsAddMultiDialogOpen(true)}>Add Product</Button> : null}
-          </div>
-          <p className="text-sm text-muted-foreground">Track inventory levels and pricing in real time.</p>
-        </div>
+      <div className="space-y-1">
+        <h1 className="text-2xl font-bold">Products</h1>
+        <p className="text-sm text-muted-foreground">Track inventory levels and pricing in real time.</p>
+        {canAddProducts ? (
+          <Button className="mt-2" onClick={() => setIsAddMultiDialogOpen(true)}>
+            Add Product
+          </Button>
+        ) : null}
       </div>
 
       {error ? <p className="text-sm text-red-600">Failed to load products: {error.message}</p> : null}
@@ -1784,9 +1850,137 @@ export default function ProductsPage() {
         <div className="rounded-md border border-border bg-white p-4 text-sm text-muted-foreground">Loading products...</div>
       ) : (
         <div className="space-y-3">
-          <div className="max-w-sm">
-            <Input placeholder="Search products..." value={query} onChange={(event) => setQuery(event.target.value)} />
+          <div className="flex flex-col gap-3 rounded-md border border-border bg-white p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-1 items-center gap-3">
+                <Input
+                  placeholder="Search products..."
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  className="lg:max-w-md"
+                />
+                {hasFilters ? <span className="text-xs text-muted-foreground">Filters active</span> : null}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="ghost" onClick={() => setFiltersOpen((prev) => !prev)}>
+                  <span className="flex items-center gap-2">
+                    <ChevronRight
+                      className={
+                        filtersOpen
+                          ? "h-4 w-4 rotate-90 transition-transform"
+                          : "h-4 w-4 rotate-0 transition-transform"
+                      }
+                    />
+                    {filtersOpen ? "Hide filters" : "Show filters"}
+                  </span>
+                </Button>
+                <Button variant={hasFilters ? "default" : "outline"} size="sm" onClick={resetFilters} disabled={!hasFilters}>
+                  Reset
+                </Button>
+              </div>
+            </div>
+
+            {filtersOpen ? (
+              <div className="grid grid-cols-1 gap-4 rounded-md border border-border bg-muted/30 p-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="space-y-1 md:col-span-2 xl:col-span-4">
+                  <label className="text-xs font-semibold text-muted-foreground">Status</label>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={statusFilter === "all" ? "default" : "outline"}
+                      className="rounded-full"
+                      onClick={() => setStatusFilter("all")}
+                    >
+                      All
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={statusFilter === "in_stock" ? "default" : "outline"}
+                      className="rounded-full"
+                      onClick={() => setStatusFilter("in_stock")}
+                    >
+                      In Stock
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={statusFilter === "out_of_stock" ? "default" : "outline"}
+                      className="rounded-full"
+                      onClick={() => setStatusFilter("out_of_stock")}
+                    >
+                      Out of Stock
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={statusFilter === "low_stock" ? "default" : "outline"}
+                      className="rounded-full"
+                      onClick={() => setStatusFilter("low_stock")}
+                    >
+                      Low Stock
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground">Department</label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    value={departmentFilter}
+                    onChange={(event) => setDepartmentFilter(event.target.value)}
+                  >
+                    {departmentFilterOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option === "all" ? "All departments" : option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground">Category</label>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    value={categoryFilter}
+                    onChange={(event) => setCategoryFilter(event.target.value)}
+                  >
+                    {categoryFilterOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option === "all" ? "All categories" : option}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground">Min Price (LKR)</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={minPrice}
+                    onChange={(event) => setMinPrice(event.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground">Max Price (LKR)</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={maxPrice}
+                    onChange={(event) => setMaxPrice(event.target.value)}
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
+
           {sortState ? (
             <div className="flex justify-end">
               <Button variant="outline" size="sm" onClick={resetSort}>
