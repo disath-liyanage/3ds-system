@@ -6,11 +6,21 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/3ds-logo.png",
+    "splash": {
+      "image": "./assets/3ds-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
       "supportsTablet": true
     },
     "android": {
-      "package": "com.paintdist.app"
+      "package": "com.paintdist.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/3ds-logo.png",
+        "backgroundColor": "#ffffff"
+      }
     },
     "web": {
       "bundler": "metro"

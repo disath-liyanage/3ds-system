@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { supabase } from "@/lib/supabase";
 
@@ -32,7 +32,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>3D's Distributors (PVT) Ltd. Login</Text>
+      <Image source={require("../../assets/3ds-logo.png")} style={styles.logo} resizeMode="contain" />
 
       <Controller
         control={control}
@@ -81,11 +81,10 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: "#f8f4ec"
   },
-  title: {
-    fontSize: 26,
-    fontWeight: "700",
-    marginBottom: 20,
-    color: "#2f241d"
+  logo: {
+    width: "100%",
+    height: 120,
+    marginBottom: 20
   },
   input: {
     backgroundColor: "#ffffff",

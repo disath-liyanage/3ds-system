@@ -218,6 +218,7 @@ export function DashboardSidebar({ isAdmin, isManager, user }: DashboardSidebarP
   return (
     <Sidebar
       title="3D's Distributors (PVT) Ltd."
+      logoSrc="/images/3ds-logo.png"
       items={navItems}
       adminItems={isAdmin ? adminNavItems : []}
       footer={
