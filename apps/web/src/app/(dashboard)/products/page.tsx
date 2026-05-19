@@ -110,11 +110,9 @@ function UnifiedSizeEditor({
           <div key={row.selling_price} className="rounded-md border border-border/50 bg-muted/30 p-3">
             <div className="flex justify-between items-center mb-3">
                <p className="text-sm font-medium">Price {priceIndex + 1 + index}</p>
-               {index === 0 && (
-                 <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleToggleRemoveSize(item.id)}>
-                  {item.isRemoved ? "Undo" : "Remove"}
-                 </Button>
-               )}
+               <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleToggleRemoveSize(item.id)}>
+                {item.isRemoved ? "Undo" : "Remove"}
+               </Button>
             </div>
             <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
               <div className="space-y-1">
@@ -510,6 +508,7 @@ function ProductFormDialog({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [pendingRemoveSizeId, setPendingRemoveSizeId] = useState<string | null>(null);
 
   const existingUnits = useMemo(() => {
     if (!existingSizes || existingSizes.length === 0) return [] as string[];
@@ -796,6 +795,16 @@ function ProductFormDialog({
     );
   };
 
+  const handleConfirmToggleRemoveSize = (id: string) => {
+    const current = existingSizes.find((item) => item.id === id);
+    if (!current) return;
+    if (current.isRemoved) {
+      handleToggleRemoveSize(id);
+      return;
+    }
+    setPendingRemoveSizeId(id);
+  };
+
   const groupedSizes = useMemo(() => {
     const groups: Record<string, { originalUnit: string; sizes: ExistingSizeFormState[] }> = {};
     for (const size of existingSizes) {
@@ -857,110 +866,112 @@ function ProductFormDialog({
           ? "Update product details, pricing, and stock thresholds."
           : "Add a new product with pricing and stock details."
       }
-      className="max-w-5xl"
-      hideFooterClose
-      showTopClose
+      maxWidthClassName="max-w-5xl"
+      stickyHeader
+      showBottomClose={false}
     >
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-1">
-          <label htmlFor={`${mode}-product-name`} className="text-sm font-medium">
-            Name
-          </label>
-          <Input
-            id={`${mode}-product-name`}
-            required
-            value={form.name}
-            onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-            placeholder="e.g. QuickDry Enamel"
-          />
-        </div>
+          <div className="space-y-1">
+            <label htmlFor={`${mode}-product-name`} className="text-sm font-medium">
+              Name
+            </label>
+            <Input
+              id={`${mode}-product-name`}
+              required
+              value={form.name}
+              onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+              placeholder="e.g. QuickDry Enamel"
+            />
+          </div>
 
-        <div className="space-y-1">
-          <label htmlFor={`${mode}-product-department`} className="text-sm font-medium">
-            Department
-          </label>
-          <SearchableSelect
-            id={`${mode}-product-department`}
-            value={form.department}
-            options={departmentOptions}
-            placeholder="Select department"
-            onChange={(value) => setForm((prev) => ({ ...prev, department: value, category: "" }))}
-          />
-        </div>
+          <div className="space-y-1">
+            <label htmlFor={`${mode}-product-department`} className="text-sm font-medium">
+              Department
+            </label>
+            <SearchableSelect
+              id={`${mode}-product-department`}
+              value={form.department}
+              options={departmentOptions}
+              placeholder="Select department"
+              onChange={(value) => setForm((prev) => ({ ...prev, department: value, category: "" }))}
+            />
+          </div>
 
-        <div className="space-y-1">
-          <label htmlFor={`${mode}-product-category`} className="text-sm font-medium">
-            Category
-          </label>
-          <SearchableSelect
-            id={`${mode}-product-category`}
-            value={form.category}
-            options={categoryOptions}
-            placeholder="Select category"
-            onChange={(value) => setForm((prev) => ({ ...prev, category: value }))}
-          />
-        </div>
+          <div className="space-y-1">
+            <label htmlFor={`${mode}-product-category`} className="text-sm font-medium">
+              Category
+            </label>
+            <SearchableSelect
+              id={`${mode}-product-category`}
+              value={form.category}
+              options={categoryOptions}
+              placeholder="Select category"
+              onChange={(value) => setForm((prev) => ({ ...prev, category: value }))}
+            />
+          </div>
 
-        <div className="space-y-1">
-          <label htmlFor={`${mode}-product-sub-category`} className="text-sm font-medium">
-            Sub category
-          </label>
-          <Input
-            id={`${mode}-product-sub-category`}
-            required
-            value={form.subCategory}
-            onChange={(event) => setForm((prev) => ({ ...prev, subCategory: event.target.value }))}
-            placeholder="e.g. Screws"
-          />
-        </div>
+          <div className="space-y-1">
+            <label htmlFor={`${mode}-product-sub-category`} className="text-sm font-medium">
+              Sub category
+            </label>
+            <Input
+              id={`${mode}-product-sub-category`}
+              required
+              value={form.subCategory}
+              onChange={(event) => setForm((prev) => ({ ...prev, subCategory: event.target.value }))}
+              placeholder="e.g. Screws"
+            />
+          </div>
         </div>
 
         {!isEditMode ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-1">
-              <label htmlFor={`${mode}-product-unit`} className="text-sm font-medium">
-                Unit
-              </label>
-              <Input
-                id={`${mode}-product-unit`}
-                required
-                value={form.unit}
-                onChange={(event) => setForm((prev) => ({ ...prev, unit: event.target.value }))}
-                placeholder="e.g. can, litre, kg"
-              />
-            </div>
+          <>
+            <div className="grid gap-3 md:grid-cols-12">
+              <div className="space-y-1 md:col-span-3">
+                <label htmlFor={`${mode}-product-unit`} className="text-sm font-medium">
+                  Unit
+                </label>
+                <Input
+                  id={`${mode}-product-unit`}
+                  required
+                  value={form.unit}
+                  onChange={(event) => setForm((prev) => ({ ...prev, unit: event.target.value }))}
+                  placeholder="e.g. can, litre, kg"
+                />
+              </div>
 
-            <div className="space-y-1">
-              <label htmlFor={`${mode}-product-price`} className="text-sm font-medium">
-                Price in LKR
-              </label>
-              <Input
-                id={`${mode}-product-price`}
-                required
-                type="number"
-                min={0}
-                step="0.01"
-                value={form.price}
-                onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
-              />
-            </div>
+              <div className="space-y-1 md:col-span-5">
+                <label htmlFor={`${mode}-product-price`} className="text-sm font-medium">
+                  Price in LKR
+                </label>
+                <Input
+                  id={`${mode}-product-price`}
+                  required
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.price}
+                  onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
+                />
+              </div>
 
-            <div className="space-y-1">
-              <label htmlFor={`${mode}-product-threshold`} className="text-sm font-medium">
-                Low Stock Threshold
-              </label>
-              <Input
-                id={`${mode}-product-threshold`}
-                required
-                type="number"
-                min={0}
-                step="1"
-                value={form.low_stock_threshold}
-                onChange={(event) => setForm((prev) => ({ ...prev, low_stock_threshold: event.target.value }))}
-              />
+              <div className="space-y-1 md:col-span-4">
+                <label htmlFor={`${mode}-product-threshold`} className="text-sm font-medium">
+                  Low Stock Threshold
+                </label>
+                <Input
+                  id={`${mode}-product-threshold`}
+                  required
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={form.low_stock_threshold}
+                  onChange={(event) => setForm((prev) => ({ ...prev, low_stock_threshold: event.target.value }))}
+                />
+              </div>
             </div>
-          </div>
+          </>
         ) : null}
 
         {isEditMode ? (
@@ -1031,7 +1042,7 @@ function ProductFormDialog({
                             item={item} 
                             priceIndex={priceIndex} 
                             handleExistingSizeChange={handleExistingSizeChange} 
-                            handleToggleRemoveSize={handleToggleRemoveSize} 
+                            handleToggleRemoveSize={handleConfirmToggleRemoveSize} 
                           />
                         ))}
                         
@@ -1133,7 +1144,7 @@ function ProductFormDialog({
         {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
 
         {isEditMode ? (
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <Button
               type="button"
               variant="danger"
@@ -1142,11 +1153,7 @@ function ProductFormDialog({
             >
               Delete product
             </Button>
-            <Button
-              type="submit"
-              className="bg-orange-500 text-white hover:bg-orange-600"
-              disabled={isSubmitting}
-            >
+            <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Saving changes..." : "Save changes"}
             </Button>
           </div>
@@ -1163,8 +1170,8 @@ function ProductFormDialog({
           onOpenChange={setIsDeleteDialogOpen}
           title="Delete product"
           description="This will permanently remove the product. This action cannot be undone."
-          hideFooterClose
-          showTopClose
+          maxWidthClassName="max-w-xl"
+          showBottomClose={false}
         >
           <div className="space-y-3">
             {deleteError ? <p className="text-sm text-red-600">{deleteError}</p> : null}
@@ -1176,6 +1183,33 @@ function ProductFormDialog({
           </div>
         </Dialog>
       ) : null}
+
+      <Dialog
+        open={pendingRemoveSizeId !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setPendingRemoveSizeId(null);
+        }}
+        title="Remove this price?"
+        description="This price entry will be removed when you save changes."
+        maxWidthClassName="max-w-lg"
+        showBottomClose={false}
+      >
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="danger"
+            onClick={() => {
+              if (!pendingRemoveSizeId) return;
+              handleToggleRemoveSize(pendingRemoveSizeId);
+              setPendingRemoveSizeId(null);
+            }}
+          >
+            Remove
+          </Button>
+          <Button variant="outline" onClick={() => setPendingRemoveSizeId(null)}>
+            Cancel
+          </Button>
+        </div>
+      </Dialog>
     </Dialog>
   );
 }
@@ -1329,66 +1363,66 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
       onOpenChange={handleOpenChange}
       title="Add product"
       description="Add a product with one or more size and price variants."
-      className="max-w-5xl"
-      hideFooterClose
-      showTopClose
+      maxWidthClassName="max-w-5xl"
+      stickyHeader
+      showBottomClose={false}
     >
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-1">
-          <label htmlFor="multi-product-name" className="text-sm font-medium">
-            Name
-          </label>
-          <Input
-            id="multi-product-name"
-            required
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="e.g. QuickDry Enamel"
-          />
-        </div>
+          <div className="space-y-1">
+            <label htmlFor="multi-product-name" className="text-sm font-medium">
+              Name
+            </label>
+            <Input
+              id="multi-product-name"
+              required
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="e.g. QuickDry Enamel"
+            />
+          </div>
 
-        <div className="space-y-1">
-          <label htmlFor="multi-product-department" className="text-sm font-medium">
-            Department
-          </label>
-          <SearchableSelect
-            id="multi-product-department"
-            value={department}
-            options={departmentOptions}
-            placeholder="Select department"
-            onChange={(value) => {
-              setDepartment(value);
-              setCategory("");
-            }}
-          />
-        </div>
+          <div className="space-y-1">
+            <label htmlFor="multi-product-department" className="text-sm font-medium">
+              Department
+            </label>
+            <SearchableSelect
+              id="multi-product-department"
+              value={department}
+              options={departmentOptions}
+              placeholder="Select department"
+              onChange={(value) => {
+                setDepartment(value);
+                setCategory("");
+              }}
+            />
+          </div>
 
-        <div className="space-y-1">
-          <label htmlFor="multi-product-category" className="text-sm font-medium">
-            Category
-          </label>
-          <SearchableSelect
-            id="multi-product-category"
-            value={category}
-            options={categoryOptions}
-            placeholder="Select category"
-            onChange={setCategory}
-          />
-        </div>
+          <div className="space-y-1">
+            <label htmlFor="multi-product-category" className="text-sm font-medium">
+              Category
+            </label>
+            <SearchableSelect
+              id="multi-product-category"
+              value={category}
+              options={categoryOptions}
+              placeholder="Select category"
+              onChange={setCategory}
+            />
+          </div>
 
-        <div className="space-y-1">
-          <label htmlFor="multi-product-sub-category" className="text-sm font-medium">
-            Sub category
-          </label>
-          <Input
-            id="multi-product-sub-category"
-            required
-            value={subCategory}
-            onChange={(event) => setSubCategory(event.target.value)}
-            placeholder="e.g. Screws"
-          />
-        </div>
+          <div className="space-y-1">
+            <label htmlFor="multi-product-sub-category" className="text-sm font-medium">
+              Sub category
+            </label>
+            <Input
+              id="multi-product-sub-category"
+              required
+              value={subCategory}
+              onChange={(event) => setSubCategory(event.target.value)}
+              placeholder="e.g. Screws"
+            />
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -1410,8 +1444,8 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
                     </Button>
                   ) : null}
                 </div>
-                <div className="flex flex-wrap items-end gap-3 lg:flex-nowrap">
-                  <div className="w-full space-y-1 lg:w-[180px]">
+                <div className="grid gap-3 md:grid-cols-12">
+                  <div className="space-y-1 md:col-span-3">
                     <label htmlFor={`multi-product-unit-${index}`} className="text-sm font-medium">
                       Unit
                     </label>
@@ -1423,7 +1457,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
                       placeholder="e.g. 1L, 5L"
                     />
                   </div>
-                  <div className="w-full min-w-0 flex-1 space-y-1">
+                  <div className="space-y-1 md:col-span-5">
                     <label htmlFor={`multi-product-price-${index}`} className="text-sm font-medium">
                       Price in LKR
                     </label>
@@ -1437,7 +1471,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
                       onChange={(event) => handleSizeChange(index, "price", event.target.value)}
                     />
                   </div>
-                  <div className="w-full space-y-1 lg:w-[190px]">
+                  <div className="space-y-1 md:col-span-4">
                     <label htmlFor={`multi-product-threshold-${index}`} className="text-sm font-medium">
                       Low Stock Threshold
                     </label>

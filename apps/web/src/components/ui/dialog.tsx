@@ -4,7 +4,6 @@ import { type ReactNode, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 type DialogProps = {
   open: boolean;
@@ -12,10 +11,10 @@ type DialogProps = {
   description?: string;
   children: ReactNode;
   onOpenChange: (open: boolean) => void;
-  className?: string;
-  contentClassName?: string;
-  hideFooterClose?: boolean;
-  showTopClose?: boolean;
+  maxWidthClassName?: string;
+  bodyClassName?: string;
+  showBottomClose?: boolean;
+  stickyHeader?: boolean;
 };
 
 export function Dialog({
@@ -24,10 +23,10 @@ export function Dialog({
   description,
   children,
   onOpenChange,
-  className,
-  contentClassName,
-  hideFooterClose = false,
-  showTopClose = false
+  maxWidthClassName = "max-w-md",
+  bodyClassName,
+  showBottomClose = true,
+  stickyHeader = false
 }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -42,39 +41,36 @@ export function Dialog({
   return (
     <dialog
       ref={dialogRef}
-      className={cn("w-full max-w-md rounded-xl border border-border bg-white p-0 shadow-xl backdrop:bg-black/35", className)}
+      className={`w-full ${maxWidthClassName} rounded-xl border border-border bg-white p-0 shadow-xl backdrop:bg-black/35`}
       onClose={() => onOpenChange(false)}
     >
-      <div className={cn("max-h-[85vh] overflow-y-auto p-6", contentClassName)}>
-        {showTopClose ? (
-          <div className="sticky top-0 z-10 -mx-6 -mt-6 mb-4 flex items-start justify-between bg-white/75 px-6 py-4 backdrop-blur-sm">
-            <div className="space-y-1 pr-4">
-              <h2 className="text-lg font-semibold">{title}</h2>
-              {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
-            </div>
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-white/85 text-muted-foreground shadow-sm transition hover:bg-white hover:text-foreground"
-              aria-label="Close dialog"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        ) : (
+      <div className={`relative ${stickyHeader ? "max-h-[85vh] overflow-hidden" : ""}`}>
+        <button
+          type="button"
+          aria-label="Close dialog"
+          onClick={() => onOpenChange(false)}
+          className={`absolute right-4 z-20 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm transition hover:text-foreground ${
+            stickyHeader ? "top-4" : "top-6"
+          }`}
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <div className={`space-y-4 p-6 ${stickyHeader ? "sticky top-0 z-10 border-b border-border bg-white/95 pr-16 backdrop-blur-sm" : "pr-16"}`}>
           <div className="space-y-1">
             <h2 className="text-lg font-semibold">{title}</h2>
             {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
           </div>
-        )}
-        {children}
-        {hideFooterClose ? null : (
-          <div className="flex justify-end">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Close
-            </Button>
-          </div>
-        )}
+        </div>
+        <div className={`${stickyHeader ? "max-h-[calc(85vh-104px)] overflow-y-auto p-6 pt-4" : "p-6 pt-0"} ${bodyClassName ?? ""}`}>
+          {children}
+          {showBottomClose ? (
+            <div className="mt-4 flex justify-end">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Close
+              </Button>
+            </div>
+          ) : null}
+        </div>
       </div>
     </dialog>
   );
