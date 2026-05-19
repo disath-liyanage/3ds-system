@@ -130,3 +130,26 @@ export async function updateSupplier(supplierId: string, input: UpdateSupplierIn
 
   return { success: true, message: "Supplier updated successfully." };
 }
+
+export async function deleteSupplier(supplierId: string): Promise<ActionResult> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!canManageSuppliers(access.profile)) {
+    return { success: false, error: "You do not have permission to delete suppliers" };
+  }
+
+  if (!supplierId) {
+    return { success: false, error: "Missing supplier id" };
+  }
+
+  const { error: deleteError } = await adminClient.from("suppliers").delete().eq("id", supplierId);
+
+  if (deleteError) {
+    return { success: false, error: deleteError.message };
+  }
+
+  revalidatePath("/suppliers");
+
+  return { success: true, message: "Supplier deleted successfully." };
+}

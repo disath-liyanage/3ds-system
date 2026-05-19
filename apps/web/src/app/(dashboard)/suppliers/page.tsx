@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useMemo, useState } from "react";
 
-import { createSupplier, updateSupplier } from "@/app/actions/suppliers";
+import { createSupplier, deleteSupplier, updateSupplier } from "@/app/actions/suppliers";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,7 @@ export default function SuppliersPage() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", phone: "", address: "" });
   const [editForm, setEditForm] = useState({ name: "", phone: "", address: "" });
@@ -113,6 +114,28 @@ export default function SuppliersPage() {
     await suppliersQuery.refetch();
   };
 
+  const handleDeleteSupplier = async () => {
+    if (!selectedSupplierId || !selectedSupplier || isDeleting) return;
+
+    const shouldDelete = window.confirm(
+      `Delete supplier "${selectedSupplier.name}"? This action cannot be undone.`
+    );
+    if (!shouldDelete) return;
+
+    setIsDeleting(true);
+    const result = await deleteSupplier(selectedSupplierId);
+    setIsDeleting(false);
+
+    if (!result.success) {
+      toast({ title: "Delete failed", description: result.error, variant: "error" });
+      return;
+    }
+
+    toast({ title: "Supplier deleted", description: result.message, variant: "success" });
+    setSelectedSupplierId(null);
+    await suppliersQuery.refetch();
+  };
+
   return (
     <section className="space-y-4">
       <header className="flex items-end justify-between gap-3">
@@ -153,6 +176,7 @@ export default function SuppliersPage() {
         onOpenChange={setIsAddOpen}
         title="Add supplier"
         description="Add a supplier to use in GRN entries."
+        showBottomClose={false}
       >
         <form className="space-y-3" onSubmit={handleAddSupplier}>
           <Input
@@ -186,6 +210,7 @@ export default function SuppliersPage() {
         }}
         title="Edit supplier"
         description={selectedSupplier ? `Editing ${selectedSupplier.name}` : ""}
+        showBottomClose={false}
       >
         {selectedSupplier ? (
           <div className="space-y-3">
@@ -207,9 +232,14 @@ export default function SuppliersPage() {
               onChange={(event) => setEditForm((prev) => ({ ...prev, address: event.target.value }))}
               required
             />
-            <Button type="button" disabled={isUpdating} onClick={handleSaveSupplier}>
-              {isUpdating ? "Saving..." : "Save changes"}
-            </Button>
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <Button type="button" variant="danger" disabled={isDeleting || isUpdating} onClick={handleDeleteSupplier}>
+                {isDeleting ? "Deleting..." : "Delete supplier"}
+              </Button>
+              <Button type="button" disabled={isUpdating || isDeleting} onClick={handleSaveSupplier}>
+                {isUpdating ? "Saving..." : "Save changes"}
+              </Button>
+            </div>
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">Supplier not found.</p>
