@@ -227,10 +227,6 @@ export default async function DashboardPage() {
 
   return (
     <section className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Live operational snapshot for today.</p>
-      </header>
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Monthly Sales Progress</CardTitle>
