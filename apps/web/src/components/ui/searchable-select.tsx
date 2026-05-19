@@ -20,6 +20,8 @@ type SearchableSelectProps = {
   required?: boolean;
   disabled?: boolean;
   className?: string;
+  searchMode?: "all" | "name" | "price";
+  onCycleSearchMode?: () => void;
   onChange: (value: string) => void;
 };
 
@@ -31,12 +33,15 @@ export function SearchableSelect({
   required = false,
   disabled = false,
   className,
+  searchMode = "all",
+  onCycleSearchMode,
   onChange
 }: SearchableSelectProps) {
   const [query, setQuery] = useState("");
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastCtrlPressRef = useRef(0);
 
   const selectedOption = useMemo(() => options.find((option) => option.value === value) ?? null, [options, value]);
 
@@ -44,10 +49,15 @@ export function SearchableSelect({
     const normalizedQuery = query.trim().toLowerCase();
     if (!normalizedQuery) return options;
     return options.filter((option) => {
-      const searchable = `${option.label} ${option.meta ?? ""} ${option.subLabel ?? ""}`.toLowerCase();
-      return searchable.includes(normalizedQuery);
+      const searchable =
+        searchMode === "name"
+          ? option.label
+          : searchMode === "price"
+            ? `${option.meta ?? ""} ${option.subLabel ?? ""}`
+            : `${option.label} ${option.meta ?? ""} ${option.subLabel ?? ""}`;
+      return searchable.toLowerCase().includes(normalizedQuery);
     });
-  }, [options, query]);
+  }, [options, query, searchMode]);
 
   useEffect(() => {
     if (selectedOption) {
@@ -115,6 +125,16 @@ export function SearchableSelect({
       const option = filteredOptions[highlightedIndex];
       if (option) {
         handleSelect(option);
+      }
+    }
+
+    if (event.key === "Control" && onCycleSearchMode) {
+      const now = Date.now();
+      if (now - lastCtrlPressRef.current < 450) {
+        onCycleSearchMode();
+        lastCtrlPressRef.current = 0;
+      } else {
+        lastCtrlPressRef.current = now;
       }
     }
 

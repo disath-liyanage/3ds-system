@@ -74,6 +74,7 @@ export default function NewInvoicePage() {
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [invoiceNumber, setInvoiceNumber] = useState<number | null>(null);
   const [currentStatus, setCurrentStatus] = useState<string | null>(null);
+  const [productSearchMode, setProductSearchMode] = useState<"all" | "name" | "price">("all");
 
   const {
     control,
@@ -217,6 +218,10 @@ export default function NewInvoicePage() {
     focusQtyField();
   }, [setValue, focusQtyField]);
 
+  const cycleProductSearchMode = useCallback(() => {
+    setProductSearchMode((prev) => (prev === "all" ? "name" : prev === "name" ? "price" : "all"));
+  }, []);
+
   const productOptions = useMemo<SearchableSelectOption[]>(
     () =>
       (products ?? []).map((product) => ({
@@ -226,6 +231,16 @@ export default function NewInvoicePage() {
       })),
     [products]
   );
+
+  const productSearchLabel =
+    productSearchMode === "name" ? "Product Name" : productSearchMode === "price" ? "Product Price" : "Product";
+  const productSearchPlaceholder = isProductsLoading
+    ? "Loading products..."
+    : productSearchMode === "name"
+      ? "Searching for the Product name"
+      : productSearchMode === "price"
+        ? "Searching for the Product price"
+        : "Select product";
 
   const customerOptions = useMemo<SearchableSelectOption[]>(
     () =>
@@ -791,13 +806,15 @@ export default function NewInvoicePage() {
                   </div>
                 )}
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Product</label>
+                  <label className="text-xs font-semibold text-muted-foreground">{productSearchLabel}</label>
                   <div className="relative">
                     <SearchableSelect
                       value={watchedDraft?.product_id ?? ""}
                       options={productOptions}
-                      placeholder={isProductsLoading ? "Loading products..." : "Select product"}
+                      placeholder={productSearchPlaceholder}
                       disabled={isProductsLoading}
+                      searchMode={productSearchMode}
+                      onCycleSearchMode={cycleProductSearchMode}
                       className={cn(
                         addAttempted && draftErrors?.product_id
                           ? "border-red-400 focus:ring-red-400/40"
