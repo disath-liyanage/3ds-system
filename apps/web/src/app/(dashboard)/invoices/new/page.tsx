@@ -107,6 +107,39 @@ export default function NewInvoicePage() {
     [products, watchedDraft?.product_id]
   );
 
+  const minPriceStockInfo = useMemo(() => {
+    if (!watchedDraft?.product_id) return null;
+    if (isStockLoading) {
+      return { label: "Loading stock..." } as const;
+    }
+
+    const bucketsWithStock = (stockByPrice ?? []).filter((bucket) => Number(bucket.received_qty) > 0);
+    if (bucketsWithStock.length === 0) {
+      if (!selectedProduct) return null;
+      return {
+        price: Number(selectedProduct.price) || 0,
+        stock: Number(selectedProduct.stock_qty) || 0
+      } as const;
+    }
+
+    const minBucket = bucketsWithStock.reduce((min, bucket) =>
+      Number(bucket.selling_price) < Number(min.selling_price) ? bucket : min
+    );
+
+    return {
+      price: Number(minBucket.selling_price) || 0,
+      stock: Number(minBucket.received_qty) || 0
+    } as const;
+  }, [isStockLoading, selectedProduct, stockByPrice, watchedDraft?.product_id]);
+
+  const productMinPriceMeta = useMemo(() => {
+    if (!watchedDraft?.product_id) return "";
+    if (!minPriceStockInfo) return "";
+    if ("label" in minPriceStockInfo) return minPriceStockInfo.label;
+
+    return `Min LKR ${minPriceStockInfo.price.toLocaleString(undefined, { minimumFractionDigits: 2 })} · Stock ${minPriceStockInfo.stock}`;
+  }, [minPriceStockInfo, watchedDraft?.product_id]);
+
   const availableQty = useMemo(() => {
     if (!watchedDraft?.product_id) return null;
     if (isStockLoading) return 0;
@@ -188,7 +221,8 @@ export default function NewInvoicePage() {
     () =>
       (products ?? []).map((product) => ({
         value: product.id,
-        label: `${product.name} · ${product.unit} · Min LKR ${Number(product.price || 0).toFixed(2)} · Stock ${Number(product.stock_qty || 0)}`
+        label: `${product.name} · ${product.unit}`,
+        meta: `Min LKR ${Number(product.price || 0).toFixed(2)} · Stock ${Number(product.stock_qty || 0)}`
       })),
     [products]
   );
@@ -758,18 +792,26 @@ export default function NewInvoicePage() {
                 )}
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground">Product</label>
-                  <SearchableSelect
-                    value={watchedDraft?.product_id ?? ""}
-                    options={productOptions}
-                    placeholder={isProductsLoading ? "Loading products..." : "Select product"}
-                    disabled={isProductsLoading}
-                    className={cn(
-                      addAttempted && draftErrors?.product_id
-                        ? "border-red-400 focus:ring-red-400/40"
-                        : ""
-                    )}
-                    onChange={handleDraftProductChange}
-                  />
+                  <div className="relative">
+                    <SearchableSelect
+                      value={watchedDraft?.product_id ?? ""}
+                      options={productOptions}
+                      placeholder={isProductsLoading ? "Loading products..." : "Select product"}
+                      disabled={isProductsLoading}
+                      className={cn(
+                        addAttempted && draftErrors?.product_id
+                          ? "border-red-400 focus:ring-red-400/40"
+                          : "",
+                        productMinPriceMeta ? "pr-36" : ""
+                      )}
+                      onChange={handleDraftProductChange}
+                    />
+                    {productMinPriceMeta ? (
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground whitespace-nowrap">
+                        {productMinPriceMeta}
+                      </span>
+                    ) : null}
+                  </div>
                   <input
                     type="hidden"
                     {...register("draft.product_id", {
