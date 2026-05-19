@@ -47,21 +47,26 @@ export function Dialog({
     >
       <div className={cn("max-h-[85vh] overflow-y-auto p-6", contentClassName)}>
         {showTopClose ? (
-          <div className="sticky top-0 z-10 -mr-2 -mt-2 mb-2 flex justify-end bg-white/70 py-1 backdrop-blur-sm">
+          <div className="sticky top-0 z-10 -mx-6 -mt-6 mb-4 flex items-start justify-between bg-white/75 px-6 py-4 backdrop-blur-sm">
+            <div className="space-y-1 pr-4">
+              <h2 className="text-lg font-semibold">{title}</h2>
+              {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+            </div>
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-white/80 text-muted-foreground shadow-sm transition hover:bg-white hover:text-foreground"
+              className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-white/85 text-muted-foreground shadow-sm transition hover:bg-white hover:text-foreground"
               aria-label="Close dialog"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
-        ) : null}
-        <div className="space-y-1">
-          <h2 className="text-lg font-semibold">{title}</h2>
-          {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
-        </div>
+        ) : (
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold">{title}</h2>
+            {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+          </div>
+        )}
         {children}
         {hideFooterClose ? null : (
           <div className="flex justify-end">

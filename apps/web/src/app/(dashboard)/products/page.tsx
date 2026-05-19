@@ -1144,7 +1144,7 @@ function ProductFormDialog({
             </Button>
             <Button
               type="submit"
-              className="bg-orange-400 text-white hover:bg-orange-500"
+              className="bg-orange-500 text-white hover:bg-orange-600"
               disabled={isSubmitting}
             >
               {isSubmitting ? "Saving changes..." : "Save changes"}
@@ -1410,8 +1410,8 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
                     </Button>
                   ) : null}
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1">
+                <div className="flex flex-wrap items-end gap-3 lg:flex-nowrap">
+                  <div className="w-full space-y-1 lg:w-[180px]">
                     <label htmlFor={`multi-product-unit-${index}`} className="text-sm font-medium">
                       Unit
                     </label>
@@ -1423,7 +1423,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
                       placeholder="e.g. 1L, 5L"
                     />
                   </div>
-                  <div className="space-y-1">
+                  <div className="w-full min-w-0 flex-1 space-y-1">
                     <label htmlFor={`multi-product-price-${index}`} className="text-sm font-medium">
                       Price in LKR
                     </label>
@@ -1437,7 +1437,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
                       onChange={(event) => handleSizeChange(index, "price", event.target.value)}
                     />
                   </div>
-                  <div className="space-y-1">
+                  <div className="w-full space-y-1 lg:w-[190px]">
                     <label htmlFor={`multi-product-threshold-${index}`} className="text-sm font-medium">
                       Low Stock Threshold
                     </label>
