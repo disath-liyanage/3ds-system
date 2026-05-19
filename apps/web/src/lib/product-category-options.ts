@@ -1,0 +1,23 @@
+export const categoryOptions: Array<{ value: string; label: string }> = [
+  { value: "Bathware", label: "Bathware" },
+  { value: "Cash Corner", label: "Cash Corner" },
+  { value: "Cycle Related Items", label: "Cycle Related Items" },
+  { value: "DANMI", label: "DANMI" },
+  { value: "Different Types of Glue", label: "Different Types of Glue" },
+  { value: "Different Types of Nets", label: "Different Types of Nets" },
+  { value: "E+ Cutting, Diamond Bar Cutter, Grinding Wheel", label: "E+ Cutting, Diamond Bar Cutter, Grinding Wheel" },
+  { value: "Electric Bathware", label: "Electric Bathware" },
+  { value: "Fast Moving", label: "Fast Moving" },
+  { value: "Gloves, Masking Tapes & Pads", label: "Gloves, Masking Tapes & Pads" },
+  { value: "Grass Related Items", label: "Grass Related Items" },
+  { value: "Hardware", label: "Hardware" },
+  { value: "Nail Varieties", label: "Nail Varieties" },
+  { value: "Pad & Spreader", label: "Pad & Spreader" },
+  { value: "Paint Brush, Rollers & Roller Sticks", label: "Paint Brush, Rollers & Roller Sticks" },
+  { value: "Paints Related", label: "Paints Related" },
+  { value: "Pantry Cupboard Related Items", label: "Pantry Cupboard Related Items" },
+  { value: "Pliers & Hammers", label: "Pliers & Hammers" },
+  { value: "Spray Gun", label: "Spray Gun" },
+  { value: "Stationery Steel Tape", label: "Stationery Steel Tape" },
+  { value: "Water Tec Range", label: "Water Tec Range" }
+];

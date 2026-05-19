@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useProducts } from "@/hooks/useProducts";
 import { useProductStockByPrice } from "@/hooks/useProductStockByPrice";
+import { categoryOptions } from "@/lib/product-category-options";
 import { toast } from "@/lib/toast";
 import { updateProductGRNPrices, updateProductGRNStock } from "@/app/actions/update-grn-prices";
 
@@ -133,6 +134,7 @@ function UnifiedSizeEditor({
 }
 type ProductFormState = {
   name: string;
+  department: string;
   category: string;
   subCategory: string;
   unit: string;
@@ -212,6 +214,7 @@ type ProductFormDialogProps = {
 
 const initialProductFormState: ProductFormState = {
   name: "",
+  department: "",
   category: "",
   subCategory: "",
   unit: "",
@@ -227,28 +230,42 @@ const initialProductSizeState: ProductSizeFormState = {
   low_stock_threshold: "10"
 };
 
-const categoryOptions = [
-  { value: "Hardware", label: "Hardware" },
-  { value: "Cash", label: "Cash" },
-  { value: "Bathware", label: "Bathware" },
-  { value: "Fast moving", label: "Fast moving" },
-  { value: "Pantry Cupboard", label: "Pantry Cupboard"}
+const departmentOptions = [
+  { value: "Import", label: "Import" },
+  { value: "local", label: "local" },
+  { value: "JB", label: "JB" },
+  { value: "Dubai", label: "Dubai" }
 ];
 
-function composeCategory(category: string, subCategory: string) {
-  return `${category.trim()} / ${subCategory.trim()}`;
+function composeCategory(department: string, category: string, subCategory: string) {
+  const head = `${department.trim()} / ${category.trim()}`;
+  const sub = subCategory.trim();
+  return sub ? `${head} / ${sub}` : head;
 }
 
 function splitCategory(value: string) {
   const trimmedValue = value.trim();
-  const parts = trimmedValue.split("/");
-  if (parts.length < 2) {
-    return { category: trimmedValue, subCategory: "" };
+  const parts = trimmedValue.split("/").map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 0) {
+    return { department: "", category: "", subCategory: "" };
   }
 
-  const category = parts[0]?.trim() ?? "";
-  const subCategory = parts.slice(1).join("/").trim();
-  return { category, subCategory };
+  const knownDepartments = new Set(departmentOptions.map((option) => option.value));
+  const head = parts[0] ?? "";
+
+  if (knownDepartments.has(head)) {
+    return {
+      department: head,
+      category: parts[1] ?? "",
+      subCategory: parts.slice(2).join(" / ").trim()
+    };
+  }
+
+  return {
+    department: "local",
+    category: head,
+    subCategory: parts.slice(1).join(" / ").trim()
+  };
 }
 
 function toNumber(value: number | string | null | undefined): number {
@@ -462,9 +479,10 @@ function SearchableSelect({ id, value, options, placeholder, onChange }: Searcha
 }
 
 function toProductFormState(product: Product): ProductFormState {
-  const { category, subCategory } = splitCategory(product.category);
+  const { department, category, subCategory } = splitCategory(product.category);
   return {
     name: product.name,
+    department,
     category,
     subCategory,
     unit: product.unit,
@@ -569,12 +587,18 @@ function ProductFormDialog({
     }
 
     const name = form.name.trim();
+    const department = form.department.trim();
     const category = form.category.trim();
     const subCategory = form.subCategory.trim();
     const unit = form.unit.trim();
 
     if (!name) {
       setSubmitError("Name is required");
+      return;
+    }
+
+    if (!department) {
+      setSubmitError("Department is required");
       return;
     }
 
@@ -598,7 +622,7 @@ function ProductFormDialog({
     }
 
     let payload: ProductFormPayload;
-    const composedCategory = composeCategory(category, subCategory);
+    const composedCategory = composeCategory(department, category, subCategory);
 
     if (isMultiSizeEdit) {
       const fallbackSize = existingSizes.find((item) => !item.isRemoved) || existingSizes[0];
@@ -848,6 +872,19 @@ function ProductFormDialog({
         </div>
 
         <div className="space-y-1">
+          <label htmlFor={`${mode}-product-department`} className="text-sm font-medium">
+            Department
+          </label>
+          <SearchableSelect
+            id={`${mode}-product-department`}
+            value={form.department}
+            options={departmentOptions}
+            placeholder="Select department"
+            onChange={(value) => setForm((prev) => ({ ...prev, department: value, category: "" }))}
+          />
+        </div>
+
+        <div className="space-y-1">
           <label htmlFor={`${mode}-product-category`} className="text-sm font-medium">
             Category
           </label>
@@ -855,7 +892,7 @@ function ProductFormDialog({
             id={`${mode}-product-category`}
             value={form.category}
             options={categoryOptions}
-            placeholder="Select department"
+            placeholder="Select category"
             onChange={(value) => setForm((prev) => ({ ...prev, category: value }))}
           />
         </div>
@@ -1135,6 +1172,7 @@ type MultiSizeProductDialogProps = {
 
 function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProductDialogProps) {
   const [name, setName] = useState("");
+  const [department, setDepartment] = useState("");
   const [category, setCategory] = useState("");
   const [subCategory, setSubCategory] = useState("");
   const [sizes, setSizes] = useState<ProductSizeFormState[]>([initialProductSizeState]);
@@ -1144,6 +1182,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
   useEffect(() => {
     if (!open) return;
     setName("");
+    setDepartment("");
     setCategory("");
     setSubCategory("");
     setSizes([initialProductSizeState]);
@@ -1177,11 +1216,17 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
     event.preventDefault();
 
     const trimmedName = name.trim();
+    const trimmedDepartment = department.trim();
     const trimmedCategory = category.trim();
     const trimmedSubCategory = subCategory.trim();
 
     if (!trimmedName) {
       setSubmitError("Name is required");
+      return;
+    }
+
+    if (!trimmedDepartment) {
+      setSubmitError("Department is required");
       return;
     }
 
@@ -1233,7 +1278,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
 
       payloads.push({
         name: trimmedName,
-        category: composeCategory(trimmedCategory, trimmedSubCategory),
+        category: composeCategory(trimmedDepartment, trimmedCategory, trimmedSubCategory),
         unit,
         price: priceResult.value,
         stock_qty: stockResult.value,
@@ -1284,6 +1329,22 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
         </div>
 
         <div className="space-y-1">
+          <label htmlFor="multi-product-department" className="text-sm font-medium">
+            Department
+          </label>
+          <SearchableSelect
+            id="multi-product-department"
+            value={department}
+            options={departmentOptions}
+            placeholder="Select department"
+            onChange={(value) => {
+              setDepartment(value);
+              setCategory("");
+            }}
+          />
+        </div>
+
+        <div className="space-y-1">
           <label htmlFor="multi-product-category" className="text-sm font-medium">
             Category
           </label>
@@ -1291,7 +1352,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
             id="multi-product-category"
             value={category}
             options={categoryOptions}
-            placeholder="Select department"
+            placeholder="Select category"
             onChange={setCategory}
           />
         </div>
