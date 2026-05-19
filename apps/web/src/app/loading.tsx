@@ -6,10 +6,10 @@ export default function AppLoading() {
       <Image
         src="/images/3ds-logo.png"
         alt="3D's Distributors (PVT) Ltd."
-        width={320}
-        height={180}
+        width={460}
+        height={259}
         priority
-        className="h-auto w-full max-w-[320px]"
+        className="h-auto w-full max-w-[460px]"
       />
     </div>
   );
