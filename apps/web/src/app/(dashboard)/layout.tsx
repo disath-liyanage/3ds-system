@@ -20,7 +20,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
 
   const { data: profile } = await supabase
     .from("users_profile")
-    .select("role, full_name, email")
+    .select("role, full_name, email, created_at, worker:workers(identity_card_no)")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -29,7 +29,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   if (!resolvedProfile && user.email) {
     const { data: fallbackProfile } = await adminClient
       .from("users_profile")
-      .select("role, full_name, email")
+      .select("role, full_name, email, created_at, worker:workers(identity_card_no)")
       .eq("email", user.email)
       .maybeSingle();
 
@@ -39,6 +39,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   const role = resolvedProfile?.role ?? "sales_rep";
   const isAdmin = role === "admin";
   const isManager = role === "manager";
+  const worker = Array.isArray(resolvedProfile?.worker) ? resolvedProfile.worker[0] : resolvedProfile?.worker;
 
   return (
     <div className="min-h-screen lg:flex">
@@ -48,7 +49,9 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
         user={{
           fullName: resolvedProfile?.full_name ?? null,
           email: user.email ?? "",
-          role
+          role,
+          createdAt: resolvedProfile?.created_at ?? null,
+          identityCardNo: worker?.identity_card_no ?? null
         }}
       />
       <main className="flex-1 p-4 lg:p-8">{children}</main>
