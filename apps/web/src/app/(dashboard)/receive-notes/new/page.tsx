@@ -58,6 +58,7 @@ export default function NewReceiveNotePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [discountInputMode, setDiscountInputMode] = useState<"percent" | "amount">("percent");
   const [latestCostsByProduct, setLatestCostsByProduct] = useState<Record<string, number>>({});
+  const [productSearchMode, setProductSearchMode] = useState<"all" | "name" | "price">("all");
   const { control, register, handleSubmit, setValue, trigger, getValues, resetField, formState } =
     useForm<ReceiveNoteForm>({
     defaultValues: {
@@ -102,6 +103,19 @@ export default function NewReceiveNotePage() {
       })),
     [latestCostsByProduct, products]
   );
+
+  const productSearchLabel =
+    productSearchMode === "name" ? "Product Name" : productSearchMode === "price" ? "Product Price" : "Product";
+  const productSearchPlaceholder = isProductsLoading
+    ? "Loading products..."
+    : productSearchMode === "name"
+      ? "Searching for the Product name"
+      : productSearchMode === "price"
+        ? "Searching for the Product price"
+        : "Select product";
+  const cycleProductSearchMode = () => {
+    setProductSearchMode((prev) => (prev === "all" ? "name" : prev === "name" ? "price" : "all"));
+  };
 
   const supplierOptions = useMemo<SearchableSelectOption[]>(
     () =>
@@ -413,12 +427,14 @@ export default function NewReceiveNotePage() {
             <div className="space-y-3">
               <div className="space-y-3 rounded-md border border-border p-4">
                 <div>
-                  <label className="text-xs font-semibold text-muted-foreground">Product</label>
+                  <label className="text-xs font-semibold text-muted-foreground">{productSearchLabel}</label>
                   <SearchableSelect
                     value={watchedDraft?.product_id ?? ""}
                     options={productOptions}
-                    placeholder={isProductsLoading ? "Loading products..." : "Select product"}
+                    placeholder={productSearchPlaceholder}
                     disabled={isProductsLoading}
+                    searchMode={productSearchMode}
+                    onCycleSearchMode={cycleProductSearchMode}
                     className={cn(
                       addAttempted && draftErrors?.product_id
                         ? "border-red-400 focus:ring-red-400/40"
