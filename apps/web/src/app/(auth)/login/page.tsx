@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -51,8 +52,11 @@ export default function LoginPage() {
     <main className="mx-auto flex min-h-screen max-w-md items-center px-4">
       <Card className="w-full">
         <CardHeader>
+          <div className="mb-4 flex justify-center">
+            <Image src="/images/3ds-logo.png" alt="3D's Distributors (PVT) Ltd." width={240} height={135} priority className="h-auto w-full max-w-[240px]" />
+          </div>
           <CardTitle>Sign in</CardTitle>
-          <CardDescription>Use your 3D's Distributors (PVT) Ltd. account credentials.</CardDescription>
+          <CardDescription>Use your 3D's Distributors account credentials.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -60,7 +64,7 @@ export default function LoginPage() {
               <label htmlFor="email" className="text-sm font-medium">
                 Email
               </label>
-              <Input id="email" type="email" placeholder="you@company.com" {...register("email")} />
+              <Input id="email" type="email" placeholder="you@3dsdis.com" {...register("email")} />
               {errors.email ? <p className="text-xs text-red-600">{errors.email.message}</p> : null}
             </div>
             <div className="space-y-1">

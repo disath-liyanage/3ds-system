@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -16,13 +17,14 @@ export type SidebarItem = {
 
 type SidebarProps = {
   title: string;
+  logoSrc?: string;
   items: SidebarItem[];
   adminItems?: SidebarItem[];
   adminTitle?: string;
   footer?: ReactNode;
 };
 
-export function Sidebar({ title, items, adminItems = [], adminTitle = "Admin", footer }: SidebarProps) {
+export function Sidebar({ title, logoSrc, items, adminItems = [], adminTitle = "Admin", footer }: SidebarProps) {
   const pathname = usePathname();
 
   const renderItem = (item: SidebarItem) => {
@@ -51,9 +53,12 @@ export function Sidebar({ title, items, adminItems = [], adminTitle = "Admin", f
 
   return (
     <aside className="flex w-full flex-col border-b border-border bg-white p-4 lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:border-b-0 lg:border-r lg:overflow-y-auto">
-      <div className="mb-6 flex items-center gap-2">
-        <div className="h-8 w-8 rounded-md bg-primary" />
-        <h2 className="text-lg font-semibold">{title}</h2>
+      <div className="mb-6 flex justify-center">
+        {logoSrc ? (
+          <Image src={logoSrc} alt={title} width={220} height={124} priority className="h-auto w-full max-w-[220px]" />
+        ) : (
+          <h2 className="text-lg font-semibold">{title}</h2>
+        )}
       </div>
 
       <div className="flex-1">
