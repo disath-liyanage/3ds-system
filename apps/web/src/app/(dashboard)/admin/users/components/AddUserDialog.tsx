@@ -124,6 +124,7 @@ export function AddUserDialog({ open, onOpenChange, customRoles, workers, usedWo
       onOpenChange={handleOpenChange}
       title="Add user"
       description="Create a new user and assign a system role."
+      showBottomClose={false}
     >
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-1">

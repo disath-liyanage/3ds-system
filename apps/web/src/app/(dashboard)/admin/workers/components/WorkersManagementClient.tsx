@@ -229,6 +229,7 @@ export function WorkersManagementClient({ workers, currentUser }: WorkersManagem
         }}
         title={editingWorker ? "Edit worker" : "Add worker"}
         description="Set worker details and salary mode."
+        showBottomClose={false}
       >
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-1">

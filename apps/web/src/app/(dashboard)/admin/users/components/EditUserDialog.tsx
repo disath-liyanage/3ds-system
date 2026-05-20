@@ -144,6 +144,7 @@ export function EditUserDialog({ open, onOpenChange, user, customRoles, workers,
       onOpenChange={onOpenChange}
       title="Edit user"
       description="Update profile details, role assignment, and account status."
+      showBottomClose={false}
     >
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-1">
