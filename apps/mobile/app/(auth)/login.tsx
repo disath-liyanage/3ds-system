@@ -84,25 +84,30 @@ const styles = StyleSheet.create({
   logo: {
     width: "100%",
     height: 120,
-    marginBottom: 20
+    marginBottom: 28
   },
   input: {
     backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: "#ddcfbf",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12
+    borderRadius: 18,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    fontSize: 16,
+    marginBottom: 16
   },
   button: {
     backgroundColor: "#e36824",
-    borderRadius: 8,
-    paddingVertical: 12,
+    borderRadius: 18,
+    paddingVertical: 16,
+    marginTop: 6,
     alignItems: "center"
   },
   buttonText: {
     color: "#fff",
-    fontWeight: "600"
+    fontWeight: "700",
+    fontSize: 20,
+    letterSpacing: 0.4
   },
   error: {
     color: "#b42318",
