@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -365,18 +366,14 @@ export default function NewReceiveNotePage() {
   if (!isLoading && !permissions?.canManageReceiveNotes) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">New GRN</h1>
-        <p className="text-sm text-muted-foreground">You do not have permission to create GRN.</p>
+        <PageHeader title="New GRN" description="You do not have permission to create GRN." />
       </section>
     );
   }
 
   return (
     <section className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold">New GRN</h1>
-        <p className="text-sm text-muted-foreground">Record supplier stock received into inventory.</p>
-      </header>
+      <PageHeader title="New GRN" description="Record supplier stock received into inventory." />
 
       <form className="space-y-4" onSubmit={handleSubmit(onSubmit, onSubmitInvalid)}>
         <Card>

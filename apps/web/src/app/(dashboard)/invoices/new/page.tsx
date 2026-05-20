@@ -6,6 +6,7 @@ import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { approveInvoice, createInvoice, getInvoiceDetail, updateDraftInvoice, updateInvoice } from "@/app/actions/invoices";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
@@ -698,8 +699,7 @@ export default function NewInvoicePage() {
   if (isPermissionsLoading) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">New Invoice</h1>
-        <p className="text-sm text-muted-foreground">Loading permissions...</p>
+        <PageHeader title="New Invoice" description="Loading permissions..." />
       </section>
     );
   }
@@ -707,22 +707,21 @@ export default function NewInvoicePage() {
   if (!permissions?.canCreateInvoices) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">New Invoice</h1>
-        <p className="text-sm text-muted-foreground">You do not have permission to create invoices.</p>
+        <PageHeader title="New Invoice" description="You do not have permission to create invoices." />
       </section>
     );
   }
 
   return (
     <section className="space-y-6 w-full max-w-6xl mx-auto">
-      <header>
-        <h1 className="text-2xl font-bold">New Invoice</h1>
-        <p className="text-sm text-muted-foreground">
-          {user?.role === "sales_rep"
+      <PageHeader
+        title="New Invoice"
+        description={
+          user?.role === "sales_rep"
             ? "Create an invoice request for approval."
-            : "Create a direct invoice for a customer."}
-        </p>
-      </header>
+            : "Create a direct invoice for a customer."
+        }
+      />
 
       <form className="space-y-6" onSubmit={handleSubmit(onSubmit, onSubmitInvalid)}>
         <Card>

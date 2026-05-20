@@ -12,6 +12,7 @@ import { useProducts } from "@/hooks/useProducts";
 import { useReceiveNote } from "@/hooks/useReceiveNote";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
+import { PageHeader } from "@/components/page-header";
 
 export default function ViewReceiveNotePage() {
   const router = useRouter();
@@ -46,8 +47,7 @@ export default function ViewReceiveNotePage() {
   if (isPermissionsLoading || isReceiveNoteLoading) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">GRN Details</h1>
-        <p className="text-sm text-muted-foreground">Loading GRN...</p>
+        <PageHeader title="GRN Details" description="Loading GRN..." />
       </section>
     );
   }
@@ -55,8 +55,7 @@ export default function ViewReceiveNotePage() {
   if (isError || !receiveNote) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">GRN Details</h1>
-        <p className="text-sm text-muted-foreground">Unable to find this GRN.</p>
+        <PageHeader title="GRN Details" description="Unable to find this GRN." />
         <Button asChild variant="outline">
           <Link href="/receive-notes">Back to GRNs</Link>
         </Button>
@@ -66,27 +65,27 @@ export default function ViewReceiveNotePage() {
 
   return (
     <section className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">GRN Details</h1>
-          <p className="text-sm text-muted-foreground">View supplier stock received into inventory.</p>
-        </div>
-        <div className="flex gap-2">
-          {canManageReceiveNotes && (
-            <>
-              <Button asChild variant="default">
-                <Link href={`/receive-notes/${receiveNoteId}/edit`}>Edit GRN</Link>
-              </Button>
-              <Button variant="danger" onClick={handleDelete}>
-                Delete GRN
-              </Button>
-            </>
-          )}
-          <Button asChild variant="outline">
-            <Link href="/receive-notes">Back</Link>
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="GRN Details"
+        description="View supplier stock received into inventory."
+        actions={
+          <>
+            {canManageReceiveNotes && (
+              <>
+                <Button asChild variant="default">
+                  <Link href={`/receive-notes/${receiveNoteId}/edit`}>Edit GRN</Link>
+                </Button>
+                <Button variant="danger" onClick={handleDelete}>
+                  Delete GRN
+                </Button>
+              </>
+            )}
+            <Button asChild variant="outline">
+              <Link href="/receive-notes">Back</Link>
+            </Button>
+          </>
+        }
+      />
 
       <Card>
         <CardHeader>

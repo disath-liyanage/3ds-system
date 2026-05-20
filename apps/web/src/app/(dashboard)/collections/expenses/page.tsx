@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { addCollectionExpense } from "@/app/actions/collections";
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -73,18 +74,14 @@ export default function CollectionExpensesPage() {
   if (!isLoading && !canRecordCollections) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">Expenses</h1>
-        <p className="text-sm text-muted-foreground">You do not have permission to add expenses.</p>
+        <PageHeader title="Expenses" description="You do not have permission to add expenses." />
       </section>
     );
   }
 
   return (
     <section className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold">Expenses</h1>
-        <p className="text-sm text-muted-foreground">Add expenses related to collection visits.</p>
-      </header>
+      <PageHeader title="Expenses" description="Add expenses related to collection visits." />
 
       <Card>
         <CardHeader>

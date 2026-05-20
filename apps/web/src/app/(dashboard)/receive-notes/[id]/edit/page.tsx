@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 
 import { deleteReceiveNote, updateReceiveNote } from "@/app/actions/receive-notes";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -327,8 +328,7 @@ export default function EditReceiveNotePage() {
   if (!isLoading && !permissions?.canManageReceiveNotes) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">Edit GRN</h1>
-        <p className="text-sm text-muted-foreground">You do not have permission to edit GRN.</p>
+        <PageHeader title="Edit GRN" description="You do not have permission to edit GRN." />
       </section>
     );
   }
@@ -336,8 +336,7 @@ export default function EditReceiveNotePage() {
   if (isReceiveNoteLoading) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">Edit GRN</h1>
-        <p className="text-sm text-muted-foreground">Loading GRN...</p>
+        <PageHeader title="Edit GRN" description="Loading GRN..." />
       </section>
     );
   }
@@ -345,18 +344,14 @@ export default function EditReceiveNotePage() {
   if (isReceiveNoteError || !receiveNote) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">Edit GRN</h1>
-        <p className="text-sm text-muted-foreground">Unable to find this GRN.</p>
+        <PageHeader title="Edit GRN" description="Unable to find this GRN." />
       </section>
     );
   }
 
   return (
     <section className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold">Edit GRN</h1>
-        <p className="text-sm text-muted-foreground">Update supplier stock received into inventory.</p>
-      </header>
+      <PageHeader title="Edit GRN" description="Update supplier stock received into inventory." />
 
       <form className="space-y-4" onSubmit={handleSubmit(onSubmit, onSubmitInvalid)}>
         <Card>
