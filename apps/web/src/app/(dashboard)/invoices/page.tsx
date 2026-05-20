@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useInvoices } from "@/hooks/useInvoices";
+import { useQuotations } from "@/hooks/useQuotations";
 import { formatDate } from "@/lib/utils";
 
 export default function InvoicesPage() {
@@ -34,6 +35,9 @@ export default function InvoicesPage() {
   const [maxTotal, setMaxTotal] = useState("");
   const [minInvoiceNo, setMinInvoiceNo] = useState("");
   const [maxInvoiceNo, setMaxInvoiceNo] = useState("");
+  const isAdminOrManager = user?.role === "admin" || user?.role === "manager";
+  const hasSearchQuery = customerSearch.trim().length > 0;
+  const { data: quotations } = useQuotations(Boolean(isAdminOrManager && hasSearchQuery));
 
   const getStatusLabel = (status: string) => {
     if (status === "pending_approval") return "Pending approval";
@@ -72,13 +76,15 @@ export default function InvoicesPage() {
 
   const filteredInvoices = useMemo(() => {
     if (!invoices) return [];
-    let result = invoices;
+    const quotationCandidates = isAdminOrManager && hasSearchQuery ? quotations ?? [] : [];
+    let result = [...invoices, ...quotationCandidates];
 
     if (customerSearch) {
       const lowerSearch = customerSearch.toLowerCase();
       result = result.filter((inv) =>
         inv.customer_name.toLowerCase().includes(lowerSearch) ||
-        String(inv.invoice_number).includes(lowerSearch)
+        String(inv.invoice_number).includes(lowerSearch) ||
+        `q${inv.quotation_number ?? ""}`.includes(lowerSearch)
       );
     }
 
@@ -108,17 +114,32 @@ export default function InvoicesPage() {
     }
 
     if (minInvoiceNo) {
-      result = result.filter((inv) => inv.invoice_number >= Number(minInvoiceNo));
+      result = result.filter((inv) => (inv.quotation_number ?? inv.invoice_number) >= Number(minInvoiceNo));
     }
     if (maxInvoiceNo) {
-      result = result.filter((inv) => inv.invoice_number <= Number(maxInvoiceNo));
+      result = result.filter((inv) => (inv.quotation_number ?? inv.invoice_number) <= Number(maxInvoiceNo));
     }
 
     return result;
-  }, [invoices, customerSearch, dateRange, statusFilter, minTotal, maxTotal, minInvoiceNo, maxInvoiceNo]);
+  }, [
+    invoices,
+    quotations,
+    isAdminOrManager,
+    hasSearchQuery,
+    customerSearch,
+    dateRange,
+    statusFilter,
+    minTotal,
+    maxTotal,
+    minInvoiceNo,
+    maxInvoiceNo
+  ]);
 
   const sortedInvoices = useMemo(
-    () => [...filteredInvoices].sort((a, b) => b.invoice_number - a.invoice_number),
+    () =>
+      [...filteredInvoices].sort(
+        (a, b) => (b.quotation_number ?? b.invoice_number) - (a.quotation_number ?? a.invoice_number)
+      ),
     [filteredInvoices]
   );
 
@@ -221,7 +242,7 @@ export default function InvoicesPage() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-1 items-center gap-3">
             <Input
-              placeholder="Search customer or invoice #..."
+              placeholder="Search customer, invoice #, or quotation #..."
               value={customerSearch}
               onChange={(e) => setCustomerSearch(e.target.value)}
               className="lg:max-w-md"
@@ -382,7 +403,9 @@ export default function InvoicesPage() {
                       : "cursor-pointer"
                 }
               >
-                <TableCell className="font-medium">{row.invoice_number}</TableCell>
+                <TableCell className="font-medium">
+                  {row.quotation_number ? `Q${row.quotation_number}` : row.invoice_number}
+                </TableCell>
                 <TableCell>{formatDate(row.created_at)}</TableCell>
                 <TableCell>{row.customer_name}</TableCell>
                 <TableCell className="capitalize">{row.payment_method}</TableCell>
