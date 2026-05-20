@@ -11,6 +11,7 @@ import { DayPicker, type DateRange } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -193,17 +194,20 @@ export default function QuotationsPage() {
 
   return (
     <section className="space-y-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Quotations</h1>
-          <p className="text-sm text-muted-foreground">Track quotation issuance, payment methods, and statuses.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="outline">
-            <Link href="/invoices">Back to Invoices</Link>
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title="Quotations"
+        description="Track quotation issuance, payment methods, and statuses."
+        actions={
+          <>
+            <Button asChild>
+              <Link href="/invoices/new?kind=quotation">Add Quotation</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/invoices">Back to Invoices</Link>
+            </Button>
+          </>
+        }
+      />
 
       <div className="flex flex-col gap-3 rounded-md border border-border bg-white p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

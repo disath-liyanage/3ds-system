@@ -65,6 +65,7 @@ export default function NewInvoicePage() {
   const searchParams = useSearchParams();
   const draftId = searchParams.get("draftId");
   const editId = searchParams.get("editId");
+  const isQuotationMode = searchParams.get("kind") === "quotation";
   const { permissions, user, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
   const { data: products, isLoading: isProductsLoading } = useProducts();
   const { data: customers, isLoading: isCustomersLoading } = useCustomers();
@@ -425,6 +426,7 @@ export default function NewInvoicePage() {
             items: values.items
           })
         : await createInvoice({
+            invoice_kind: isQuotationMode ? "quotation" : "invoice",
             customer_id: values.customer_id,
             payment_method: values.payment_method,
             notes: values.notes?.trim() || undefined,
@@ -453,15 +455,16 @@ export default function NewInvoicePage() {
     }
 
     const successTitle = result.message?.includes("request")
-      ? "Invoice request submitted"
+      ? `${isQuotationMode ? "Quotation" : "Invoice"} request submitted`
       : editId
-        ? "Invoice updated"
-        : "Invoice saved";
+        ? `${isQuotationMode ? "Quotation" : "Invoice"} updated`
+        : `${isQuotationMode ? "Quotation" : "Invoice"} saved`;
 
     toast({ title: successTitle, description: result.message, variant: "success" });
     await queryClient.invalidateQueries({ queryKey: ["invoices"] });
+    await queryClient.invalidateQueries({ queryKey: ["quotations"] });
     await queryClient.invalidateQueries({ queryKey: ["products"] });
-    router.push("/invoices");
+    router.push(isQuotationMode ? "/invoices/quotations" : "/invoices");
   };
 
   const handleSaveDraft = async () => {
@@ -493,6 +496,7 @@ export default function NewInvoicePage() {
             items: values.items
           })
         : await createInvoice({
+            invoice_kind: isQuotationMode ? "quotation" : "invoice",
             customer_id: values.customer_id,
             payment_method: values.payment_method,
             notes: values.notes?.trim() || undefined,
@@ -511,7 +515,8 @@ export default function NewInvoicePage() {
 
     toast({ title: "Draft saved", variant: "success" });
     await queryClient.invalidateQueries({ queryKey: ["invoices"] });
-    router.push("/invoices");
+    await queryClient.invalidateQueries({ queryKey: ["quotations"] });
+    router.push(isQuotationMode ? "/invoices/quotations" : "/invoices");
   };
 
   const handleAddItem = async () => {
@@ -699,7 +704,7 @@ export default function NewInvoicePage() {
   if (isPermissionsLoading) {
     return (
       <section className="space-y-4">
-        <PageHeader title="New Invoice" description="Loading permissions..." />
+        <PageHeader title={isQuotationMode ? "New Quotation" : "New Invoice"} description="Loading permissions..." />
       </section>
     );
   }
@@ -707,7 +712,10 @@ export default function NewInvoicePage() {
   if (!permissions?.canCreateInvoices) {
     return (
       <section className="space-y-4">
-        <PageHeader title="New Invoice" description="You do not have permission to create invoices." />
+        <PageHeader
+          title={isQuotationMode ? "New Quotation" : "New Invoice"}
+          description={`You do not have permission to create ${isQuotationMode ? "quotations" : "invoices"}.`}
+        />
       </section>
     );
   }
@@ -715,22 +723,24 @@ export default function NewInvoicePage() {
   return (
     <section className="space-y-6 w-full max-w-6xl mx-auto">
       <PageHeader
-        title="New Invoice"
+        title={isQuotationMode ? "New Quotation" : "New Invoice"}
         description={
           user?.role === "sales_rep"
-            ? "Create an invoice request for approval."
-            : "Create a direct invoice for a customer."
+            ? `Create a ${isQuotationMode ? "quotation" : "invoice"} request for approval.`
+            : `Create a direct ${isQuotationMode ? "quotation" : "invoice"} for a customer.`
         }
       />
 
       <form className="space-y-6" onSubmit={handleSubmit(onSubmit, onSubmitInvalid)}>
         <Card>
           <CardHeader>
-            <CardTitle>Invoice Details</CardTitle>
+            <CardTitle>{isQuotationMode ? "Quotation Details" : "Invoice Details"}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-muted-foreground">Invoice Number</label>
+              <label className="text-xs font-semibold text-muted-foreground">
+                {isQuotationMode ? "Quotation Number" : "Invoice Number"}
+              </label>
               <Input disabled value={invoiceNumber ? String(invoiceNumber) : "Auto-generated upon save"} />
             </div>
 
@@ -1050,7 +1060,9 @@ export default function NewInvoicePage() {
                       : user?.role === "sales_rep" && currentStatus === "pending_approval"
                         ? "Update Request"
                         : "Save Changes"
-                    : user?.role === "sales_rep"
+                    : isQuotationMode
+                      ? "Add Quotation"
+                      : user?.role === "sales_rep"
                       ? "Request Invoice"
                       : "Save Invoice"}
             </Button>
