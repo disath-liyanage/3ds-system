@@ -165,10 +165,10 @@ export default function ProductStockDetailPage() {
         </div>
       ) : product ? (
         <Card>
-          <CardHeader className="flex flex-wrap items-start justify-between gap-2 pb-1">
+          <CardHeader className="flex items-center justify-between gap-3 pb-2">
             <CardTitle>{product.name}</CardTitle>
             <Select
-              className="w-[120px]"
+              className="w-[160px] shrink-0"
               value={selectedMonth}
               options={monthOptions}
               onChange={(event) => setSelectedMonth(event.target.value)}

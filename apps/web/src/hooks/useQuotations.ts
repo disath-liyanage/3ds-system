@@ -8,7 +8,7 @@ export type QuotationRow = InvoiceListRow;
 
 export const QUOTATIONS_QUERY_KEY = ["quotations"];
 
-export function useQuotations() {
+export function useQuotations(enabled = true) {
   return useQuery<QuotationRow[]>({
     queryKey: QUOTATIONS_QUERY_KEY,
     queryFn: async () => {
@@ -16,6 +16,7 @@ export function useQuotations() {
       if (!result.success) throw new Error(result.error || "Failed to load quotations");
       return result.data ?? [];
     },
+    enabled,
     refetchOnWindowFocus: true,
     refetchOnMount: "always"
   });
