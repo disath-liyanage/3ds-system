@@ -261,6 +261,10 @@ export default function NewInvoicePage() {
   });
 
   useEffect(() => {
+    document.title = isQuotationMode ? "Quotations" : "Invoices";
+  }, [isQuotationMode]);
+
+  useEffect(() => {
     if (!draftId) return;
     let isMounted = true;
 

@@ -14,26 +14,26 @@ export const REPORT_SECTIONS: ReportSection[] = [
     key: "sales",
     title: "Sales",
     reports: [
-      { key: "date-wise-sales-report", title: "Date wise Sales report" },
-      { key: "invoice-wise-sales-report", title: "Invoice wise sales report" },
-      { key: "quotation-sales-report", title: "Quotation sales report" },
-      { key: "route-wise-sales-report", title: "Route wise Sales report" },
-      { key: "return-invoice-report", title: "Return Invoice report" },
-      { key: "delete-invoice-report", title: "Delete invoice report" },
-      { key: "department-wise-sales-invoice", title: "Department wise sales invoice" },
-      { key: "customer-wise-sales-and-quantity-summary", title: "Customer wise sales and quantity summary" },
-      { key: "route-wise-invoice-payment-details", title: "Route wise invoice payment details" },
-      { key: "fast-moving-products-report", title: "Fast moving products report" },
-      { key: "product-wise-sales-qty-reports", title: "Product wise sales qty reports" }
+      { key: "date-wise-sales-report", title: "Date wise Sales Report" },
+      { key: "invoice-wise-sales-report", title: "Invoice wise sales Report" },
+      { key: "quotation-sales-report", title: "Quotation sales Report" },
+      { key: "route-wise-sales-report", title: "Route wise Sales Report" },
+      { key: "return-invoice-report", title: "Return Invoice Report" },
+      { key: "delete-invoice-report", title: "Delete invoice Report" },
+      { key: "department-wise-sales-invoice", title: "Department wise Sales Invoice" },
+      { key: "customer-wise-sales-and-quantity-summary", title: "Customer wise Sales & Quantity Summary" },
+      { key: "route-wise-invoice-payment-details", title: "Route wise Invoice Payment Details" },
+      { key: "fast-moving-products-report", title: "Fast Moving Products Report" },
+      { key: "product-wise-sales-qty-reports", title: "Product wise Sales Quantity Reports" }
     ]
   },
   {
     key: "customer",
     title: "Customer",
     reports: [
-      { key: "customer-outstanding-reports", title: "Customer outstanding reports" },
-      { key: "daily-revenue-report", title: "Daily revenue report" },
-      { key: "date-wise-cheque-payment-details", title: "Date Wise Cheque Payment Details" },
+      { key: "customer-outstanding-reports", title: "Customer Outstanding reports" },
+      { key: "daily-revenue-report", title: "Daily Revenue report" },
+      { key: "date-wise-cheque-payment-details", title: "Date wise Cheque Payment Details" },
       { key: "customer-details", title: "Customer Details" },
       { key: "customer-payment-details", title: "Customer Payment Details" },
       { key: "available-credit-invoices", title: "Available Credit Invoices" }

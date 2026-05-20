@@ -385,7 +385,7 @@ export default function CustomersPage() {
             <Input
               type="number"
               min={0}
-              step="0.01"
+              step="100000"
               placeholder="Credit limit"
               value={editForm.credit_limit}
               disabled={!isEditing}
@@ -516,7 +516,7 @@ export default function CustomersPage() {
           <Input
             type="number"
             min={0}
-            step="0.01"
+            step="100000"
             placeholder="Credit limit"
             value={form.credit_limit}
             onChange={(event) => setForm((prev) => ({ ...prev, credit_limit: event.target.value }))}
