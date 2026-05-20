@@ -97,7 +97,10 @@ export function DashboardSidebar({ isAdmin, isManager, user }: DashboardSidebarP
           ]
         : baseNavItems;
 
-    return withAttendance.map((item) =>
+    const filteredItems =
+      user.role === "sales_rep" ? withAttendance.filter((item) => item.href !== "/reports") : withAttendance;
+
+    return filteredItems.map((item) =>
       item.href === "/notifications" ? { ...item, badgeCount: unreadNotificationsQuery.data ?? 0 } : item
     );
   }, [unreadNotificationsQuery.data, user.role]);
