@@ -16,6 +16,7 @@ export const REPORT_SECTIONS: ReportSection[] = [
     reports: [
       { key: "date-wise-sales-report", title: "Date wise Sales report" },
       { key: "invoice-wise-sales-report", title: "Invoice wise sales report" },
+      { key: "quotation-sales-report", title: "Quotation sales report" },
       { key: "route-wise-sales-report", title: "Route wise Sales report" },
       { key: "return-invoice-report", title: "Return Invoice report" },
       { key: "delete-invoice-report", title: "Delete invoice report" },

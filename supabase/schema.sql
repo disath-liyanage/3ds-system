@@ -111,6 +111,8 @@ create table if not exists public.collection_expenses (
 create table if not exists public.invoices (
   id uuid primary key default gen_random_uuid(),
   invoice_number bigint not null unique default nextval('public.invoice_number_seq'),
+  invoice_kind text not null default 'invoice' check (invoice_kind in ('invoice', 'quotation')),
+  quotation_number bigint unique,
   order_id uuid references public.orders (id),
   customer_id uuid not null references public.customers (id),
   issued_by uuid not null references public.users_profile (id),

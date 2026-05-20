@@ -33,6 +33,7 @@ type ProfilePermissionRow = {
 export type InvoiceListRow = {
   id: string;
   invoice_number: number;
+  quotation_number?: number | null;
   order_id: string | null;
   customer_id: string;
   customer_name: string;
@@ -319,8 +320,9 @@ export async function listInvoices(): Promise<{ success: boolean; data?: Invoice
   let query = adminClient
     .from("invoices")
     .select(
-      "id, invoice_number, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at, customer:customers(name), issuer:users_profile!invoices_issued_by_fkey(full_name)"
+      "id, invoice_number, quotation_number, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at, customer:customers(name), issuer:users_profile!invoices_issued_by_fkey(full_name)"
     )
+    .eq("invoice_kind", "invoice")
     .order("created_at", { ascending: false });
 
   if (!canViewAllInvoices(access.profile)) {
@@ -338,6 +340,7 @@ export async function listInvoices(): Promise<{ success: boolean; data?: Invoice
     return {
       id: row.id,
       invoice_number: row.invoice_number,
+      quotation_number: row.quotation_number ?? null,
       order_id: row.order_id,
       customer_id: row.customer_id,
       customer_name: customer?.name ?? "Unknown Customer",
@@ -353,6 +356,47 @@ export async function listInvoices(): Promise<{ success: boolean; data?: Invoice
   if (canViewAllInvoices(access.profile)) {
     rows = rows.filter((row) => row.status !== "draft" || row.issued_by === access.profile.id);
   }
+
+  return { success: true, data: rows };
+}
+
+export async function listQuotations(): Promise<{ success: boolean; data?: InvoiceListRow[]; error?: string }> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!isAdminOrManager(access.profile)) {
+    return { success: false, error: "You do not have permission to view quotations" };
+  }
+
+  const { data, error } = await adminClient
+    .from("invoices")
+    .select(
+      "id, invoice_number, quotation_number, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at, customer:customers(name), issuer:users_profile!invoices_issued_by_fkey(full_name)"
+    )
+    .eq("invoice_kind", "quotation")
+    .order("quotation_number", { ascending: false });
+
+  if (error) return { success: false, error: error.message };
+
+  const rows = (data ?? []).map((row: any) => {
+    const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
+    const issuer = Array.isArray(row.issuer) ? row.issuer[0] : row.issuer;
+
+    return {
+      id: row.id,
+      invoice_number: row.invoice_number,
+      quotation_number: row.quotation_number ?? null,
+      order_id: row.order_id,
+      customer_id: row.customer_id,
+      customer_name: customer?.name ?? "Unknown Customer",
+      issued_by: row.issued_by,
+      issued_by_name: issuer?.full_name ?? "Unknown",
+      total_amount: Number(row.total_amount),
+      payment_method: row.payment_method,
+      status: row.status,
+      created_at: row.created_at
+    } as InvoiceListRow;
+  });
 
   return { success: true, data: rows };
 }

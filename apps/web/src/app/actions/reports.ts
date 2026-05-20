@@ -325,6 +325,7 @@ async function fetchDateWiseSalesRows(fromIso: string, toIso: string) {
     const { data, error } = await adminClient
       .from("invoices")
       .select("created_at, total_amount")
+      .eq("invoice_kind", "invoice")
       .in("status", ["approved", "issued", "paid"])
       .gte("created_at", fromIso)
       .lte("created_at", toIso)
@@ -379,6 +380,7 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
       const { data, error } = await adminClient
         .from("invoices")
         .select("id, invoice_number, created_at, total_amount, payment_method, status, customer:customers(name)")
+        .eq("invoice_kind", "invoice")
         .in("status", ["approved", "issued", "paid"])
         .gte("created_at", fromIso)
         .lte("created_at", toIso)
@@ -400,10 +402,36 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         }
       };
     }
+    case "sales/quotation-sales-report": {
+      const { data, error } = await adminClient
+        .from("invoices")
+        .select("id, quotation_number, created_at, total_amount, payment_method, status, customer:customers(name)")
+        .eq("invoice_kind", "quotation")
+        .gte("created_at", fromIso)
+        .lte("created_at", toIso)
+        .order("quotation_number", { ascending: false });
+      if (error) return { success: false, error: error.message };
+      return {
+        success: true,
+        data: {
+          columns: ["Quotation No", "Date", "Customer", "P. Method", "Status", "Amount"],
+          rows: (data ?? []).map((r: any) => ({
+            __invoiceId: r.id ?? "",
+            "Quotation No": `Q${Number(r.quotation_number) || 0}`,
+            Date: String(r.created_at).slice(0, 10),
+            Customer: r.customer?.name ?? "Unknown",
+            "P. Method": r.payment_method ?? "",
+            Status: r.status ?? "",
+            Amount: Number(r.total_amount) || 0
+          }))
+        }
+      };
+    }
     case "sales/route-wise-sales-report": {
       const { data, error } = await adminClient
         .from("invoices")
         .select("total_amount, created_at, customer:customers(area)")
+        .eq("invoice_kind", "invoice")
         .in("status", ["approved", "issued", "paid"])
         .gte("created_at", fromIso)
         .lte("created_at", toIso);
@@ -468,8 +496,9 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
     case "sales/department-wise-sales-invoice": {
       const { data, error } = await adminClient
         .from("invoice_items")
-        .select("qty, free_qty, unit_price, discount_type, discount_value, product:products(category), invoice:invoices!inner(status, created_at)")
+        .select("qty, free_qty, unit_price, discount_type, discount_value, product:products(category), invoice:invoices!inner(status, created_at, invoice_kind)")
         .in("invoice.status", ["approved", "issued", "paid"])
+        .eq("invoice.invoice_kind", "invoice")
         .gte("invoice.created_at", fromIso)
         .lte("invoice.created_at", toIso);
       if (error) return { success: false, error: error.message };
@@ -496,8 +525,9 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
     case "sales/customer-wise-sales-and-quantity-summary": {
       const { data, error } = await adminClient
         .from("invoice_items")
-        .select("qty, free_qty, unit_price, discount_type, discount_value, invoice:invoices!inner(status, created_at, customer:customers(name))")
+        .select("qty, free_qty, unit_price, discount_type, discount_value, invoice:invoices!inner(status, created_at, invoice_kind, customer:customers(name))")
         .in("invoice.status", ["approved", "issued", "paid"])
+        .eq("invoice.invoice_kind", "invoice")
         .gte("invoice.created_at", fromIso)
         .lte("invoice.created_at", toIso);
       if (error) return { success: false, error: error.message };
@@ -530,6 +560,7 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
       const { data, error } = await adminClient
         .from("invoices")
         .select("id, invoice_number, total_amount, payment_method, created_at, customer:customers(name, area)")
+        .eq("invoice_kind", "invoice")
         .in("status", ["approved", "issued", "paid"])
         .gte("created_at", fromIso)
         .lte("created_at", toIso)
@@ -554,8 +585,9 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
     case "sales/product-wise-sales-qty-reports": {
       const { data, error } = await adminClient
         .from("invoice_items")
-        .select("qty, free_qty, product:products(name), invoice:invoices!inner(status, created_at)")
+        .select("qty, free_qty, product:products(name), invoice:invoices!inner(status, created_at, invoice_kind)")
         .in("invoice.status", ["approved", "issued", "paid"])
+        .eq("invoice.invoice_kind", "invoice")
         .gte("invoice.created_at", fromIso)
         .lte("invoice.created_at", toIso);
       if (error) return { success: false, error: error.message };
