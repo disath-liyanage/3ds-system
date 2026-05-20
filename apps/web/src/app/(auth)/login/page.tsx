@@ -105,11 +105,11 @@ export default function LoginPage() {
 
         <Card className="rounded-none border-0 bg-white shadow-none lg:col-span-2">
           <div className="flex h-full flex-col justify-center">
-          <CardHeader className="space-y-3 px-6 pb-6 sm:px-12">
-            <CardTitle className="text-5xl font-extrabold text-[#666666]">Sign In</CardTitle>
+          <CardHeader className="space-y-4 px-6 pb-8 sm:px-12">
+            <CardTitle className="text-5xl font-black leading-tight tracking-[0.08em] text-[#163a63]">Sign In</CardTitle>
           </CardHeader>
           <CardContent className="px-6 sm:px-12">
-            <form onSubmit={handleSubmit(onSubmit)} className="mx-auto w-full max-w-md space-y-5">
+            <form onSubmit={handleSubmit(onSubmit)} className="mx-auto w-full max-w-lg space-y-6">
               <div className="space-y-1">
                 <div className="relative">
                   <User className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-[#a06a46]" />
@@ -117,7 +117,7 @@ export default function LoginPage() {
                     id="email"
                     type="email"
                     placeholder="name@3dsdis.com"
-                    className="h-16 rounded-[999px] border-[#e7c9b1] bg-transparent pl-12 pr-5 focus-visible:ring-[#cc7c3f]"
+                    className="h-[72px] rounded-[9999px] border border-[#e7c1a4] bg-transparent pl-14 pr-6 text-base placeholder:text-[17px] placeholder:text-[#9a8b80] focus-visible:border-[#cc7c3f] focus-visible:ring-[#cc7c3f]"
                     {...register("email")}
                   />
                 </div>
@@ -130,7 +130,7 @@ export default function LoginPage() {
                     id="password"
                     type="password"
                     placeholder="Your password"
-                    className="h-16 rounded-[999px] border-[#e7c9b1] bg-transparent pl-12 pr-5 focus-visible:ring-[#cc7c3f]"
+                    className="h-[72px] rounded-[9999px] border border-[#e7c1a4] bg-transparent pl-14 pr-6 text-base placeholder:text-[17px] placeholder:text-[#9a8b80] focus-visible:border-[#cc7c3f] focus-visible:ring-[#cc7c3f]"
                     {...register("password")}
                   />
                 </div>
@@ -139,7 +139,7 @@ export default function LoginPage() {
               {authError ? <p className="text-sm text-red-600">{authError}</p> : null}
               <Button
                 type="submit"
-                className="mt-5 h-16 w-full rounded-[999px] bg-gradient-to-r from-[#8a4f1f] via-[#b76528] to-[#d67d36] px-6 text-base font-semibold text-white hover:from-[#7f481d] hover:via-[#a95c25] hover:to-[#c97332]"
+                className="mt-5 h-[72px] w-full rounded-[9999px] bg-gradient-to-r from-[#8a4f1f] via-[#b76528] to-[#d67d36] px-8 text-xl font-bold text-white hover:from-[#7f481d] hover:via-[#a95c25] hover:to-[#c97332]"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? "Signing in..." : "Sign in"}
