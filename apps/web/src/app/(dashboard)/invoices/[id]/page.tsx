@@ -123,12 +123,16 @@ export default function InvoiceDetailsPage() {
     );
   }
 
+  const isQuotation = invoice.invoice_kind === "quotation";
+  const documentLabel = isQuotation ? "Quotation" : "Invoice";
+  const documentNumber = isQuotation ? `Q${invoice.quotation_number ?? invoice.invoice_number}` : String(invoice.invoice_number);
+
   return (
     <section className="space-y-6">
       <PageHeader
         className="print:hidden"
-        title={`Invoice #${invoice.invoice_number}`}
-        description="View and print invoice details."
+        title={`${documentLabel} #${documentNumber}`}
+        description={`View and print ${documentLabel.toLowerCase()} details.`}
         actions={
           <>
             {invoice.status !== "paid" ? (
@@ -140,12 +144,12 @@ export default function InvoiceDetailsPage() {
                       : `/invoices/new?editId=${invoice.id}`
                   }
                 >
-                  Edit Invoice
+                  {isQuotation ? "Edit Quotation" : "Edit Invoice"}
                 </Link>
               </Button>
             ) : null}
             <Button variant="default" onClick={handlePrint}>
-              Print Invoice
+              {isQuotation ? "Print Quotation" : "Print Invoice"}
             </Button>
             {isAdminOrManager && (
               <Button variant="danger" onClick={handleDelete}>
@@ -163,9 +167,9 @@ export default function InvoiceDetailsPage() {
       <div className="print-area bg-white p-8 rounded-lg shadow-sm border print:shadow-none print:border-none print:p-0">
         <div className="flex justify-between items-start border-b pb-6 mb-6">
           <div>
-            <h2 className="text-3xl font-bold text-primary mb-2">INVOICE</h2>
+            <h2 className="text-3xl font-bold text-primary mb-2">{isQuotation ? "QUOTATION" : "INVOICE"}</h2>
             <div className="text-sm text-muted-foreground">
-              <p>Invoice #: {invoice.invoice_number}</p>
+              <p>{documentLabel} #: {documentNumber}</p>
               <p>Date: {formatDate(invoice.created_at)}</p>
               <p className="capitalize">Payment Method: {invoice.payment_method}</p>
             </div>

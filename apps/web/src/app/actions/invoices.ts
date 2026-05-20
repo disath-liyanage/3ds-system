@@ -632,7 +632,7 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
     }
   }
 
-  if (invoiceKind === "invoice" && (status === "approved" || status === "paid")) {
+  if (status === "approved" || status === "paid") {
     // Reduce product stock
     try {
       for (const item of items) {
@@ -826,7 +826,7 @@ export async function updateDraftInvoice(input: UpdateDraftInvoiceInput): Promis
     }
   }
 
-  if (finalize && invoice.invoice_kind !== "quotation" && (status === "approved" || status === "paid")) {
+  if (finalize && (status === "approved" || status === "paid")) {
     // Reduce product stock
     try {
       for (const item of items) {
@@ -959,9 +959,7 @@ export async function updateInvoice(input: UpdateInvoiceInput): Promise<ActionRe
     total_amount += qty * Math.max(0, effectiveUnitPrice);
   }
 
-  const shouldUpdateStock =
-    invoice.invoice_kind !== "quotation" &&
-    (invoice.status === "approved" || invoice.status === "paid" || invoice.status === "issued");
+  const shouldUpdateStock = invoice.status === "approved" || invoice.status === "paid" || invoice.status === "issued";
 
   if (shouldUpdateStock) {
     const { data: existingItems, error: existingItemsError } = await adminClient
@@ -1329,7 +1327,7 @@ export async function deleteInvoice(invoiceId: string): Promise<ActionResult> {
     return { success: false, error: error.message };
   }
 
-  if (invoice.invoice_kind !== "quotation" && (invoice.status === "approved" || invoice.status === "paid" || invoice.status === "issued")) {
+  if (invoice.status === "approved" || invoice.status === "paid" || invoice.status === "issued") {
     // Restore stock
     try {
       for (const item of invoice.invoice_items || []) {

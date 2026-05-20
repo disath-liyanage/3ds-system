@@ -309,7 +309,9 @@ export default function ProductStockDetailPage() {
                     <TableRow key={row.id}>
                       <TableCell>
                         <Link href={`/invoices/${row.invoice_id}`} className="underline">
-                          INV-{row.invoice_number}
+                          {row.invoice_kind === "quotation"
+                            ? `Q-${row.quotation_number ?? row.invoice_number}`
+                            : `INV-${row.invoice_number}`}
                         </Link>
                       </TableCell>
                       <TableCell>{formatQuantity(row.qty + row.free_qty)}</TableCell>
