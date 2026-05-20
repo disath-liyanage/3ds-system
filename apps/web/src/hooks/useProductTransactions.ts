@@ -22,6 +22,8 @@ export type ProductInvoicedEntry = {
   id: string;
   invoice_id: string;
   invoice_number: number;
+  quotation_number?: number | null;
+  invoice_kind?: "invoice" | "quotation";
   qty: number;
   free_qty: number;
   unit_price: number;
@@ -93,7 +95,9 @@ async function fetchProductTransactions(
         .order("created_at", { ascending: false }),
       supabase
         .from("invoice_items")
-        .select("id, invoice_id, qty, free_qty, unit_price, created_at, invoice:invoices(id, invoice_number, created_at)")
+        .select(
+          "id, invoice_id, qty, free_qty, unit_price, created_at, invoice:invoices(id, invoice_number, quotation_number, invoice_kind, created_at)"
+        )
         .eq("product_id", productId)
         .gte("created_at", rangeStart)
         .lt("created_at", rangeEnd)
@@ -153,6 +157,8 @@ async function fetchProductTransactions(
       id: row.id,
       invoice_id: row.invoice_id,
       invoice_number: invoice?.invoice_number ?? 0,
+      quotation_number: invoice?.quotation_number ?? null,
+      invoice_kind: invoice?.invoice_kind === "quotation" ? "quotation" : "invoice",
       qty: Number(row.qty) || 0,
       free_qty: Number(row.free_qty) || 0,
       unit_price: Number(row.unit_price) || 0,
