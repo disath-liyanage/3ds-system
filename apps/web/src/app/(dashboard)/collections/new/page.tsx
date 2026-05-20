@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation";
 import { addCollectionExpense, recordCollection } from "@/app/actions/collections";
 import { getInvoiceDetail } from "@/app/actions/invoices";
 import { getCollectionRecipients } from "@/app/actions/customers";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -211,18 +212,17 @@ export default function NewCollectionPage() {
   if (!isLoading && !permissions?.canRecordCollections) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">New Collection</h1>
-        <p className="text-sm text-muted-foreground">You do not have permission to record collections.</p>
+        <PageHeader
+          title="New Collection"
+          description="You do not have permission to record collections."
+        />
       </section>
     );
   }
 
   return (
     <section className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold">New Collection</h1>
-        <p className="text-sm text-muted-foreground">Record a collection against a customer invoice.</p>
-      </header>
+      <PageHeader title="New Collection" description="Record a collection against a customer invoice." />
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">

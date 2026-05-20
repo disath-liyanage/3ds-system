@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 
 import { listReturnInvoices, type ReturnInvoiceListRow } from "@/app/actions/invoices";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
@@ -27,8 +28,7 @@ export default function ReturnInvoiceListPage() {
   if (isError) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">Returned Invoices</h1>
-        <p className="text-sm text-muted-foreground">Failed to load returned invoices.</p>
+        <PageHeader title="Returned Invoices" description="Failed to load returned invoices." />
         <p className="text-xs text-muted-foreground">{error instanceof Error ? error.message : "Unknown error"}</p>
         <Button asChild variant="outline">
           <Link href="/invoices/return">Back</Link>
@@ -39,15 +39,15 @@ export default function ReturnInvoiceListPage() {
 
   return (
     <section className="space-y-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Returned Invoices</h1>
-          <p className="text-sm text-muted-foreground">All created return invoices.</p>
-        </div>
-        <Button asChild variant="outline">
-          <Link href="/invoices/return">Back</Link>
-        </Button>
-      </header>
+      <PageHeader
+        title="Returned Invoices"
+        description="All created return invoices."
+        actions={
+          <Button asChild variant="outline">
+            <Link href="/invoices/return">Back</Link>
+          </Button>
+        }
+      />
 
       <div className="rounded-md border border-border bg-white">
         <Table>

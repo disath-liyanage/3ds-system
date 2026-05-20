@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { createReturnInvoice, listReturnableInvoices, type ReturnableInvoiceRow } from "@/app/actions/invoices";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -116,8 +117,10 @@ export default function ReturnInvoicePage() {
   if (!isAdminOrManager) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">Return Invoices</h1>
-        <p className="text-sm text-muted-foreground">Only managers and admins can add return invoices.</p>
+        <PageHeader
+          title="Return Invoices"
+          description="Only managers and admins can add return invoices."
+        />
       </section>
     );
   }
@@ -125,8 +128,7 @@ export default function ReturnInvoicePage() {
   if (isError) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">Return Invoices</h1>
-        <p className="text-sm text-muted-foreground">Failed to load returnable invoices.</p>
+        <PageHeader title="Return Invoices" description="Failed to load returnable invoices." />
         <p className="text-xs text-muted-foreground">{error instanceof Error ? error.message : "Unknown error"}</p>
       </section>
     );
@@ -134,20 +136,20 @@ export default function ReturnInvoicePage() {
 
   return (
     <section className="space-y-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Return Invoices</h1>
-          <p className="text-sm text-muted-foreground">Select sold items and subtract quantities to create a return.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="outline">
-            <Link href="/invoices/return/list">View Returned Invoices</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/invoices">Back to Invoices</Link>
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title="Return Invoices"
+        description="Select sold items and subtract quantities to create a return."
+        actions={
+          <>
+            <Button asChild variant="outline">
+              <Link href="/invoices/return/list">View Returned Invoices</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/invoices">Back to Invoices</Link>
+            </Button>
+          </>
+        }
+      />
 
       <Card>
         <CardHeader>

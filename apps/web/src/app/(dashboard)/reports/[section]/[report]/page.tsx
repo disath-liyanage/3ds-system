@@ -28,6 +28,7 @@ import { Select } from "@/components/ui/select";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { ReportPdfTemplate } from "@/lib/pdf/report-template";
 import { getReportItem, getReportSection } from "../../reports-data";
+import { PageHeader } from "@/components/page-header";
 
 type ReportDetailPageProps = {
   params: {
@@ -567,15 +568,15 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
 
   return (
     <section className="space-y-6">
-      <header className="space-y-2">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">{sectionTitle}</p>
-        <h1 className="text-2xl font-bold">{reportTitle}</h1>
-        <p className="text-sm text-muted-foreground">
-          {isOutstandingStyleCustomerFilterReport
+      <PageHeader
+        eyebrow={sectionTitle}
+        title={reportTitle}
+        description={
+          isOutstandingStyleCustomerFilterReport
             ? "Select a route or customer and run the report."
-            : "Select a date range and run the report."}
-        </p>
-      </header>
+            : "Select a date range and run the report."
+        }
+      />
 
       <Card>
         <CardHeader>

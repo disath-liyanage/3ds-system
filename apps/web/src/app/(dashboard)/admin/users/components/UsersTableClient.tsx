@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { deleteUser, updateUser } from "@/app/actions/users";
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -139,20 +140,20 @@ export function UsersTableClient({ users, customRoles, workers, currentUser }: U
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">User Management</h1>
-          <p className="text-sm text-muted-foreground">Create users, assign roles, and control account access.</p>
-        </div>
-        {permissions.canManageUsers ? (
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline">
-              <Link href="/admin/roles">Define Role</Link>
-            </Button>
-            <Button onClick={() => setIsAddDialogOpen(true)}>Add User</Button>
-          </div>
-        ) : null}
-      </div>
+      <PageHeader
+        title="User Management"
+        description="Create users, assign roles, and control account access."
+        actions={
+          permissions.canManageUsers ? (
+            <>
+              <Button asChild variant="outline">
+                <Link href="/admin/roles">Define Role</Link>
+              </Button>
+              <Button onClick={() => setIsAddDialogOpen(true)}>Add User</Button>
+            </>
+          ) : null
+        }
+      />
 
       <Table>
         <TableHeader>

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { PageHeader } from "@/components/page-header";
 import { useProducts } from "@/hooks/useProducts";
 import { useProductStockByPrice } from "@/hooks/useProductStockByPrice";
 import { useProductTransactions } from "@/hooks/useProductTransactions";
@@ -128,36 +129,35 @@ export default function ProductStockDetailPage() {
   if (!productId) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">Product stock</h1>
-        <p className="text-sm text-muted-foreground">Missing product id.</p>
+        <PageHeader title="Product stock" description="Missing product id." />
       </section>
     );
   }
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Product stock</h1>
-          <p className="text-sm text-muted-foreground">Track price-level inventory for a single product.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {product && (
-            <Button
-              variant="default"
-              onClick={() => {
-                localStorage.setItem("open_edit_product_id", product.id);
-                router.push("/products");
-              }}
-            >
-              Edit product
+      <PageHeader
+        title="Product stock"
+        description="Track price-level inventory for a single product."
+        actions={
+          <>
+            {product && (
+              <Button
+                variant="default"
+                onClick={() => {
+                  localStorage.setItem("open_edit_product_id", product.id);
+                  router.push("/products");
+                }}
+              >
+                Edit product
+              </Button>
+            )}
+            <Button asChild variant="outline">
+              <Link href="/products">Back to products</Link>
             </Button>
-          )}
-          <Button asChild variant="outline">
-            <Link href="/products">Back to products</Link>
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {isLoading ? (
         <div className="rounded-md border border-border bg-white p-4 text-sm text-muted-foreground">

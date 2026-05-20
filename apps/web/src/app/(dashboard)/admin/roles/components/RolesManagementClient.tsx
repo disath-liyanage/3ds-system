@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { deleteCustomRole } from "@/app/actions/users";
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,20 +72,20 @@ export function RolesManagementClient({ roles, currentUser }: RolesManagementCli
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Custom Roles</h1>
-          <p className="text-sm text-muted-foreground">Build role templates with explicit permission flags.</p>
-        </div>
-        <Button
-          onClick={() => {
-            setEditingRole(null);
-            setIsDialogOpen(true);
-          }}
-        >
-          New Role
-        </Button>
-      </div>
+      <PageHeader
+        title="Custom Roles"
+        description="Build role templates with explicit permission flags."
+        actions={
+          <Button
+            onClick={() => {
+              setEditingRole(null);
+              setIsDialogOpen(true);
+            }}
+          >
+            New Role
+          </Button>
+        }
+      />
 
       {sortedRoles.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border bg-white p-8 text-center text-sm text-muted-foreground">

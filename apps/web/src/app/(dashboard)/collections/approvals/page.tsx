@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { approveCollectionRep } from "@/app/actions/collections";
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,20 +71,20 @@ export default function CollectionApprovalsPage() {
   if (!isLoading && !canValidate) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">Approve Collections</h1>
-        <p className="text-sm text-muted-foreground">You do not have permission to approve collections.</p>
+        <PageHeader
+          title="Approve Collections"
+          description="You do not have permission to approve collections."
+        />
       </section>
     );
   }
 
   return (
     <section className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold">Approve Collections</h1>
-        <p className="text-sm text-muted-foreground">
-          Select a sales rep to review pending collections and expenses.
-        </p>
-      </header>
+      <PageHeader
+        title="Approve Collections"
+        description="Select a sales rep to review pending collections and expenses."
+      />
 
       <Card>
         <CardHeader>

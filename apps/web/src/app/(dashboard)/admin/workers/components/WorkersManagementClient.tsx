@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { createWorker, deleteWorker, updateWorker } from "@/app/actions/users";
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -166,15 +167,11 @@ export function WorkersManagementClient({ workers, currentUser }: WorkersManagem
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Workers</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage worker salary setup and link each worker to only one system user.
-          </p>
-        </div>
-        {canManageWorkerMaster ? <Button onClick={handleOpenCreate}>Add Worker</Button> : null}
-      </div>
+      <PageHeader
+        title="Workers"
+        description="Manage worker salary setup and link each worker to only one system user."
+        actions={canManageWorkerMaster ? <Button onClick={handleOpenCreate}>Add Worker</Button> : null}
+      />
 
       <Table>
         <TableHeader>

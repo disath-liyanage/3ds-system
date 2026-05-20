@@ -13,6 +13,7 @@ import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useInvoice } from "@/hooks/useInvoice";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
+import { PageHeader } from "@/components/page-header";
 
 export default function InvoiceDetailsPage() {
   const router = useRouter();
@@ -106,8 +107,7 @@ export default function InvoiceDetailsPage() {
   if (isPermissionsLoading || isInvoiceLoading) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">Invoice Details</h1>
-        <p className="text-sm text-muted-foreground">Loading invoice...</p>
+        <PageHeader title="Invoice Details" description="Loading invoice..." />
       </section>
     );
   }
@@ -115,8 +115,7 @@ export default function InvoiceDetailsPage() {
   if (isError || !invoice) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">Invoice Details</h1>
-        <p className="text-sm text-muted-foreground">Unable to find this invoice.</p>
+        <PageHeader title="Invoice Details" description="Unable to find this invoice." />
         <Button asChild variant="outline">
           <Link href="/invoices">Back to Invoices</Link>
         </Button>
@@ -126,38 +125,39 @@ export default function InvoiceDetailsPage() {
 
   return (
     <section className="space-y-6">
-      <div className="flex items-center justify-between print:hidden">
-        <div>
-          <h1 className="text-2xl font-bold">Invoice #{invoice.invoice_number}</h1>
-          <p className="text-sm text-muted-foreground">View and print invoice details.</p>
-        </div>
-        <div className="flex gap-2">
-          {invoice.status !== "paid" ? (
+      <PageHeader
+        className="print:hidden"
+        title={`Invoice #${invoice.invoice_number}`}
+        description="View and print invoice details."
+        actions={
+          <>
+            {invoice.status !== "paid" ? (
+              <Button asChild variant="outline">
+                <Link
+                  href={
+                    invoice.status === "draft"
+                      ? `/invoices/new?draftId=${invoice.id}`
+                      : `/invoices/new?editId=${invoice.id}`
+                  }
+                >
+                  Edit Invoice
+                </Link>
+              </Button>
+            ) : null}
+            <Button variant="default" onClick={handlePrint}>
+              Print Invoice
+            </Button>
+            {isAdminOrManager && (
+              <Button variant="danger" onClick={handleDelete}>
+                Delete Invoice
+              </Button>
+            )}
             <Button asChild variant="outline">
-              <Link
-                href={
-                  invoice.status === "draft"
-                    ? `/invoices/new?draftId=${invoice.id}`
-                    : `/invoices/new?editId=${invoice.id}`
-                }
-              >
-                Edit Invoice
-              </Link>
+              <Link href="/invoices">Back</Link>
             </Button>
-          ) : null}
-          <Button variant="default" onClick={handlePrint}>
-            Print Invoice
-          </Button>
-          {isAdminOrManager && (
-            <Button variant="danger" onClick={handleDelete}>
-              Delete Invoice
-            </Button>
-          )}
-          <Button asChild variant="outline">
-            <Link href="/invoices">Back</Link>
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Printable Area */}
       <div className="print-area bg-white p-8 rounded-lg shadow-sm border print:shadow-none print:border-none print:p-0">

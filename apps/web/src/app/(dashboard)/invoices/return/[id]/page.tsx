@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 
 import { getReturnInvoiceDetail, type ReturnInvoiceDetailRow } from "@/app/actions/invoices";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -32,8 +33,7 @@ export default function ReturnInvoiceReceiptPage() {
   if (isError || !data) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">Return Receipt</h1>
-        <p className="text-sm text-muted-foreground">Could not load return receipt.</p>
+        <PageHeader title="Return Receipt" description="Could not load return receipt." />
         <p className="text-xs text-muted-foreground">{error instanceof Error ? error.message : "Unknown error"}</p>
         <Button asChild variant="outline">
           <Link href="/invoices/return">Back</Link>
@@ -44,20 +44,21 @@ export default function ReturnInvoiceReceiptPage() {
 
   return (
     <section className="space-y-6">
-      <div className="flex items-center justify-between print:hidden">
-        <div>
-          <h1 className="text-2xl font-bold">Return Invoice #{data.return_number}</h1>
-          <p className="text-sm text-muted-foreground">Receipt for returned items.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="default" onClick={() => window.print()}>
-            Print Receipt
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/invoices/return">Back</Link>
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        className="print:hidden"
+        title={`Return Invoice #${data.return_number}`}
+        description="Receipt for returned items."
+        actions={
+          <>
+            <Button variant="default" onClick={() => window.print()}>
+              Print Receipt
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/invoices/return">Back</Link>
+            </Button>
+          </>
+        }
+      />
 
       <Card className="bg-white p-8 print:shadow-none print:border-none print:p-0">
         <div className="mb-6 border-b pb-6">
