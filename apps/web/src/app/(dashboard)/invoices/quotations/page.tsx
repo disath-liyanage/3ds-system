@@ -202,9 +202,6 @@ export default function QuotationsPage() {
             <Button asChild>
               <Link href="/invoices/new?kind=quotation">Add Quotation</Link>
             </Button>
-            <Button asChild variant="outline">
-              <Link href="/invoices">Back to Invoices</Link>
-            </Button>
           </>
         }
       />

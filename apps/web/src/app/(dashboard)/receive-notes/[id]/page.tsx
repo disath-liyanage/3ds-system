@@ -56,9 +56,6 @@ export default function ViewReceiveNotePage() {
     return (
       <section className="space-y-4">
         <PageHeader title="GRN Details" description="Unable to find this GRN." />
-        <Button asChild variant="outline">
-          <Link href="/receive-notes">Back to GRNs</Link>
-        </Button>
       </section>
     );
   }
@@ -80,9 +77,6 @@ export default function ViewReceiveNotePage() {
                 </Button>
               </>
             )}
-            <Button asChild variant="outline">
-              <Link href="/receive-notes">Back</Link>
-            </Button>
           </>
         }
       />
