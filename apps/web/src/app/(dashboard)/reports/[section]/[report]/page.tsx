@@ -1023,6 +1023,11 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                           reportKey === "sales/delete-invoice-report" &&
                           (colLower === "product qty" || colLower === "free qty");
                         const hasInvoiceLink = /invoice\s*(no|number)/i.test(column) && typeof row.__invoiceId === "string" && row.__invoiceId.length > 0;
+                        const hasQuotationLink =
+                          reportKey === "sales/quotation-sales-report" &&
+                          /quotation\s*(no|number)/i.test(column) &&
+                          typeof row.__invoiceId === "string" &&
+                          row.__invoiceId.length > 0;
                         const hasCancelledInvoiceReportLink =
                           reportKey === "sales/delete-invoice-report" &&
                           /invoice\s*(no|number)/i.test(column) &&
@@ -1113,6 +1118,17 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                                   : String(value ?? "")}
                               </Link>
                             ) : hasInvoiceLink ? (
+                              <Link
+                                href={`/invoices/${row.__invoiceId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-medium text-primary underline-offset-2 hover:underline"
+                              >
+                                {typeof value === "number"
+                                  ? value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                                  : String(value ?? "")}
+                              </Link>
+                            ) : hasQuotationLink ? (
                               <Link
                                 href={`/invoices/${row.__invoiceId}`}
                                 target="_blank"
