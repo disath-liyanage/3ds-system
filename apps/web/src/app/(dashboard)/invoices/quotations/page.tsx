@@ -15,12 +15,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
-import { useInvoices } from "@/hooks/useInvoices";
+import { useQuotations } from "@/hooks/useQuotations";
 import { formatDate } from "@/lib/utils";
 
-export default function InvoicesPage() {
-  const { permissions, user, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
-  const { data: invoices, isLoading: isInvoicesLoading, isError, error } = useInvoices();
+export default function QuotationsPage() {
+  const { user, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
+  const { data: quotations, isLoading: isQuotationsLoading, isError, error } = useQuotations();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -32,8 +32,8 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [minTotal, setMinTotal] = useState("");
   const [maxTotal, setMaxTotal] = useState("");
-  const [minInvoiceNo, setMinInvoiceNo] = useState("");
-  const [maxInvoiceNo, setMaxInvoiceNo] = useState("");
+  const [minQuotationNo, setMinQuotationNo] = useState("");
+  const [maxQuotationNo, setMaxQuotationNo] = useState("");
 
   const getStatusLabel = (status: string) => {
     if (status === "pending_approval") return "Pending approval";
@@ -57,8 +57,8 @@ export default function InvoicesPage() {
     statusFilter !== "all" ||
     minTotal !== "" ||
     maxTotal !== "" ||
-    minInvoiceNo !== "" ||
-    maxInvoiceNo !== "";
+    minQuotationNo !== "" ||
+    maxQuotationNo !== "";
 
   const handleResetFilters = () => {
     setCustomerSearch("");
@@ -66,19 +66,19 @@ export default function InvoicesPage() {
     setStatusFilter("all");
     setMinTotal("");
     setMaxTotal("");
-    setMinInvoiceNo("");
-    setMaxInvoiceNo("");
+    setMinQuotationNo("");
+    setMaxQuotationNo("");
   };
 
-  const filteredInvoices = useMemo(() => {
-    if (!invoices) return [];
-    let result = invoices;
+  const filteredQuotations = useMemo(() => {
+    if (!quotations) return [];
+    let result = quotations;
 
     if (customerSearch) {
       const lowerSearch = customerSearch.toLowerCase();
       result = result.filter((inv) =>
         inv.customer_name.toLowerCase().includes(lowerSearch) ||
-        String(inv.invoice_number).includes(lowerSearch)
+        `Q${inv.quotation_number ?? ""}`.toLowerCase().includes(lowerSearch)
       );
     }
 
@@ -107,22 +107,22 @@ export default function InvoicesPage() {
       result = result.filter((inv) => inv.total_amount <= Number(maxTotal));
     }
 
-    if (minInvoiceNo) {
-      result = result.filter((inv) => inv.invoice_number >= Number(minInvoiceNo));
+    if (minQuotationNo) {
+      result = result.filter((inv) => (inv.quotation_number ?? 0) >= Number(minQuotationNo));
     }
-    if (maxInvoiceNo) {
-      result = result.filter((inv) => inv.invoice_number <= Number(maxInvoiceNo));
+    if (maxQuotationNo) {
+      result = result.filter((inv) => (inv.quotation_number ?? 0) <= Number(maxQuotationNo));
     }
 
     return result;
-  }, [invoices, customerSearch, dateRange, statusFilter, minTotal, maxTotal, minInvoiceNo, maxInvoiceNo]);
+  }, [quotations, customerSearch, dateRange, statusFilter, minTotal, maxTotal, minQuotationNo, maxQuotationNo]);
 
-  const sortedInvoices = useMemo(
-    () => [...filteredInvoices].sort((a, b) => b.invoice_number - a.invoice_number),
-    [filteredInvoices]
+  const sortedQuotations = useMemo(
+    () => [...filteredQuotations].sort((a, b) => (b.quotation_number ?? 0) - (a.quotation_number ?? 0)),
+    [filteredQuotations]
   );
 
-  const handleRowClick = (row: (typeof sortedInvoices)[number]) => {
+  const handleRowClick = (row: (typeof sortedQuotations)[number]) => {
     if (row.status === "draft") {
       router.push(`/invoices/new?draftId=${row.id}`);
       return;
@@ -175,20 +175,18 @@ export default function InvoicesPage() {
   if (isError) {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">Invoices</h1>
-        <p className="text-sm text-muted-foreground">Failed to load invoices.</p>
+        <h1 className="text-2xl font-bold">Quotations</h1>
+        <p className="text-sm text-muted-foreground">Failed to load quotations.</p>
         <p className="text-xs text-muted-foreground">{error instanceof Error ? error.message : "Unknown error"}</p>
       </section>
     );
   }
 
-  // NOTE: assuming canCreateInvoices also grants view permissions for simplicity,
-  // or you could have a dedicated canViewInvoices. Using canCreateInvoices for now.
-  if (!permissions?.canCreateInvoices) {
+  if (user?.role !== "admin" && user?.role !== "manager") {
     return (
       <section className="space-y-4">
-        <h1 className="text-2xl font-bold">Invoices</h1>
-        <p className="text-sm text-muted-foreground">You do not have permission to view invoices.</p>
+        <h1 className="text-2xl font-bold">Quotations</h1>
+        <p className="text-sm text-muted-foreground">You do not have permission to view quotations.</p>
       </section>
     );
   }
@@ -197,22 +195,12 @@ export default function InvoicesPage() {
     <section className="space-y-6">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Invoices</h1>
-          <p className="text-sm text-muted-foreground">Track issuance, payment methods, and statuses.</p>
+          <h1 className="text-2xl font-bold">Quotations</h1>
+          <p className="text-sm text-muted-foreground">Track quotation issuance, payment methods, and statuses.</p>
         </div>
         <div className="flex items-center gap-2">
-          {user?.role === "admin" || user?.role === "manager" ? (
-            <Button asChild variant="outline">
-              <Link href="/invoices/quotations">Quotations</Link>
-            </Button>
-          ) : null}
-          {user?.role === "admin" || user?.role === "manager" ? (
-            <Button asChild variant="outline">
-              <Link href="/invoices/return">Return Invoice</Link>
-            </Button>
-          ) : null}
-          <Button asChild>
-            <Link href="/invoices/new">New Invoice</Link>
+          <Button asChild variant="outline">
+            <Link href="/invoices">Back to Invoices</Link>
           </Button>
         </div>
       </header>
@@ -221,7 +209,7 @@ export default function InvoicesPage() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-1 items-center gap-3">
             <Input
-              placeholder="Search customer or invoice #..."
+              placeholder="Search customer or quotation #..."
               value={customerSearch}
               onChange={(e) => setCustomerSearch(e.target.value)}
               className="lg:max-w-md"
@@ -323,20 +311,20 @@ export default function InvoicesPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-muted-foreground">Invoice # Range</label>
+              <label className="text-xs font-semibold text-muted-foreground">Quotation # Range</label>
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
                   placeholder="Min"
-                  value={minInvoiceNo}
-                  onChange={(e) => setMinInvoiceNo(e.target.value)}
+                  value={minQuotationNo}
+                  onChange={(e) => setMinQuotationNo(e.target.value)}
                 />
                 <span className="text-xs text-muted-foreground">to</span>
                 <Input
                   type="number"
                   placeholder="Max"
-                  value={maxInvoiceNo}
-                  onChange={(e) => setMaxInvoiceNo(e.target.value)}
+                  value={maxQuotationNo}
+                  onChange={(e) => setMaxQuotationNo(e.target.value)}
                 />
               </div>
             </div>
@@ -347,7 +335,7 @@ export default function InvoicesPage() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Invoice #</TableHead>
+            <TableHead>Quotation #</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Customer</TableHead>
             <TableHead>Payment</TableHead>
@@ -357,20 +345,20 @@ export default function InvoicesPage() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isInvoicesLoading ? (
+          {isQuotationsLoading ? (
             <TableRow>
               <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
-                Loading invoices...
+                Loading quotations...
               </TableCell>
             </TableRow>
-          ) : sortedInvoices.length === 0 ? (
+          ) : sortedQuotations.length === 0 ? (
             <TableRow>
               <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
-                No invoices found matching criteria.
+                No quotations found matching criteria.
               </TableCell>
             </TableRow>
           ) : (
-            sortedInvoices.map((row) => (
+            sortedQuotations.map((row) => (
               <TableRow
                 key={row.id}
                 onClick={() => handleRowClick(row)}
@@ -382,7 +370,7 @@ export default function InvoicesPage() {
                       : "cursor-pointer"
                 }
               >
-                <TableCell className="font-medium">{row.invoice_number}</TableCell>
+                <TableCell className="font-medium">Q{row.quotation_number ?? "-"}</TableCell>
                 <TableCell>{formatDate(row.created_at)}</TableCell>
                 <TableCell>{row.customer_name}</TableCell>
                 <TableCell className="capitalize">{row.payment_method}</TableCell>
