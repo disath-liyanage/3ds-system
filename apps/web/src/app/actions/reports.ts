@@ -189,6 +189,19 @@ function splitDepartmentCategorySubcategory(
     .map((part) => part.trim())
     .filter(Boolean);
 
+  if (parts.length === 0) {
+    return { department: "Uncategorized", category: "General", subcategory: "General" };
+  }
+
+  const knownDepartments = new Set(["Import", "local", "JB", "Dubai"]);
+  const head = parts[0] ?? "";
+
+  if (!knownDepartments.has(head)) {
+    const category = head || "General";
+    const subcategory = parts.slice(1).join(" / ").trim() || "General";
+    return { department: "local", category, subcategory };
+  }
+
   if (parts.length >= 3) {
     return {
       department: parts[0] || "Uncategorized",
