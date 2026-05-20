@@ -46,6 +46,7 @@ export type InvoiceListRow = {
 };
 
 export type InvoiceDetailRow = InvoiceListRow & {
+  invoice_kind?: "invoice" | "quotation";
   customer_phone: string;
   customer_address: string;
   notes: string | null;
@@ -136,6 +137,7 @@ export type CancelledInvoiceReportRow = {
 export type InvoiceInput = {
   customer_id: string;
   payment_method: string;
+  invoice_kind?: "invoice" | "quotation";
   saveAsDraft?: boolean;
   notes?: string;
   items: Array<{
@@ -190,6 +192,24 @@ export type CreateReturnInvoiceInput = {
 };
 
 type InvoiceStatus = InvoiceListRow["status"];
+
+async function getNextQuotationNumber(): Promise<number> {
+  const { data, error } = await adminClient
+    .from("invoices")
+    .select("quotation_number")
+    .eq("invoice_kind", "quotation")
+    .not("quotation_number", "is", null)
+    .order("quotation_number", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ quotation_number: number | null }>();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const current = Number(data?.quotation_number) || 5999;
+  return current + 1;
+}
 
 async function getCurrentUserProfile() {
   const supabase = createClient();
@@ -421,7 +441,7 @@ export async function getInvoiceDetail(
     .from("invoices")
     .select(
       `
-        id, invoice_number, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at, notes,
+        id, invoice_number, quotation_number, invoice_kind, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at, notes,
         customer:customers(name, phone, address),
         issuer:users_profile!invoices_issued_by_fkey(full_name),
         invoice_items (
@@ -454,6 +474,8 @@ export async function getInvoiceDetail(
   const result: InvoiceDetailRow = {
     id: invoiceData.id,
     invoice_number: invoiceData.invoice_number,
+    quotation_number: invoiceData.quotation_number ?? null,
+    invoice_kind: invoiceData.invoice_kind === "quotation" ? "quotation" : "invoice",
     order_id: invoiceData.order_id,
     customer_id: invoiceData.customer_id,
     customer_name: invoiceData.customer?.name ?? "Unknown Customer",
@@ -491,6 +513,7 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
   }
 
   const { customer_id, payment_method, items, notes, saveAsDraft } = input;
+  const invoiceKind = input.invoice_kind === "quotation" ? "quotation" : "invoice";
 
   if (!customer_id) {
     return { success: false, error: "Customer is required" };
@@ -552,9 +575,20 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
         ? "paid"
         : "approved";
 
+  let quotationNumber: number | null = null;
+  if (invoiceKind === "quotation") {
+    try {
+      quotationNumber = await getNextQuotationNumber();
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : "Failed to generate quotation number" };
+    }
+  }
+
   const { data: invoice, error: invoiceError } = await adminClient
     .from("invoices")
     .insert({
+      invoice_kind: invoiceKind,
+      quotation_number: quotationNumber,
       customer_id,
       issued_by: access.profile.id,
       total_amount,
@@ -598,7 +632,7 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
     }
   }
 
-  if (status === "approved" || status === "paid") {
+  if (invoiceKind === "invoice" && (status === "approved" || status === "paid")) {
     // Reduce product stock
     try {
       for (const item of items) {
@@ -677,7 +711,7 @@ export async function updateDraftInvoice(input: UpdateDraftInvoiceInput): Promis
 
   const { data: invoice, error: invoiceError } = await adminClient
     .from("invoices")
-    .select("id, invoice_number, issued_by, status, customer_id")
+    .select("id, invoice_number, issued_by, status, customer_id, invoice_kind")
     .eq("id", invoice_id)
     .single();
 
@@ -792,7 +826,7 @@ export async function updateDraftInvoice(input: UpdateDraftInvoiceInput): Promis
     }
   }
 
-  if (finalize && (status === "approved" || status === "paid")) {
+  if (finalize && invoice.invoice_kind !== "quotation" && (status === "approved" || status === "paid")) {
     // Reduce product stock
     try {
       for (const item of items) {
@@ -870,7 +904,7 @@ export async function updateInvoice(input: UpdateInvoiceInput): Promise<ActionRe
 
   const { data: invoice, error: invoiceError } = await adminClient
     .from("invoices")
-    .select("id, issued_by, status, customer_id, total_amount, payment_method")
+    .select("id, issued_by, status, customer_id, total_amount, payment_method, invoice_kind")
     .eq("id", invoice_id)
     .single();
 
@@ -925,7 +959,9 @@ export async function updateInvoice(input: UpdateInvoiceInput): Promise<ActionRe
     total_amount += qty * Math.max(0, effectiveUnitPrice);
   }
 
-  const shouldUpdateStock = invoice.status === "approved" || invoice.status === "paid" || invoice.status === "issued";
+  const shouldUpdateStock =
+    invoice.invoice_kind !== "quotation" &&
+    (invoice.status === "approved" || invoice.status === "paid" || invoice.status === "issued");
 
   if (shouldUpdateStock) {
     const { data: existingItems, error: existingItemsError } = await adminClient
@@ -1279,7 +1315,7 @@ export async function deleteInvoice(invoiceId: string): Promise<ActionResult> {
 
   const { data: invoice, error: invoiceError } = await adminClient
     .from("invoices")
-    .select("id, invoice_number, status, total_amount, payment_method, customer_id, invoice_items(product_id, qty, free_qty)")
+    .select("id, invoice_number, invoice_kind, status, total_amount, payment_method, customer_id, invoice_items(product_id, qty, free_qty)")
     .eq("id", invoiceId)
     .single();
 
@@ -1293,7 +1329,7 @@ export async function deleteInvoice(invoiceId: string): Promise<ActionResult> {
     return { success: false, error: error.message };
   }
 
-  if (invoice.status === "approved" || invoice.status === "paid" || invoice.status === "issued") {
+  if (invoice.invoice_kind !== "quotation" && (invoice.status === "approved" || invoice.status === "paid" || invoice.status === "issued")) {
     // Restore stock
     try {
       for (const item of invoice.invoice_items || []) {
