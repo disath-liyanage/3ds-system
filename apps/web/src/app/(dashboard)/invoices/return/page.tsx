@@ -144,9 +144,6 @@ export default function ReturnInvoicePage() {
             <Button asChild variant="outline">
               <Link href="/invoices/return/list">View Returned Invoices</Link>
             </Button>
-            <Button asChild variant="outline">
-              <Link href="/invoices">Back to Invoices</Link>
-            </Button>
           </>
         }
       />

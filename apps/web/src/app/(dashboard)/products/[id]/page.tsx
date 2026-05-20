@@ -152,9 +152,6 @@ export default function ProductStockDetailPage() {
                 Edit product
               </Button>
             )}
-            <Button asChild variant="outline">
-              <Link href="/products">Back to products</Link>
-            </Button>
           </>
         }
       />

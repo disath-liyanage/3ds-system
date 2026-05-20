@@ -1066,9 +1066,6 @@ export default function NewInvoicePage() {
                       ? "Request Invoice"
                       : "Save Invoice"}
             </Button>
-            <Button type="button" variant="outline" onClick={() => router.back()}>
-              Cancel
-            </Button>
           </div>
             {!editId ? (
               <Button type="button" variant="outline" onClick={handleSaveDraft} disabled={formState.isSubmitting}>

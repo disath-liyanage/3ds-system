@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useMemo, useState } from "react";
 
@@ -143,7 +144,12 @@ export default function SuppliersPage() {
           <h1 className="text-2xl font-bold">Suppliers</h1>
           <p className="text-sm text-muted-foreground">Manage suppliers for GRN entries.</p>
         </div>
-        {canManageReceiveNotes ? <Button onClick={() => setIsAddOpen(true)}>Add Supplier</Button> : null}
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <Link href="/receive-notes">Back</Link>
+          </Button>
+          {canManageReceiveNotes ? <Button onClick={() => setIsAddOpen(true)}>Add Supplier</Button> : null}
+        </div>
       </header>
 
       <Table>

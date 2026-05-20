@@ -116,9 +116,6 @@ export default function InvoiceDetailsPage() {
     return (
       <section className="space-y-4">
         <PageHeader title="Invoice Details" description="Unable to find this invoice." />
-        <Button asChild variant="outline">
-          <Link href="/invoices">Back to Invoices</Link>
-        </Button>
       </section>
     );
   }
@@ -156,9 +153,6 @@ export default function InvoiceDetailsPage() {
                 Delete Invoice
               </Button>
             )}
-            <Button asChild variant="outline">
-              <Link href="/invoices">Back</Link>
-            </Button>
           </>
         }
       />

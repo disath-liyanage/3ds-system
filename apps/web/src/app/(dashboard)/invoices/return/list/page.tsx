@@ -6,7 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 
 import { listReturnInvoices, type ReturnInvoiceListRow } from "@/app/actions/invoices";
 import { PageHeader } from "@/components/page-header";
-import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
 
@@ -30,9 +29,6 @@ export default function ReturnInvoiceListPage() {
       <section className="space-y-4">
         <PageHeader title="Returned Invoices" description="Failed to load returned invoices." />
         <p className="text-xs text-muted-foreground">{error instanceof Error ? error.message : "Unknown error"}</p>
-        <Button asChild variant="outline">
-          <Link href="/invoices/return">Back</Link>
-        </Button>
       </section>
     );
   }
@@ -42,11 +38,6 @@ export default function ReturnInvoiceListPage() {
       <PageHeader
         title="Returned Invoices"
         description="All created return invoices."
-        actions={
-          <Button asChild variant="outline">
-            <Link href="/invoices/return">Back</Link>
-          </Button>
-        }
       />
 
       <div className="rounded-md border border-border bg-white">
