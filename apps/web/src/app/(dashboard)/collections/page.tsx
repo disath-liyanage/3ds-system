@@ -506,6 +506,7 @@ export default function CollectionsPage() {
         }}
         title={historyInvoiceNumber ? `Collection History · Invoice #${historyInvoiceNumber}` : "Collection History"}
         description="View how this invoice was collected."
+        showBottomClose={false}
       >
         {historyQuery.isLoading ? (
           <p className="text-sm text-muted-foreground">Loading history...</p>

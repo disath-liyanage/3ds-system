@@ -486,6 +486,7 @@ export default function CustomersPage() {
         onOpenChange={setIsAddOpen}
         title="Add customer"
         description="Admins and managers create customers immediately. Sales reps submit a request for review."
+        showBottomClose={false}
       >
         <form className="space-y-3" onSubmit={handleAddCustomer}>
           <Input
@@ -539,6 +540,7 @@ export default function CustomersPage() {
         onOpenChange={setIsAddAreaOpen}
         title="Add area"
         description="Create a new area to use in customer records."
+        showBottomClose={false}
       >
         <form
           className="space-y-3"
