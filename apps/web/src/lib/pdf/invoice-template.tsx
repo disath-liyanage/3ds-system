@@ -17,15 +17,14 @@ type InvoiceTemplateProps = {
 
 const styles = StyleSheet.create({
   page: { padding: 20, fontSize: 11, fontFamily: "Times-Roman" },
-  topWrap: { borderWidth: 1, borderColor: "#000", marginBottom: 8, flexDirection: "row" },
-  leftTop: { width: "60%", borderRightWidth: 1, borderRightColor: "#000", padding: 8 },
-  rightTop: { width: "40%", padding: 8 },
-  topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  logo: { width: 100, height: 40, objectFit: "contain" },
-  invoiceText: { width: 90, height: 20, objectFit: "contain" },
-  infoText: { fontSize: 10, marginBottom: 4 },
-  details: { flexDirection: "row", marginBottom: 8 },
+  topWrap: { marginBottom: 10, flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
+  logo: { width: 140, height: 58, objectFit: "contain" },
+  invoiceText: { width: 100, height: 28, objectFit: "contain", marginTop: 6 },
+  rightTop: { width: "38%" },
+  infoText: { fontSize: 11, marginBottom: 5 },
+  details: { flexDirection: "row", marginBottom: 8, gap: 8 },
   col: { width: "50%" },
+  boxedCol: { borderWidth: 1, borderColor: "#000", padding: 8 },
   field: { marginBottom: 3 },
   tableHeader: {
     flexDirection: "row",
@@ -56,12 +55,8 @@ export function InvoiceTemplate({ invoice, items, companyName }: InvoiceTemplate
     <Document>
       <Page size="LETTER" style={styles.page}>
         <View style={styles.topWrap}>
-          <View style={styles.leftTop}>
-            <View style={styles.topRow}>
-              <Image src="/images/receipt-logo.svg" style={styles.logo} />
-              <Image src="/images/invoice-text.svg" style={styles.invoiceText} />
-            </View>
-          </View>
+          <Image src="/images/receipt-logo.svg" style={styles.logo} />
+          <Image src="/images/invoice-text.svg" style={styles.invoiceText} />
           <View style={styles.rightTop}>
             <Text style={styles.infoText}>No 44/1, Tharanga Place, Panagoda, Homagama</Text>
             <Text style={styles.infoText}>077 530 3215 / 011 208 3773</Text>
@@ -70,13 +65,13 @@ export function InvoiceTemplate({ invoice, items, companyName }: InvoiceTemplate
         </View>
 
         <View style={styles.details}>
-          <View style={styles.col}>
+          <View style={[styles.col, styles.boxedCol]}>
             <Text style={styles.field}>Customer Code: {invoice.customer_id}</Text>
             <Text style={styles.field}>Customer Name: {companyName}</Text>
           </View>
-          <View style={styles.col}>
+          <View style={[styles.col, styles.boxedCol]}>
             <Text style={styles.field}>Invoice Number: {invoice.invoice_number}</Text>
-            <Text style={styles.field}>Invoice Date: {formatDate(invoice.created_at)}</Text>
+            <Text style={styles.field}>Invoiced By: {String((invoice as { issued_by?: string }).issued_by || "-")}</Text>
           </View>
         </View>
 

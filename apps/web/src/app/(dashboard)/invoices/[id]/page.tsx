@@ -108,6 +108,13 @@ export default function InvoiceDetailsPage() {
   const documentNumber = isQuotation ? `Q${invoice.quotation_number ?? invoice.invoice_number}` : String(invoice.invoice_number);
   const createdDate = new Date(invoice.created_at);
   const formatAmount = (amount: number) => `LKR ${amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+  const buildCustomerCode = (rawId?: string) => {
+    if (!rawId) return "C001";
+    const digits = rawId.replace(/\D/g, "");
+    if (!digits) return "C001";
+    const num = (Number(digits.slice(-6)) % 999) + 1;
+    return `C${String(num).padStart(3, "0")}`;
+  };
   const totalDiscountAmount = invoice.items.reduce((sum, item) => {
     const discountPerUnit = getDiscountPerUnit(item.unit_price, item.discount_type, item.discount_value);
     return sum + (Number(item.qty) || 0) * discountPerUnit;
@@ -150,31 +157,27 @@ export default function InvoiceDetailsPage() {
 
       {/* Printable Area */}
       <div className="print-area invoice-print bg-white p-8 rounded-lg shadow-sm border print:shadow-none print:border-none print:p-0">
-        <div className="border border-black mb-4">
-          <div className="flex items-stretch">
-            <div className="w-[60%] border-r border-black p-3">
-              <div className="flex items-center justify-between gap-3">
-                <img src="/images/receipt-logo.svg" alt="Receipt logo" className="h-14 w-auto object-contain" />
-                <img src="/images/invoice-text.svg" alt="Invoice text" className="h-8 w-auto object-contain" />
-              </div>
-            </div>
-            <div className="w-[40%] p-3 text-xs space-y-2">
-              <div className="flex items-start gap-2"><MapPin className="h-4 w-4 mt-0.5 shrink-0" /><span>No 44/1, Tharanga Place, Panagoda, Homagama</span></div>
-              <div className="flex items-start gap-2"><Phone className="h-4 w-4 mt-0.5 shrink-0" /><span>077 530 3215 / 011 208 3773</span></div>
-              <div className="flex items-start gap-2"><Mail className="h-4 w-4 mt-0.5 shrink-0" /><span>sanulapaintshub@gmail.com</span></div>
+        <div className="mb-4">
+          <div className="flex items-start justify-between gap-4">
+            <img src="/images/receipt-logo.svg" alt="Receipt logo" className="h-20 w-auto object-contain" />
+            <img src="/images/invoice-text.svg" alt="Invoice text" className="h-9 w-auto object-contain mt-2" />
+            <div className="w-[38%] text-sm leading-relaxed space-y-2">
+              <div className="flex items-start gap-2"><MapPin className="h-5 w-5 mt-0.5 shrink-0" /><span>No 44/1,Tharanga Place, Panagoda, Homagama</span></div>
+              <div className="flex items-start gap-2"><Phone className="h-5 w-5 mt-0.5 shrink-0" /><span>077 530 3215 / 011 208 3773</span></div>
+              <div className="flex items-start gap-2"><Mail className="h-5 w-5 mt-0.5 shrink-0" /><span>sanulapaintshub@gmail.com</span></div>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-          <div className="space-y-1">
-            <p><span className="font-semibold">Customer Code:</span> {invoice.customer_code || invoice.customer_id}</p>
+          <div className="space-y-1 border border-black p-3">
+            <p><span className="font-semibold">Customer Code:</span> {buildCustomerCode(invoice.customer_code || invoice.customer_id)}</p>
             <p><span className="font-semibold">Customer Name:</span> {invoice.customer_name}</p>
             <p><span className="font-semibold">Customer Address:</span> {invoice.customer_address || "-"}</p>
             <p><span className="font-semibold">Customer Contact No:</span> {invoice.customer_phone || "-"}</p>
             <p><span className="font-semibold">Total Outstanding:</span> {formatAmount(Number(invoice.customer_balance) || 0)}</p>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1 border border-black p-3">
             <p><span className="font-semibold">{isQuotation ? "Quotation Number:" : "Invoice Number:"}</span> {documentNumber}</p>
             <p>
               <span className="font-semibold">Invoice Date:</span>{" "}
@@ -190,13 +193,13 @@ export default function InvoiceDetailsPage() {
 
         <Table className="mb-4 border border-black">
           <TableHeader>
-            <TableRow className="border-black">
-              <TableHead>Product</TableHead>
-              <TableHead className="text-right">Qty</TableHead>
-              <TableHead className="text-right">FQTY</TableHead>
-              <TableHead className="text-right">U Price</TableHead>
-              <TableHead className="text-right">DSCNT</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
+            <TableRow className="border-black border-b">
+              <TableHead className="bg-transparent">Product</TableHead>
+              <TableHead className="text-right bg-transparent">Qty</TableHead>
+              <TableHead className="text-right bg-transparent">FQTY</TableHead>
+              <TableHead className="text-right bg-transparent">U Price</TableHead>
+              <TableHead className="text-left bg-transparent">DSCNT</TableHead>
+              <TableHead className="text-right bg-transparent">Amount</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -205,7 +208,7 @@ export default function InvoiceDetailsPage() {
               const effectiveUnitPrice = Math.max(0, item.unit_price - discountPerUnit);
 
               return (
-                <TableRow key={item.id}>
+                <TableRow key={item.id} className="border-b border-black">
                   <TableCell className="font-medium">
                     {item.product_name} <span className="text-muted-foreground text-xs">({item.product_unit})</span>
                   </TableCell>
@@ -214,7 +217,7 @@ export default function InvoiceDetailsPage() {
                   <TableCell className="text-right">
                     {formatAmount(item.unit_price)}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-left">
                     {item.discount_type === "percent"
                       ? `${item.discount_value}%`
                       : formatAmount(Number(item.discount_value) || 0)}
@@ -225,33 +228,35 @@ export default function InvoiceDetailsPage() {
                 </TableRow>
               );
             })}
-            <TableRow className="border-t border-black">
-              <TableCell colSpan={5} className="text-right font-semibold">Total Amount</TableCell>
+            <TableRow className="border-t border-black border-b">
+              <TableCell colSpan={4}>
+                {invoice.payment_method === "credit" ? (
+                  <span>
+                    Cheques to be written infavor of : <strong>SANULA PAINTS HUB (PVT)LTD &amp; CROSSED</strong> as{" "}
+                    <strong>A/C PAYEE ONLY</strong>
+                  </span>
+                ) : null}
+              </TableCell>
+              <TableCell className="text-left font-semibold">Total Amount</TableCell>
               <TableCell className="text-right font-semibold">{formatAmount(invoice.total_amount)}</TableCell>
             </TableRow>
-            <TableRow>
-              <TableCell colSpan={5} className="text-right font-semibold">Total Dis Amount</TableCell>
+            <TableRow className="border-b border-black">
+              <TableCell colSpan={4} />
+              <TableCell className="text-left font-semibold">Total Dis Amount</TableCell>
               <TableCell className="text-right font-semibold">{formatAmount(totalDiscountAmount)}</TableCell>
             </TableRow>
-            <TableRow>
-              <TableCell colSpan={5} className="text-right font-semibold">Net Amount</TableCell>
-              <TableCell className="text-right font-semibold">{formatAmount(netAmount)}</TableCell>
+            <TableRow className="border-b border-black">
+              <TableCell colSpan={4} />
+              <TableCell className="text-left font-bold text-[15px]">Net Amount</TableCell>
+              <TableCell className="text-right font-bold text-[15px]">{formatAmount(netAmount)}</TableCell>
             </TableRow>
           </TableBody>
         </Table>
 
-        {invoice.payment_method === "credit" ? (
-          <p className="text-sm mb-6">
-            Cheques to be written infavor of : <strong>SANULA PAINTS HUB (PVT)LTD &amp; CROSSED</strong> as{" "}
-            <strong>A/C PAYEE ONLY</strong>
-          </p>
-        ) : null}
-
         <div className="grid grid-cols-2 gap-10 text-sm mb-6 mt-12">
-          <div className="pt-4 border-t border-dotted border-black">Signature</div>
+          <div className="pt-4 border-t border-dotted border-black" />
           <div className="pt-4 border-t border-dotted border-black">
-            <p className="italic font-bold mb-2">Goods received in good condition &amp; correct qty.</p>
-            <p>Signature</p>
+            <p className="italic font-bold mb-2 -mt-8">Goods received in good condition &amp; correct qty.</p>
           </div>
         </div>
 
@@ -260,18 +265,18 @@ export default function InvoiceDetailsPage() {
             <h3 className="font-semibold text-sm mb-2">Customer available invoice List</h3>
             <Table className="border border-black">
               <TableHeader>
-                <TableRow className="border-black">
-                  <TableHead>Invoice Date</TableHead>
-                  <TableHead>Invoice No</TableHead>
-                  <TableHead className="text-right">Net Amount</TableHead>
-                  <TableHead className="text-right">Creddit Amount</TableHead>
-                  <TableHead className="text-right">Settled Amount</TableHead>
-                  <TableHead className="text-right">Due Amount</TableHead>
+                <TableRow className="border-black border-b">
+                  <TableHead className="bg-transparent">Invoice Date</TableHead>
+                  <TableHead className="bg-transparent">Invoice No</TableHead>
+                  <TableHead className="text-right bg-transparent">Net Amount</TableHead>
+                  <TableHead className="text-right bg-transparent">Creddit Amount</TableHead>
+                  <TableHead className="text-right bg-transparent">Settled Amount</TableHead>
+                  <TableHead className="text-right bg-transparent">Due Amount</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {outstandingRows.map((row) => (
-                  <TableRow key={row.id}>
+                  <TableRow key={row.id} className="border-b border-black">
                     <TableCell>{new Date(row.created_at).toLocaleDateString("en-GB")}</TableCell>
                     <TableCell>{row.invoice_number}</TableCell>
                     <TableCell className="text-right">{formatAmount(row.net_amount)}</TableCell>
