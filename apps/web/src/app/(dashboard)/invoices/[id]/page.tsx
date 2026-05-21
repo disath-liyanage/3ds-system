@@ -121,6 +121,7 @@ export default function InvoiceDetailsPage() {
   }, 0);
   const netAmount = Math.max(0, Number(invoice.total_amount) - totalDiscountAmount);
   const outstandingRows = invoice.outstanding_invoices ?? [];
+  const totalOutstandingAmount = outstandingRows.reduce((sum, row) => sum + (Number(row.due_amount) || 0), 0);
 
   return (
     <section className="space-y-6">
@@ -184,10 +185,10 @@ export default function InvoiceDetailsPage() {
             <p><span className="font-semibold">Customer Name &thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :  </span> {invoice.customer_name}</p>
             <p><span className="font-semibold">Customer Address&nbsp;&thinsp;&thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:  </span> {invoice.customer_address || "-"}</p>
             <p><span className="font-semibold">Customer Contact No &thinsp;&thinsp;:  </span> {invoice.customer_phone || "-"}</p>
-            <p><span className="font-semibold">Total Outstanding &thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:  </span> {formatAmount(Number(invoice.customer_balance) || 0)}</p>
+            <p><span className="font-semibold">Total Outstanding &thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:  </span> {formatAmount(totalOutstandingAmount)}</p>
           </div>
           <div className="space-y-1 border border-black p-3">
-            <p><span className="font-semibold">{isQuotation ? "Quotation Number :" : "Invoice Number :"}</span> {documentNumber}</p>
+            <p><span className="font-semibold">{isQuotation ? "Invoice Number :" : "Invoice Number :"}</span> {documentNumber}</p>
             <p>
               <span className="font-semibold">Invoice Date&thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span>{" "}
               {createdDate.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" })}{" "}
@@ -200,15 +201,15 @@ export default function InvoiceDetailsPage() {
           </div>
         </div>
 
-        <Table className="border border-black">
+        <Table className="border border-black" containerClassName="rounded-none border-0 bg-transparent">
           <TableHeader>
             <TableRow className="border-black border-b">
-              <TableHead className="text-center bg-transparent border-r border-black">Product</TableHead>
-              <TableHead className="text-center bg-transparent border-r border-black">Qty</TableHead>
-              <TableHead className="text-center bg-transparent border-r border-black">FQTY</TableHead>
-              <TableHead className="text-center bg-transparent border-r border-black">U Price</TableHead>
-              <TableHead className="text-center bg-transparent border-r border-l border-black">DSCNT</TableHead>
-              <TableHead className="text-center bg-transparent">Amount</TableHead>
+              <TableHead className="py-0 text-center bg-transparent border-r border-black">Product</TableHead>
+              <TableHead className="py-0 text-center bg-transparent border-r border-black">Qty</TableHead>
+              <TableHead className="py-0 text-center bg-transparent border-r border-black">F QTY</TableHead>
+              <TableHead className="py-0 text-center bg-transparent border-r border-black">U Price</TableHead>
+              <TableHead className="py-0 text-center bg-transparent border-r border-l border-black">DSCNT</TableHead>
+              <TableHead className="py-0 text-center bg-transparent">Amount</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -218,21 +219,21 @@ export default function InvoiceDetailsPage() {
               const firstRowTopBorder = idx === 0 ? "border-t border-black" : "";
 
               return (
-                <TableRow key={item.id} className="border-b-0">
-                  <TableCell className={`font-medium border-r border-black ${firstRowTopBorder}`}>
+                <TableRow key={item.id} className="border-b border-black">
+                  <TableCell className={`py-0 font-medium border-r border-black border-b border-black ${firstRowTopBorder}`}>
                     {item.product_name} <span className="text-muted-foreground text-xs">({item.product_unit})</span>
                   </TableCell>
-                  <TableCell className={`text-right border-r border-black ${firstRowTopBorder}`}>{item.qty}</TableCell>
-                  <TableCell className={`text-right border-r border-black ${firstRowTopBorder}`}>{item.free_qty || 0}</TableCell>
-                  <TableCell className={`text-right border-r border-black ${firstRowTopBorder}`}>
+                  <TableCell className={`py-0 text-right border-r border-black border-b border-black ${firstRowTopBorder}`}>{item.qty}</TableCell>
+                  <TableCell className={`py-0 text-right border-r border-black border-b border-black ${firstRowTopBorder}`}>{item.free_qty || 0}</TableCell>
+                  <TableCell className={`py-0 text-right border-r border-black border-b border-black ${firstRowTopBorder}`}>
                     {formatAmount(item.unit_price)}
                   </TableCell>
-                  <TableCell className={`text-left border-r border-l border-black ${firstRowTopBorder}`}>
+                  <TableCell className={`py-0 text-right border-r border-l border-black border-b border-black ${firstRowTopBorder}`}>
                     {item.discount_type === "percent"
                       ? `${item.discount_value}%`
                       : formatAmount(Number(item.discount_value) || 0)}
                   </TableCell>
-                  <TableCell className={`text-right font-medium ${firstRowTopBorder}`}>
+                  <TableCell className={`py-0 text-right font-medium border-b border-black ${firstRowTopBorder}`}>
                     {formatAmount(item.qty * effectiveUnitPrice)}
                   </TableCell>
                 </TableRow>
@@ -241,26 +242,24 @@ export default function InvoiceDetailsPage() {
           </TableBody>
         </Table>
 
-        {invoice.payment_method === "credit" ? (
-          <div className="mt-1 mb-2 text-sm">
-            Cheques to be written infavor of :
-            <br />
-            <strong>SANULA PAINTS HUB (PVT)LTD &amp; CROSSED</strong> as <strong>A/C PAYEE ONLY</strong>
-          </div>
-        ) : null}
-
-        <div className="mb-4 -mt-[54px] ml-auto w-[42%] border border-black">
+        <div className="mt-1 mb-2 text-sm">
+          Cheques to be written infavor of :
+          <br />
+          <strong>SANULA PAINTS HUB (PVT)LTD &amp; CROSSED</strong> as <strong>A/C PAYEE ONLY</strong>
+        </div>
+        
+        <div className="mb-4 -mt-[53px] ml-auto w-[42%] border border-black">
           <div className="grid grid-cols-[1fr_auto]">
-            <div className="px-3 py-1.5 font-semibold">Total Amount</div>
-            <div className="px-3 py-1.5 text-right font-semibold">{formatAmount(invoice.total_amount)}</div>
+            <div className="px-3 py-0 font-semibold">Total Amount</div>
+            <div className="px-3 py-0 text-right font-semibold">{formatAmount(invoice.total_amount)}</div>
           </div>
           <div className="grid grid-cols-[1fr_auto]">
-            <div className="px-3 py-1.5 font-semibold">Total Dis Amount</div>
-            <div className="px-3 py-1.5 text-right font-semibold">{formatAmount(totalDiscountAmount)}</div>
+            <div className="px-3 py-0 font-semibold">Total Dis Amount</div>
+            <div className="px-3 py-0 text-right font-semibold">{formatAmount(totalDiscountAmount)}</div>
           </div>
           <div className="grid grid-cols-[1fr_auto]">
-            <div className="px-3 py-1.5 font-bold text-[15px]">Net Amount</div>
-            <div className="px-3 py-1.5 text-right font-bold text-[15px]">{formatAmount(netAmount)}</div>
+            <div className="px-3 py-0 font-bold text-[15px]">Net Amount</div>
+            <div className="px-3 py-0 text-right font-bold text-[15px]">{formatAmount(netAmount)}</div>
           </div>
         </div>
 
@@ -278,7 +277,7 @@ export default function InvoiceDetailsPage() {
           </div>
           <div>
             <svg className="w-full h-4" aria-hidden="true">
-              <line x1="40%" y1="2" x2="85%" y2="2" stroke="black" strokeWidth="1" strokeDasharray="2 4" />
+              <line x1="20%" y1="2" x2="90%" y2="2" stroke="black" strokeWidth="1" strokeDasharray="2 4" />
             </svg>
           </div>
         </div>
@@ -286,26 +285,30 @@ export default function InvoiceDetailsPage() {
         {outstandingRows.length > 0 ? (
           <div className="mt-4">
             <h3 className="font-semibold text-sm mb-2">Customer Available Credit Invoice List</h3>
-            <Table className="border border-black">
+            <Table className="border border-black" containerClassName="rounded-none border-0 bg-transparent">
               <TableHeader>
                 <TableRow className="border-black border-b">
-                  <TableHead className="text-center bg-transparent border-r border-black">Invoice Date</TableHead>
-                  <TableHead className="text-center bg-transparent border-r border-black">Invoice No</TableHead>
-                  <TableHead className="text-center bg-transparent border-r border-black">Net Amount</TableHead>
-                  <TableHead className="text-center bg-transparent border-r border-black">Creddit Amount</TableHead>
-                  <TableHead className="text-center bg-transparent border-r border-black">Settled Amount</TableHead>
-                  <TableHead className="text-center bg-transparent">Due Amount</TableHead>
+                  <TableHead className="py-0 text-center bg-transparent border-r border-black">Invoice Date</TableHead>
+                  <TableHead className="py-0 text-center bg-transparent border-r border-black">Invoice No</TableHead>
+                  <TableHead className="py-0 text-center bg-transparent border-r border-black">Net Amount</TableHead>
+                  <TableHead className="py-0 text-center bg-transparent border-r border-black">Creddit Amount</TableHead>
+                  <TableHead className="py-0 text-center bg-transparent border-r border-black">Settled Amount</TableHead>
+                  <TableHead className="py-0 text-center bg-transparent">Due Amount</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {outstandingRows.map((row) => (
-                  <TableRow key={row.id} className="first:border-t first:border-black border-b border-black last:border-b-0">
-                    <TableCell className="border-r border-black">{new Date(row.created_at).toLocaleDateString("en-GB")}</TableCell>
-                    <TableCell className="border-r border-black">{row.invoice_number}</TableCell>
-                    <TableCell className="text-right border-r border-black">{formatAmount(row.net_amount)}</TableCell>
-                    <TableCell className="text-right border-r border-black">{formatAmount(row.credit_amount)}</TableCell>
-                    <TableCell className="text-right border-r border-black">{formatAmount(row.settled_amount)}</TableCell>
-                    <TableCell className="text-right font-semibold">{formatAmount(row.due_amount)}</TableCell>
+                {outstandingRows.map((row, idx) => (
+                  <TableRow key={row.id} className={`border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>
+                    <TableCell className={`py-0 border-r border-black border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>{new Date(row.created_at).toLocaleDateString("en-GB")}</TableCell>
+                    <TableCell className={`py-0 border-r border-black border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>
+                      <Link href={`/invoices/${row.id}`} className="hover:underline">
+                        {row.invoice_number}
+                      </Link>
+                    </TableCell>
+                    <TableCell className={`py-0 text-right border-r border-black border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>{formatAmount(row.net_amount)}</TableCell>
+                    <TableCell className={`py-0 text-right border-r border-black border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>{formatAmount(row.credit_amount)}</TableCell>
+                    <TableCell className={`py-0 text-right border-r border-black border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>{formatAmount(row.settled_amount)}</TableCell>
+                    <TableCell className={`py-0 text-right font-semibold border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>{formatAmount(row.due_amount)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
