@@ -12,7 +12,9 @@ import {
   Package,
   ReceiptText,
   UserCircle2,
-  Users
+  Users,
+  ContactRound,
+  UserRound
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -36,8 +38,8 @@ type DashboardSidebarProps = {
 
 const baseNavItems: SidebarItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
-  { href: "/collections", label: "Collections", icon: HandCoins },
   { href: "/invoices", label: "Invoices", icon: FileText },
+  { href: "/collections", label: "Collections", icon: HandCoins },
   { href: "/receive-notes", label: "GRN", icon: ReceiptText },
   { href: "/products", label: "Products", icon: Package },
   { href: "/customers", label: "Customers", icon: Users },
@@ -46,8 +48,8 @@ const baseNavItems: SidebarItem[] = [
 ];
 
 const adminNavItems: SidebarItem[] = [
-  { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/workers", label: "Workers", icon: Users }
+  { href: "/admin/users", label: "Users", icon: ContactRound },
+  { href: "/admin/workers", label: "Workers", icon: UserRound }
 ];
 
 export function DashboardSidebar({ isAdmin, isManager, user }: DashboardSidebarProps) {
@@ -221,7 +223,7 @@ export function DashboardSidebar({ isAdmin, isManager, user }: DashboardSidebarP
   return (
     <Sidebar
       title="3D's Distributors (PVT) Ltd."
-      logoSrc="/images/3ds-logo.png"
+      logoSrc="/images/3ds-logo.svg"
       items={navItems}
       adminItems={isAdmin ? adminNavItems : []}
       footer={
