@@ -164,14 +164,21 @@ export default function InvoiceDetailsPage() {
               <img src="/images/invoice-text.svg" alt="Invoice text" className="h-10 w-auto object-contain" />
             </div>
             <div className="justify-self-end w-[90%] text-[15px] font-bold leading-relaxed space-y-2">
-              <div className="flex items-start gap-2"><MapPin className="h-5 w-5 mt-0.5 shrink-0" /><span>No 44/1, Tharanga Place, Panagoda, Homagama</span></div>
+              <div className="flex items-center gap-2">
+                <MapPin className="h-5 w-5 shrink-0" />
+                <span>
+                  No 44/1, Tharanga Place
+                  <br />
+                  Panagoda, Homagama
+                </span>
+              </div>
               <div className="flex items-start gap-2"><Phone className="h-5 w-5 mt-0.5 shrink-0" /><span>077 530 3215 / 011 208 3773</span></div>
               <div className="flex items-start gap-2"><Mail className="h-5 w-5 mt-0.5 shrink-0" /><span>sanulapaintshub@gmail.com</span></div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-[1.35fr_0.65fr] gap-4 text-sm mb-4">
+        <div className="grid grid-cols-[1.2fr_0.8fr] gap-4 text-sm mb-4">
           <div className="space-y-1 border border-black p-3">
             <p><span className="font-semibold">Customer Code &thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:  </span> {buildCustomerCode(invoice.customer_code || invoice.customer_id)}</p>
             <p><span className="font-semibold">Customer Name &thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :  </span> {invoice.customer_name}</p>
@@ -259,7 +266,7 @@ export default function InvoiceDetailsPage() {
 
         <div className="grid grid-cols-2 gap-10 text-sm mb-3 mt-6">
           <div />
-          <div className="pl-40">
+          <div className="pl-20">
             <p className="italic font-bold">Goods received in good condition &amp; correct qty.</p>
           </div>
         </div>
