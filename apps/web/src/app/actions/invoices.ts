@@ -534,6 +534,7 @@ export async function getInvoiceDetail(
         due_amount: dueAmount
       };
     })
+    .filter((row) => row.id !== String(invoiceData.id))
     .filter((row) => row.due_amount > 0);
 
   const result: InvoiceDetailRow = {
