@@ -2,17 +2,15 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useState } from "react";
+import { Mail, MapPin, Phone } from "lucide-react";
 
 import { approveInvoice, deleteInvoice, rejectInvoice } from "@/app/actions/invoices";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useInvoice } from "@/hooks/useInvoice";
 import { toast } from "@/lib/toast";
-import { formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
 
 export default function InvoiceDetailsPage() {
@@ -83,21 +81,6 @@ export default function InvoiceDetailsPage() {
     router.refresh();
   };
 
-  const statusLabel = (status: string) => {
-    if (status === "pending_approval") return "PENDING APPROVAL";
-    if (status === "approved") return "APPROVED";
-    if (status === "rejected") return "REJECTED";
-    if (status === "issued") return "APPROVED";
-    return status.toUpperCase();
-  };
-
-  const statusVariant = (status: string) => {
-    if (status === "paid" || status === "approved" || status === "issued") return "success";
-    if (status === "rejected") return "danger";
-    if (status === "pending_approval" || status === "draft") return "warning";
-    return "default";
-  };
-
   const getDiscountPerUnit = (unitPrice: number, discountType: "percent" | "amount", discountValue: number) => {
     if (!discountValue) return 0;
     if (discountType === "percent") return (unitPrice * discountValue) / 100;
@@ -123,6 +106,14 @@ export default function InvoiceDetailsPage() {
   const isQuotation = invoice.invoice_kind === "quotation";
   const documentLabel = isQuotation ? "Quotation" : "Invoice";
   const documentNumber = isQuotation ? `Q${invoice.quotation_number ?? invoice.invoice_number}` : String(invoice.invoice_number);
+  const createdDate = new Date(invoice.created_at);
+  const formatAmount = (amount: number) => `LKR ${amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
+  const totalDiscountAmount = invoice.items.reduce((sum, item) => {
+    const discountPerUnit = getDiscountPerUnit(item.unit_price, item.discount_type, item.discount_value);
+    return sum + (Number(item.qty) || 0) * discountPerUnit;
+  }, 0);
+  const netAmount = Math.max(0, Number(invoice.total_amount) - totalDiscountAmount);
+  const outstandingRows = invoice.outstanding_invoices ?? [];
 
   return (
     <section className="space-y-6">
@@ -158,40 +149,54 @@ export default function InvoiceDetailsPage() {
       />
 
       {/* Printable Area */}
-      <div className="print-area bg-white p-8 rounded-lg shadow-sm border print:shadow-none print:border-none print:p-0">
-        <div className="flex justify-between items-start border-b pb-6 mb-6">
-          <div>
-            <h2 className="text-3xl font-bold text-primary mb-2">{isQuotation ? "QUOTATION" : "INVOICE"}</h2>
-            <div className="text-sm text-muted-foreground">
-              <p>{documentLabel} #: {documentNumber}</p>
-              <p>Date: {formatDate(invoice.created_at)}</p>
-              <p className="capitalize">Payment Method: {invoice.payment_method}</p>
+      <div className="print-area invoice-print bg-white p-8 rounded-lg shadow-sm border print:shadow-none print:border-none print:p-0">
+        <div className="border border-black mb-4">
+          <div className="flex items-stretch">
+            <div className="w-[60%] border-r border-black p-3">
+              <div className="flex items-center justify-between gap-3">
+                <img src="/images/receipt-logo.svg" alt="Receipt logo" className="h-14 w-auto object-contain" />
+                <img src="/images/invoice-text.svg" alt="Invoice text" className="h-8 w-auto object-contain" />
+              </div>
+            </div>
+            <div className="w-[40%] p-3 text-xs space-y-2">
+              <div className="flex items-start gap-2"><MapPin className="h-4 w-4 mt-0.5 shrink-0" /><span>No 44/1, Tharanga Place, Panagoda, Homagama</span></div>
+              <div className="flex items-start gap-2"><Phone className="h-4 w-4 mt-0.5 shrink-0" /><span>077 530 3215 / 011 208 3773</span></div>
+              <div className="flex items-start gap-2"><Mail className="h-4 w-4 mt-0.5 shrink-0" /><span>sanulapaintshub@gmail.com</span></div>
             </div>
           </div>
-          <div className="text-right text-sm">
-            <h3 className="font-semibold text-lg">3DS Paint Distribution</h3>
-            <p className="text-muted-foreground">123 Main Street</p>
-            <p className="text-muted-foreground">City, Country</p>
-            <p className="text-muted-foreground">Phone: +94 77 123 4567</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+          <div className="space-y-1">
+            <p><span className="font-semibold">Customer Code:</span> {invoice.customer_code || invoice.customer_id}</p>
+            <p><span className="font-semibold">Customer Name:</span> {invoice.customer_name}</p>
+            <p><span className="font-semibold">Customer Address:</span> {invoice.customer_address || "-"}</p>
+            <p><span className="font-semibold">Customer Contact No:</span> {invoice.customer_phone || "-"}</p>
+            <p><span className="font-semibold">Total Outstanding:</span> {formatAmount(Number(invoice.customer_balance) || 0)}</p>
+          </div>
+          <div className="space-y-1">
+            <p><span className="font-semibold">{isQuotation ? "Quotation Number:" : "Invoice Number:"}</span> {documentNumber}</p>
+            <p>
+              <span className="font-semibold">Invoice Date:</span>{" "}
+              {createdDate.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" })}{" "}
+              <span className="font-semibold">time:</span>{" "}
+              {createdDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}
+            </p>
+            <p><span className="font-semibold">Sales Person:</span> {invoice.sales_rep_name || "Unassigned"} {invoice.sales_rep_phone ? `(${invoice.sales_rep_phone})` : ""}</p>
+            <p><span className="font-semibold">Invoice Root:</span> {invoice.customer_route || "-"}</p>
+            <p><span className="font-semibold">Invoiced By:</span> {invoice.issued_by_name}</p>
           </div>
         </div>
 
-        <div className="mb-8">
-          <h3 className="font-semibold text-gray-700 mb-2">Bill To:</h3>
-          <div className="text-sm">
-            <p className="font-medium text-lg">{invoice.customer_name}</p>
-            <p className="text-muted-foreground">{invoice.customer_address}</p>
-            <p className="text-muted-foreground">{invoice.customer_phone}</p>
-          </div>
-        </div>
-
-        <Table className="mb-8">
+        <Table className="mb-4 border border-black">
           <TableHeader>
-            <TableRow>
+            <TableRow className="border-black">
               <TableHead>Product</TableHead>
               <TableHead className="text-right">Qty</TableHead>
-              <TableHead className="text-right">Unit Price</TableHead>
-              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">FQTY</TableHead>
+              <TableHead className="text-right">U Price</TableHead>
+              <TableHead className="text-right">DSCNT</TableHead>
+              <TableHead className="text-right">Amount</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -203,50 +208,94 @@ export default function InvoiceDetailsPage() {
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">
                     {item.product_name} <span className="text-muted-foreground text-xs">({item.product_unit})</span>
-                    {(item.free_qty > 0 || item.discount_value > 0) && (
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {item.free_qty > 0 ? `Free: ${item.free_qty}` : ""}
-                        {item.free_qty > 0 && item.discount_value > 0 ? " · " : ""}
-                        {item.discount_value > 0
-                          ? `Discount: ${item.discount_type === "percent" ? `${item.discount_value}%` : `LKR ${item.discount_value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}`
-                          : ""}
-                      </div>
-                    )}
                   </TableCell>
                   <TableCell className="text-right">{item.qty}</TableCell>
+                  <TableCell className="text-right">{item.free_qty || 0}</TableCell>
                   <TableCell className="text-right">
-                    LKR {item.unit_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {formatAmount(item.unit_price)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {item.discount_type === "percent"
+                      ? `${item.discount_value}%`
+                      : formatAmount(Number(item.discount_value) || 0)}
                   </TableCell>
                   <TableCell className="text-right font-medium">
-                    LKR {(item.qty * effectiveUnitPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {formatAmount(item.qty * effectiveUnitPrice)}
                   </TableCell>
                 </TableRow>
               );
             })}
+            <TableRow className="border-t border-black">
+              <TableCell colSpan={5} className="text-right font-semibold">Total Amount</TableCell>
+              <TableCell className="text-right font-semibold">{formatAmount(invoice.total_amount)}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell colSpan={5} className="text-right font-semibold">Total Dis Amount</TableCell>
+              <TableCell className="text-right font-semibold">{formatAmount(totalDiscountAmount)}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell colSpan={5} className="text-right font-semibold">Net Amount</TableCell>
+              <TableCell className="text-right font-semibold">{formatAmount(netAmount)}</TableCell>
+            </TableRow>
           </TableBody>
         </Table>
 
-        <div className="flex justify-end border-t pt-4">
-          <div className="w-64 space-y-3">
-            <div className="flex justify-between font-bold text-lg">
-              <span>Grand Total:</span>
-              <span>LKR {invoice.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm pt-2 border-t">
-              <span>Status:</span>
-              <Badge
-                variant={statusVariant(invoice.status)}
-              >
-                {statusLabel(invoice.status)}
-              </Badge>
-            </div>
+        {invoice.payment_method === "credit" ? (
+          <p className="text-sm mb-6">
+            Cheques to be written infavor of : <strong>SANULA PAINTS HUB (PVT)LTD &amp; CROSSED</strong> as{" "}
+            <strong>A/C PAYEE ONLY</strong>
+          </p>
+        ) : null}
+
+        <div className="grid grid-cols-2 gap-10 text-sm mb-6 mt-12">
+          <div className="pt-4 border-t border-dotted border-black">Signature</div>
+          <div className="pt-4 border-t border-dotted border-black">
+            <p className="italic font-bold mb-2">Goods received in good condition &amp; correct qty.</p>
+            <p>Signature</p>
           </div>
         </div>
 
-        <div className="mt-16 text-center text-xs text-muted-foreground print:block">
-          <p>Thank you for your business!</p>
-          <p>Issued by: {invoice.issued_by_name}</p>
-        </div>
+        {outstandingRows.length > 0 ? (
+          <div className="mt-4">
+            <h3 className="font-semibold text-sm mb-2">Customer available invoice List</h3>
+            <Table className="border border-black">
+              <TableHeader>
+                <TableRow className="border-black">
+                  <TableHead>Invoice Date</TableHead>
+                  <TableHead>Invoice No</TableHead>
+                  <TableHead className="text-right">Net Amount</TableHead>
+                  <TableHead className="text-right">Creddit Amount</TableHead>
+                  <TableHead className="text-right">Settled Amount</TableHead>
+                  <TableHead className="text-right">Due Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {outstandingRows.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell>{new Date(row.created_at).toLocaleDateString("en-GB")}</TableCell>
+                    <TableCell>{row.invoice_number}</TableCell>
+                    <TableCell className="text-right">{formatAmount(row.net_amount)}</TableCell>
+                    <TableCell className="text-right">{formatAmount(row.credit_amount)}</TableCell>
+                    <TableCell className="text-right">{formatAmount(row.settled_amount)}</TableCell>
+                    <TableCell className="text-right font-semibold">{formatAmount(row.due_amount)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : null}
+        <style jsx global>{`
+          @media print {
+            @page {
+              size: Letter;
+              margin: 10mm;
+            }
+            .invoice-print {
+              font-family: "Times New Roman", Times, serif !important;
+              font-size: 12px !important;
+            }
+          }
+        `}</style>
       </div>
 
       {isAdminOrManager && invoice.status === "pending_approval" ? (
