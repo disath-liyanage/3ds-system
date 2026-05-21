@@ -158,36 +158,40 @@ export default function InvoiceDetailsPage() {
 
       {/* Printable Area */}
       <div className="print-area invoice-print bg-white p-8 rounded-lg shadow-sm border print:shadow-none print:border-none print:p-0">
-        <div className="mb-4">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-            <img src="/images/receipt-logo.svg" alt="Receipt logo" className="h-32 w-auto object-contain" />
-            <div className="flex justify-center items-center">
-              <img src="/images/invoice-text.svg" alt="Invoice text" className="h-10 w-auto object-contain" />
+        <div className="invoice-print-header relative mb-4 flex items-center justify-between gap-6 overflow-visible">
+          <div className="invoice-print-logo-wrap min-w-0 flex-1 overflow-visible pr-4">
+            <img
+              src="/images/receipt-logo.svg"
+              alt="Receipt logo"
+              className="invoice-print-logo block h-32 w-auto max-w-[340px] shrink-0 object-contain object-left"
+            />
+          </div>
+          <div className="invoice-print-title pointer-events-none absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center px-4">
+            <img src="/images/invoice-text.svg" alt="Invoice text" className="h-10 w-auto object-contain" />
+          </div>
+          <div className="invoice-print-contact ml-auto w-[320px] max-w-[320px] shrink-0 self-center pl-2 text-[15px] font-bold leading-[1] space-y-1 translate-x-20">
+            <div className="flex items-start gap-1.5 leading-[1]">
+              <MapPin className="h-[18px] w-[18px] mt-[1px] shrink-0" />
+              <span>
+                No 44/1, Tharanga Place
+                <br />
+                Panagoda, Homagama
+              </span>
             </div>
-            <div className="justify-self-end w-[90%] text-[15px] font-bold leading-relaxed space-y-2">
-              <div className="flex items-center gap-2">
-                <MapPin className="h-5 w-5 shrink-0" />
-                <span>
-                  No 44/1, Tharanga Place
-                  <br />
-                  Panagoda, Homagama
-                </span>
-              </div>
-              <div className="flex items-start gap-2"><Phone className="h-5 w-5 mt-0.5 shrink-0" /><span>077 530 3215 / 011 208 3773</span></div>
-              <div className="flex items-start gap-2"><Mail className="h-5 w-5 mt-0.5 shrink-0" /><span>sanulapaintshub@gmail.com</span></div>
-            </div>
+            <div className="flex items-center gap-1.5 leading-[1.25]"><Phone className="h-[18px] w-[18px] shrink-0" /><span className="block leading-[1.25]">077 530 3215 / 011 208 3773</span></div>
+            <div className="flex items-center gap-1.5 leading-[1.25]"><Mail className="h-[18px] w-[18px] shrink-0" /><span className="block leading-[1.25]">sanulapaintshub@gmail.com</span></div>
           </div>
         </div>
 
         <div className="grid grid-cols-[1.2fr_0.8fr] gap-4 text-sm mb-4">
-          <div className="space-y-1 border border-black p-3">
+          <div className="space-y-0.5 border border-black px-2 py-1">
             <p><span className="font-semibold">Customer Code &thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:  </span> {buildCustomerCode(invoice.customer_code || invoice.customer_id)}</p>
             <p><span className="font-semibold">Customer Name &thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :  </span> {invoice.customer_name}</p>
             <p><span className="font-semibold">Customer Address&nbsp;&thinsp;&thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:  </span> {invoice.customer_address || "-"}</p>
             <p><span className="font-semibold">Customer Contact No &thinsp;&thinsp;:  </span> {invoice.customer_phone || "-"}</p>
             <p><span className="font-semibold">Total Outstanding &thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:  </span> {formatAmount(totalOutstandingAmount)}</p>
           </div>
-          <div className="space-y-1 border border-black p-3">
+          <div className="space-y-0.5 border border-black px-2 py-1">
             <p><span className="font-semibold">{isQuotation ? "Invoice Number :" : "Invoice Number :"}</span> {documentNumber}</p>
             <p>
               <span className="font-semibold">Invoice Date&thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span>{" "}
@@ -345,6 +349,56 @@ export default function InvoiceDetailsPage() {
             .invoice-print {
               font-family: "Times New Roman", Times, serif !important;
               font-size: 12px !important;
+            }
+            .invoice-print-header,
+            .invoice-print-header * {
+              overflow: visible !important;
+            }
+            .invoice-print-header {
+              break-inside: avoid;
+              page-break-inside: avoid;
+              display: flex !important;
+              align-items: center !important;
+              justify-content: space-between !important;
+              gap: 1rem !important;
+              position: relative !important;
+            }
+            .invoice-print-header > * {
+              min-width: 0;
+              overflow: visible !important;
+            }
+            .invoice-print-logo-wrap {
+              overflow: visible !important;
+              flex: 1 1 auto !important;
+              min-width: 0 !important;
+              max-width: 56% !important;
+              padding-right: 0.75rem !important;
+            }
+            .invoice-print-logo {
+              display: block !important;
+              max-width: 100% !important;
+              width: auto !important;
+              height: 6.9rem !important;
+              object-fit: contain !important;
+              object-position: left center !important;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            .invoice-print-title {
+              position: absolute !important;
+              left: 50% !important;
+              top: 50% !important;
+              transform: translate(-50%, -50%) !important;
+              z-index: 2 !important;
+            }
+            .invoice-print-contact {
+              margin-left: auto !important;
+              width: 320px !important;
+              flex: 0 0 320px !important;
+              max-width: 320px !important;
+              line-height: 1 !important;
+              text-align: left !important;
+              transform: translateX(20mm) !important;
             }
           }
         `}</style>
