@@ -47,9 +47,23 @@ export type InvoiceListRow = {
 
 export type InvoiceDetailRow = InvoiceListRow & {
   invoice_kind?: "invoice" | "quotation";
+  customer_code?: string;
   customer_phone: string;
   customer_address: string;
+  customer_route?: string;
+  customer_balance?: number;
+  sales_rep_name?: string;
+  sales_rep_phone?: string | null;
   notes: string | null;
+  outstanding_invoices?: Array<{
+    id: string;
+    invoice_number: number;
+    created_at: string;
+    net_amount: number;
+    credit_amount: number;
+    settled_amount: number;
+    due_amount: number;
+  }>;
   items: Array<{
     id: string;
     product_id: string;
@@ -442,7 +456,7 @@ export async function getInvoiceDetail(
     .select(
       `
         id, invoice_number, quotation_number, invoice_kind, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at, notes,
-        customer:customers(name, phone, address),
+        customer:customers(id, name, phone, address, area, balance, sales_rep_id),
         issuer:users_profile!invoices_issued_by_fkey(full_name),
         invoice_items (
           id, product_id, qty, free_qty, unit_price, discount_type, discount_value,
@@ -470,6 +484,57 @@ export async function getInvoiceDetail(
   }
 
   const invoiceData = data as any;
+  const customer = invoiceData.customer ?? null;
+
+  const salesRepId = customer?.sales_rep_id ? String(customer.sales_rep_id) : null;
+  let salesRep: { full_name: string | null; phone: string | null } | null = null;
+  if (salesRepId) {
+    const { data: salesRepData } = await adminClient
+      .from("users_profile")
+      .select("full_name, phone")
+      .eq("id", salesRepId)
+      .maybeSingle<{ full_name: string | null; phone: string | null }>();
+    salesRep = salesRepData ?? null;
+  }
+
+  const { data: customerInvoices } = await adminClient
+    .from("invoices")
+    .select("id, invoice_number, created_at, total_amount, payment_method, status")
+    .eq("customer_id", invoiceData.customer_id)
+    .neq("status", "rejected")
+    .order("created_at", { ascending: false });
+
+  const invoiceIds = (customerInvoices ?? []).map((row) => row.id);
+  const collectionTotals = new Map<string, number>();
+  if (invoiceIds.length > 0) {
+    const { data: collections } = await adminClient
+      .from("collections")
+      .select("invoice_id, amount, status")
+      .in("invoice_id", invoiceIds);
+    for (const entry of collections ?? []) {
+      if (entry.status === "rejected") continue;
+      const invoiceKey = String(entry.invoice_id || "");
+      if (!invoiceKey) continue;
+      collectionTotals.set(invoiceKey, (collectionTotals.get(invoiceKey) ?? 0) + Number(entry.amount || 0));
+    }
+  }
+
+  const outstandingInvoices = (customerInvoices ?? [])
+    .map((row) => {
+      const netAmount = Number(row.total_amount) || 0;
+      const settledAmount = collectionTotals.get(String(row.id)) ?? 0;
+      const dueAmount = Math.max(0, netAmount - settledAmount);
+      return {
+        id: String(row.id),
+        invoice_number: Number(row.invoice_number) || 0,
+        created_at: String(row.created_at),
+        net_amount: netAmount,
+        credit_amount: row.payment_method === "credit" ? netAmount : 0,
+        settled_amount: settledAmount,
+        due_amount: dueAmount
+      };
+    })
+    .filter((row) => row.due_amount > 0);
 
   const result: InvoiceDetailRow = {
     id: invoiceData.id,
@@ -478,9 +543,14 @@ export async function getInvoiceDetail(
     invoice_kind: invoiceData.invoice_kind === "quotation" ? "quotation" : "invoice",
     order_id: invoiceData.order_id,
     customer_id: invoiceData.customer_id,
-    customer_name: invoiceData.customer?.name ?? "Unknown Customer",
-    customer_phone: invoiceData.customer?.phone ?? "",
-    customer_address: invoiceData.customer?.address ?? "",
+    customer_code: customer?.id ?? invoiceData.customer_id,
+    customer_name: customer?.name ?? "Unknown Customer",
+    customer_phone: customer?.phone ?? "",
+    customer_address: customer?.address ?? "",
+    customer_route: customer?.area ?? "",
+    customer_balance: Number(customer?.balance) || 0,
+    sales_rep_name: salesRep?.full_name ?? undefined,
+    sales_rep_phone: salesRep?.phone ?? null,
     issued_by: invoiceData.issued_by,
     issued_by_name: invoiceData.issuer?.full_name ?? "Unknown",
     total_amount: Number(invoiceData.total_amount),
@@ -488,6 +558,7 @@ export async function getInvoiceDetail(
     status: invoiceData.status,
     notes: invoiceData.notes ?? null,
     created_at: invoiceData.created_at,
+    outstanding_invoices: outstandingInvoices,
     items: (invoiceData.invoice_items ?? []).map((item: any) => ({
       id: item.id,
       product_id: item.product_id,
