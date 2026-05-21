@@ -91,7 +91,7 @@ export default function LoginPage() {
             </svg>
           </div>
           <Image
-            src="/images/3ds-logo.png"
+            src="/images/3ds-logo.svg"
             alt="3D's Distributors (PVT) Ltd."
             width={380}
             height={214}
@@ -106,7 +106,7 @@ export default function LoginPage() {
         <Card className="rounded-none border-0 bg-white shadow-none lg:col-span-2">
           <div className="flex h-full flex-col justify-center">
           <CardHeader className="space-y-4 px-6 pb-8 sm:px-12">
-            <CardTitle className="text-5xl font-black leading-tight tracking-[0.08em] text-[#163a63]">Sign In</CardTitle>
+            <CardTitle className="text-5xl font-extrabold leading-tight tracking-[0.03em] text-[#0f2f57]">Sign In</CardTitle>
           </CardHeader>
           <CardContent className="px-6 sm:px-12">
             <form onSubmit={handleSubmit(onSubmit)} className="mx-auto w-full max-w-lg space-y-6">
@@ -117,7 +117,7 @@ export default function LoginPage() {
                     id="email"
                     type="email"
                     placeholder="name@3dsdis.com"
-                    className="h-[72px] rounded-[9999px] border border-[#e7c1a4] bg-transparent pl-14 pr-6 text-base placeholder:text-[17px] placeholder:text-[#9a8b80] focus-visible:border-[#cc7c3f] focus-visible:ring-[#cc7c3f]"
+                    className="h-[74px] rounded-[38px] border border-[#d8b191] bg-transparent pl-14 pr-6 text-[19px] tracking-[0.01em] placeholder:text-[21px] placeholder:font-medium placeholder:text-[#9a8b80] focus-visible:border-2 focus-visible:border-[#b96a34] focus-visible:ring-1 focus-visible:ring-[#b96a34]/30"
                     {...register("email")}
                   />
                 </div>
@@ -130,7 +130,7 @@ export default function LoginPage() {
                     id="password"
                     type="password"
                     placeholder="Your password"
-                    className="h-[72px] rounded-[9999px] border border-[#e7c1a4] bg-transparent pl-14 pr-6 text-base placeholder:text-[17px] placeholder:text-[#9a8b80] focus-visible:border-[#cc7c3f] focus-visible:ring-[#cc7c3f]"
+                    className="h-[74px] rounded-[38px] border border-[#d8b191] bg-transparent pl-14 pr-6 text-[19px] tracking-[0.01em] placeholder:text-[21px] placeholder:font-medium placeholder:text-[#9a8b80] focus-visible:border-2 focus-visible:border-[#b96a34] focus-visible:ring-1 focus-visible:ring-[#b96a34]/30"
                     {...register("password")}
                   />
                 </div>
@@ -139,7 +139,7 @@ export default function LoginPage() {
               {authError ? <p className="text-sm text-red-600">{authError}</p> : null}
               <Button
                 type="submit"
-                className="mt-5 h-[72px] w-full rounded-[9999px] bg-gradient-to-r from-[#8a4f1f] via-[#b76528] to-[#d67d36] px-8 text-xl font-bold text-white hover:from-[#7f481d] hover:via-[#a95c25] hover:to-[#c97332]"
+                className="mt-5 h-[74px] w-full rounded-[38px] bg-gradient-to-r from-[#8a4f1f] via-[#b76528] to-[#d67d36] px-8 text-[28px] font-extrabold tracking-[0.01em] text-white hover:from-[#7f481d] hover:via-[#a95c25] hover:to-[#c97332]"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? "Signing in..." : "Sign in"}
