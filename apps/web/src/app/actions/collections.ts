@@ -37,6 +37,13 @@ export type RecordCollectionInput = {
   incentive_recipient_id?: string;
 };
 
+type DueChequeReminderCandidate = {
+  id: string;
+  invoice_id: string | null;
+  cheque_deposit_date: string | null;
+  invoice: { invoice_number: number; customer: { name: string | null } | null } | null;
+};
+
 export type CollectionExpenseStatus = "pending" | "approved" | "rejected";
 
 export type CollectionExpenseRow = {
@@ -257,6 +264,101 @@ function canManageCollectionApprovals(profile: ProfilePermissionRow): boolean {
     profile.role === "cashier" ||
     Boolean(customRole?.perm_validate_collections)
   );
+}
+
+function getColomboDateKey(value: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Colombo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(value);
+}
+
+function getColomboHour(value: Date): number {
+  return Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Colombo",
+      hour: "2-digit",
+      hour12: false
+    }).format(value)
+  );
+}
+
+export async function createDueChequeDepositReminders(): Promise<{ success: boolean; error?: string }> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!(access.profile.role === "admin" || access.profile.role === "manager")) {
+    return { success: true };
+  }
+
+  const now = new Date();
+  if (getColomboHour(now) < 8) {
+    return { success: true };
+  }
+  const todayColombo = getColomboDateKey(now);
+
+  const { data: candidates, error: candidatesError } = await adminClient
+    .from("collections")
+    .select("id, invoice_id, cheque_deposit_date, invoice:invoices(invoice_number, customer:customers(name))")
+    .eq("payment_type", "cheque")
+    .in("status", ["pending", "validated"])
+    .not("cheque_deposit_date", "is", null)
+    .returns<DueChequeReminderCandidate[]>();
+
+  if (candidatesError) {
+    return { success: false, error: candidatesError.message };
+  }
+
+  const dueRows = (candidates ?? []).filter((row) => {
+    if (!row.cheque_deposit_date) return false;
+    const depositDate = new Date(row.cheque_deposit_date);
+    if (Number.isNaN(depositDate.getTime())) return false;
+    return getColomboDateKey(depositDate) === todayColombo;
+  });
+
+  if (dueRows.length === 0) {
+    return { success: true };
+  }
+
+  const { data: existingReminders, error: existingError } = await adminClient
+    .from("notifications")
+    .select("message")
+    .eq("recipient_id", access.profile.id)
+    .eq("type", "cheque_deposit_reminder");
+
+  if (existingError) {
+    return { success: false, error: existingError.message };
+  }
+
+  const existingMessages = new Set((existingReminders ?? []).map((row) => (row as { message: string }).message));
+  const notifications = dueRows
+    .map((row) => {
+      const customerName = row.invoice?.customer?.name ?? "Unknown customer";
+      const message = `Cheque collection for invoice #${row.invoice?.invoice_number ?? "-"} (${customerName}) is due for deposit today. Ref ${row.id.slice(0, 8)}.`;
+      return {
+        recipient_id: access.profile.id,
+        title: "Cheque deposit reminder",
+        message,
+        type: "cheque_deposit_reminder",
+        invoice_id: row.invoice_id,
+        created_by: access.profile.id
+      };
+    })
+    .filter((row) => !existingMessages.has(row.message));
+
+  if (notifications.length === 0) {
+    return { success: true };
+  }
+
+  const { error: insertError } = await adminClient.from("notifications").insert(notifications);
+  if (insertError) {
+    return { success: false, error: insertError.message };
+  }
+
+  revalidatePath("/notifications");
+  return { success: true };
 }
 
 function buildDueDate(issuedAt: string): string {
@@ -795,37 +897,6 @@ export async function recordCollection(input: RecordCollectionInput): Promise<Ac
 
       if (customerUpdateError) {
         return { success: false, error: customerUpdateError.message };
-      }
-    }
-  }
-
-  if (paymentType === "cheque" && chequeDepositDate) {
-    const { data: managers, error: managerError } = await adminClient
-      .from("users_profile")
-      .select("id")
-      .in("role", ["admin", "manager"]);
-
-    if (managerError) {
-      return { success: false, error: managerError.message };
-    }
-
-    const customerName = customer?.name ?? "Unknown customer";
-
-    if (managers && managers.length > 0) {
-      const depositDateLabel = chequeDepositDate.toLocaleDateString("en-CA");
-      const notifications = managers.map((manager) => ({
-        recipient_id: manager.id,
-        title: "Cheque deposit reminder",
-        message: `Cheque collection for invoice #${invoice.invoice_number} (${customerName ?? "Unknown customer"}) is due for deposit on ${depositDateLabel}.`,
-        type: "cheque_deposit_reminder",
-        invoice_id: invoice.id,
-        created_by: access.profile.id,
-        created_at: chequeDepositDate.toISOString()
-      }));
-
-      const { error: notificationError } = await adminClient.from("notifications").insert(notifications);
-      if (notificationError) {
-        return { success: false, error: notificationError.message };
       }
     }
   }

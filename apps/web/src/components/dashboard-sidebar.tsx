@@ -20,6 +20,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { createDueChequeDepositReminders } from "@/app/actions/collections";
 import { Sidebar, type SidebarItem } from "@/components/ui/sidebar";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
@@ -75,6 +76,7 @@ export function DashboardSidebar({ isAdmin, isManager, user }: DashboardSidebarP
       } = await supabase.auth.getUser();
 
       if (!authUser) return 0;
+      await createDueChequeDepositReminders();
 
       const { count, error } = await supabase
         .from("notifications")
