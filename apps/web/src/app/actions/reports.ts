@@ -407,6 +407,7 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         .from("invoices")
         .select("id, quotation_number, created_at, total_amount, payment_method, status, customer:customers(name)")
         .eq("invoice_kind", "quotation")
+        .in("status", ["approved", "issued", "paid"])
         .gte("created_at", fromIso)
         .lte("created_at", toIso)
         .order("quotation_number", { ascending: false });

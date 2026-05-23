@@ -501,7 +501,9 @@ export async function getInvoiceDetail(
     .from("invoices")
     .select("id, invoice_number, created_at, total_amount, payment_method, status")
     .eq("customer_id", invoiceData.customer_id)
-    .neq("status", "rejected")
+    .eq("invoice_kind", "invoice")
+    .eq("payment_method", "credit")
+    .in("status", ["approved", "issued", "paid"])
     .order("created_at", { ascending: false });
 
   const invoiceIds = (customerInvoices ?? []).map((row) => row.id);
@@ -647,31 +649,54 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
         ? "paid"
         : "approved";
 
-  let quotationNumber: number | null = null;
-  if (invoiceKind === "quotation") {
-    try {
-      quotationNumber = await getNextQuotationNumber();
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : "Failed to generate quotation number" };
+  const isQuotationNumberConflict = (error: { code?: string; message?: string } | null | undefined) => {
+    if (!error) return false;
+    if (error.code === "23505") return true;
+    return Boolean(error.message && error.message.includes("quotation_number"));
+  };
+
+  let invoice: { id: string; invoice_number: number } | null = null;
+  let invoiceError: { code?: string; message?: string } | null = null;
+  const maxAttempts = invoiceKind === "quotation" ? 3 : 1;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    let quotationNumber: number | null = null;
+    if (invoiceKind === "quotation") {
+      try {
+        quotationNumber = await getNextQuotationNumber();
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : "Failed to generate quotation number" };
+      }
+    }
+
+    const { data, error } = await adminClient
+      .from("invoices")
+      .insert({
+        invoice_kind: invoiceKind,
+        quotation_number: quotationNumber,
+        customer_id,
+        issued_by: access.profile.id,
+        total_amount,
+        payment_method,
+        status,
+        notes: notes || null
+      })
+      .select("id, invoice_number")
+      .single();
+
+    if (!error && data) {
+      invoice = data as { id: string; invoice_number: number };
+      invoiceError = null;
+      break;
+    }
+
+    invoiceError = error as { code?: string; message?: string } | null;
+    if (!(invoiceKind === "quotation" && isQuotationNumberConflict(invoiceError) && attempt < maxAttempts - 1)) {
+      break;
     }
   }
 
-  const { data: invoice, error: invoiceError } = await adminClient
-    .from("invoices")
-    .insert({
-      invoice_kind: invoiceKind,
-      quotation_number: quotationNumber,
-      customer_id,
-      issued_by: access.profile.id,
-      total_amount,
-      payment_method,
-      status,
-      notes: notes || null
-    })
-    .select("id, invoice_number")
-    .single();
-
-  if (invoiceError || !invoice) {
+  if (!invoice) {
     return { success: false, error: invoiceError?.message || "Failed to create invoice" };
   }
 

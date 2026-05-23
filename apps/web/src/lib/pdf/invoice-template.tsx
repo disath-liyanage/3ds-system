@@ -117,7 +117,7 @@ export function InvoiceTemplate({ invoice, items, companyName }: InvoiceTemplate
           <View style={styles.totalsLeft}>
             {(invoice as { payment_method?: string }).payment_method === "credit" ? (
               <Text style={styles.note}>
-                Cheques to be written infavor of : SANULA PAINTS HUB (PVT)LTD & CROSSED as A/C PAYEE ONLY
+                Cheques to be written in favor of : SANULA PAINTS HUB (PVT)LTD & CROSSED as A/C PAYEE ONLY
               </Text>
             ) : null}
           </View>

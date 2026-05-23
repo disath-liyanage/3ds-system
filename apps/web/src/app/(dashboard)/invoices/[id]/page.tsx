@@ -247,7 +247,7 @@ export default function InvoiceDetailsPage() {
         </Table>
 
         <div className="mt-1 mb-2 text-sm">
-          Cheques to be written infavor of :
+          Cheques to be written in favor of :
           <br />
           <strong>SANULA PAINTS HUB (PVT)LTD &amp; CROSSED</strong> as <strong>A/C PAYEE ONLY</strong>
         </div>
@@ -295,7 +295,7 @@ export default function InvoiceDetailsPage() {
                   <TableHead className="py-0 text-center bg-transparent border-r border-black">Invoice Date</TableHead>
                   <TableHead className="py-0 text-center bg-transparent border-r border-black">Invoice No</TableHead>
                   <TableHead className="py-0 text-center bg-transparent border-r border-black">Net Amount</TableHead>
-                  <TableHead className="py-0 text-center bg-transparent border-r border-black">Creddit Amount</TableHead>
+                  <TableHead className="py-0 text-center bg-transparent border-r border-black">Credit Amount</TableHead>
                   <TableHead className="py-0 text-center bg-transparent border-r border-black">Settled Amount</TableHead>
                   <TableHead className="py-0 text-center bg-transparent">Due Amount</TableHead>
                 </TableRow>
