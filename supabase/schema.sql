@@ -113,6 +113,10 @@ create table if not exists public.invoices (
   invoice_number bigint not null unique default nextval('public.invoice_number_seq'),
   invoice_kind text not null default 'invoice' check (invoice_kind in ('invoice', 'quotation')),
   quotation_number bigint unique,
+  constraint invoices_quotation_number_kind_chk check (
+    (invoice_kind = 'quotation' and quotation_number is not null)
+    or (invoice_kind = 'invoice' and quotation_number is null)
+  ),
   order_id uuid references public.orders (id),
   customer_id uuid not null references public.customers (id),
   issued_by uuid not null references public.users_profile (id),

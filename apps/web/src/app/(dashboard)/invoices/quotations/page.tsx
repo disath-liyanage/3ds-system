@@ -21,7 +21,8 @@ import { formatDate } from "@/lib/utils";
 
 export default function QuotationsPage() {
   const { user, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
-  const { data: quotations, isLoading: isQuotationsLoading, isError, error } = useQuotations();
+  const canViewQuotations = user?.role === "admin" || user?.role === "manager";
+  const { data: quotations, isLoading: isQuotationsLoading, isError, error } = useQuotations(canViewQuotations);
   const router = useRouter();
   const searchParams = useSearchParams();
 
