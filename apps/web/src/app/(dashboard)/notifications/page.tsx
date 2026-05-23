@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
+import { createDueChequeDepositReminders } from "@/app/actions/collections";
 import { approvePendingCustomer, markNotificationRead, removePendingCustomer } from "@/app/actions/customers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,6 +66,7 @@ export default function NotificationsPage() {
       } = await supabase.auth.getUser();
 
       if (!user) return [];
+      await createDueChequeDepositReminders();
 
       const { data, error } = await supabase
         .from("notifications")

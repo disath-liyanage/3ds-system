@@ -349,13 +349,13 @@ export default function CollectionsPage() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Invoice #</TableHead>
+            <TableHead>Invoice</TableHead>
             <TableHead>Customer</TableHead>
             <TableHead>Remaining</TableHead>
-            <TableHead>Due Date</TableHead>
+            <TableHead>Due</TableHead>
             <TableHead>Sales Rep</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Settled At</TableHead>
+            <TableHead>Settled</TableHead>
             <TableHead>Action</TableHead>
           </TableRow>
         </TableHeader>
