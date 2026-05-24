@@ -280,6 +280,12 @@ export default function EditReceiveNotePage() {
       }),
     [watchedItems]
   );
+  const grandTotal = useMemo(
+    () => itemSummaries.reduce((sum, item) => sum + item.qty * item.cost, 0),
+    [itemSummaries]
+  );
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("en-LK", { style: "currency", currency: "LKR", maximumFractionDigits: 2 }).format(value);
 
   const handleAddItem = async () => {
     setAddAttempted(true);
@@ -549,6 +555,7 @@ export default function EditReceiveNotePage() {
             Delete GRN
           </Button>
         </div>
+        <div className="text-right text-base font-semibold">Total Amount: {formatCurrency(grandTotal)}</div>
       </form>
     </section>
   );

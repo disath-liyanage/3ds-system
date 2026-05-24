@@ -13,7 +13,7 @@ const RECEIVE_NOTES_QUERY_KEY = ["receive-notes"] as const;
 async function listReceiveNotes(supabase: ReturnType<typeof createClient>): Promise<ReceiveNote[]> {
   const { data, error } = await supabase
     .from("receive_notes")
-    .select("id, rn_number, invoice_number, supplier_name, notes, created_at")
+    .select("id, rn_number, invoice_number, supplier_name, notes, created_at, receive_note_items(qty, unit_cost)")
     .order("created_at", { ascending: false });
 
   if (error) throw error;

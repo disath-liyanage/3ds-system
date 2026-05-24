@@ -180,6 +180,7 @@ export interface ReceiveNote {
   received_by: string;
   notes: string | null;
   created_at: string;
+  receive_note_items?: Array<Pick<ReceiveNoteItem, "qty" | "unit_cost">> | null;
 }
 
 export interface ReceiveNoteItem {
