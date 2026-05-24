@@ -368,8 +368,6 @@ export async function listInvoices(
     return { success: false, error: "You do not have permission to view invoices" };
   }
 
-  const supabase = createClient();
-
   const page = Math.max(1, Number(params.page ?? 1));
   const pageSize = Math.max(1, Number(params.pageSize ?? 50));
   const from = (page - 1) * pageSize;
