@@ -1515,6 +1515,7 @@ function DuplicateProductDialog({ open, onOpenChange, product, onChooseRename, o
       open={open}
       onOpenChange={onOpenChange}
       title="Product already exists"
+      showBottomClose={false}
       description={
         product
           ? `${product.name} already exists. Do you want to change the name or add another size to the existing product?`
