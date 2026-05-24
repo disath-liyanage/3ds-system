@@ -2,19 +2,20 @@
 
 import { useQuery } from "@tanstack/react-query";
 
-import { listInvoices, type InvoiceListRow } from "@/app/actions/invoices";
+import { listInvoices, type InvoiceListRow, type ListInvoicesParams } from "@/app/actions/invoices";
 
 export type InvoiceRow = InvoiceListRow;
+export type InvoicesPageResult = { rows: InvoiceRow[]; total: number };
 
 export const INVOICES_QUERY_KEY = ["invoices"];
 
-export function useInvoices() {
-  return useQuery<InvoiceRow[]>({
-    queryKey: INVOICES_QUERY_KEY,
+export function useInvoices(params: ListInvoicesParams) {
+  return useQuery<InvoicesPageResult>({
+    queryKey: [...INVOICES_QUERY_KEY, params],
     queryFn: async () => {
-      const result = await listInvoices();
+      const result = await listInvoices(params);
       if (!result.success) throw new Error(result.error || "Failed to load invoices");
-      return result.data ?? [];
+      return { rows: result.data ?? [], total: result.total ?? 0 };
     },
     refetchOnWindowFocus: true,
     refetchOnMount: "always"
