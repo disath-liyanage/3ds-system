@@ -193,7 +193,12 @@ export default function ReceiveNotesPage() {
           <div className="grid grid-cols-1 gap-4 rounded-md border border-border bg-muted/30 p-4 md:grid-cols-2 xl:grid-cols-3">
             <div className="relative space-y-1" ref={datePickerRef}>
               <label className="text-xs font-semibold text-muted-foreground">Date range</label>
-              <Button type="button" variant="outline" onClick={() => setIsDatePickerOpen((prev) => !prev)}>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => setIsDatePickerOpen((prev) => !prev)}
+              >
                 {dateRangeLabel}
               </Button>
               {isDatePickerOpen ? (
