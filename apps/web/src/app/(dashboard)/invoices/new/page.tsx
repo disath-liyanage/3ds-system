@@ -468,6 +468,12 @@ export default function NewInvoicePage() {
     await queryClient.invalidateQueries({ queryKey: ["invoices"] });
     await queryClient.invalidateQueries({ queryKey: ["quotations"] });
     await queryClient.invalidateQueries({ queryKey: ["products"] });
+    const createdInvoiceId = "invoice_id" in result ? result.invoice_id : undefined;
+    if (!editId && !draftId && createdInvoiceId) {
+      router.push(`/invoices/${createdInvoiceId}`);
+      return;
+    }
+
     router.push(isQuotationMode ? "/invoices/quotations" : "/invoices");
   };
 
