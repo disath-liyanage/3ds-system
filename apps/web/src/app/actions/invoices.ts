@@ -13,6 +13,10 @@ type ActionResult = {
   message?: string;
 };
 
+type CreateInvoiceActionResult = ActionResult & {
+  invoice_id?: string;
+};
+
 type ReturnActionResult = ActionResult & {
   return_invoice_id?: string;
 };
@@ -627,7 +631,7 @@ export async function getInvoiceDetail(
   return { success: true, data: result };
 }
 
-export async function createInvoice(input: InvoiceInput): Promise<ActionResult> {
+export async function createInvoice(input: InvoiceInput): Promise<CreateInvoiceActionResult> {
   const access = await getCurrentUserProfile();
   if ("error" in access) return { success: false, error: access.error };
 
@@ -824,6 +828,7 @@ export async function createInvoice(input: InvoiceInput): Promise<ActionResult> 
 
   return {
     success: true,
+    invoice_id: invoice.id,
     message:
       status === "pending_approval"
         ? "Invoice request submitted. Admins and managers were notified for approval."
