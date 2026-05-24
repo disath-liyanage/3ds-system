@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { DayPicker, type DateRange } from "react-day-picker";
+import { ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -141,7 +142,7 @@ export default function ReceiveNotesPage() {
 
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">GRN</h1>
           <p className="text-sm text-muted-foreground">GRN log from suppliers.</p>
@@ -158,64 +159,83 @@ export default function ReceiveNotesPage() {
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="w-full max-w-sm">
-          <Input placeholder="Search GRNs..." value={query} onChange={(event) => setQuery(event.target.value)} />
-        </div>
-        <Button type="button" variant="ghost" onClick={() => setFiltersOpen((prev) => !prev)}>
-          {filtersOpen ? "Hide filters" : "Show filters"}
-        </Button>
-        <Button type="button" variant="outline" onClick={handleResetFilters} disabled={!hasFilters}>
-          Reset filters
-        </Button>
-      </div>
-
-      {filtersOpen ? (
-        <div className="grid gap-3 rounded-md border border-border bg-muted/20 p-3 md:grid-cols-3">
-          <div className="relative space-y-1" ref={datePickerRef}>
-            <label className="text-xs font-semibold text-muted-foreground">Date range</label>
-            <Button type="button" variant="outline" onClick={() => setIsDatePickerOpen((prev) => !prev)}>
-              {dateRangeLabel}
+      <div className="flex flex-col gap-3 rounded-md border border-border bg-white p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-1 items-center gap-3">
+            <Input
+              placeholder="Search GRNs..."
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="lg:max-w-md"
+            />
+            {hasFilters ? <span className="text-xs text-muted-foreground">Filters active</span> : null}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="ghost" onClick={() => setFiltersOpen((prev) => !prev)}>
+              <span className="flex items-center gap-2">
+                <ChevronRight
+                  className={
+                    filtersOpen
+                      ? "h-4 w-4 rotate-90 transition-transform"
+                      : "h-4 w-4 rotate-0 transition-transform"
+                  }
+                />
+                {filtersOpen ? "Hide filters" : "Show filters"}
+              </span>
             </Button>
-            {isDatePickerOpen ? (
-              <div className="absolute left-0 top-12 z-20 rounded-md border border-border bg-white p-2 shadow-lg">
-                <DayPicker mode="range" selected={dateRange} onSelect={setDateRange} numberOfMonths={2} />
-              </div>
-            ) : null}
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-muted-foreground">GRN id range</label>
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="number"
-                placeholder="From"
-                value={grnRangeFrom}
-                onChange={(event) => setGrnRangeFrom(event.target.value)}
-              />
-              <Input type="number" placeholder="To" value={grnRangeTo} onChange={(event) => setGrnRangeTo(event.target.value)} />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-muted-foreground">Total invoice range</label>
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="From"
-                value={amountRangeFrom}
-                onChange={(event) => setAmountRangeFrom(event.target.value)}
-              />
-              <Input
-                type="number"
-                step="0.01"
-                placeholder="To"
-                value={amountRangeTo}
-                onChange={(event) => setAmountRangeTo(event.target.value)}
-              />
-            </div>
+            <Button variant={hasFilters ? "default" : "outline"} size="sm" onClick={handleResetFilters} disabled={!hasFilters}>
+              Reset
+            </Button>
           </div>
         </div>
-      ) : null}
+
+        {filtersOpen ? (
+          <div className="grid grid-cols-1 gap-4 rounded-md border border-border bg-muted/30 p-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="relative space-y-1" ref={datePickerRef}>
+              <label className="text-xs font-semibold text-muted-foreground">Date range</label>
+              <Button type="button" variant="outline" onClick={() => setIsDatePickerOpen((prev) => !prev)}>
+                {dateRangeLabel}
+              </Button>
+              {isDatePickerOpen ? (
+                <div className="absolute left-0 top-12 z-20 rounded-md border border-border bg-white p-2 shadow-lg">
+                  <DayPicker mode="range" selected={dateRange} onSelect={setDateRange} numberOfMonths={2} />
+                </div>
+              ) : null}
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">GRN id range</label>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  type="number"
+                  placeholder="From"
+                  value={grnRangeFrom}
+                  onChange={(event) => setGrnRangeFrom(event.target.value)}
+                />
+                <Input type="number" placeholder="To" value={grnRangeTo} onChange={(event) => setGrnRangeTo(event.target.value)} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Total invoice range</label>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="From"
+                  value={amountRangeFrom}
+                  onChange={(event) => setAmountRangeFrom(event.target.value)}
+                />
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder="To"
+                  value={amountRangeTo}
+                  onChange={(event) => setAmountRangeTo(event.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       <Table>
         <TableHeader>
