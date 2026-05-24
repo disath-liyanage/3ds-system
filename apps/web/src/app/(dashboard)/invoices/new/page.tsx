@@ -983,6 +983,7 @@ export default function NewInvoicePage() {
                   open={isPriceModalOpen}
                   onOpenChange={setIsPriceModalOpen}
                   title="Select Price Bucket"
+                  showBottomClose={false}
                 >
                   <div className="py-2">
                     {isStockLoading ? (
