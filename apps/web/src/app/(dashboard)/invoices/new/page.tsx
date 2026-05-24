@@ -77,6 +77,7 @@ export default function NewInvoicePage() {
   const [invoiceNumber, setInvoiceNumber] = useState<number | null>(null);
   const [currentStatus, setCurrentStatus] = useState<string | null>(null);
   const [productSearchMode, setProductSearchMode] = useState<"all" | "name" | "price">("all");
+  const [openDetailsAfterSave, setOpenDetailsAfterSave] = useState(true);
 
   const {
     control,
@@ -85,6 +86,7 @@ export default function NewInvoicePage() {
     setValue,
     trigger,
     getValues,
+    reset,
     resetField,
     formState
   } = useForm<InvoiceForm>({
@@ -468,6 +470,23 @@ export default function NewInvoicePage() {
     await queryClient.invalidateQueries({ queryKey: ["invoices"] });
     await queryClient.invalidateQueries({ queryKey: ["quotations"] });
     await queryClient.invalidateQueries({ queryKey: ["products"] });
+
+    if (!editId && !draftId && !openDetailsAfterSave) {
+      reset({
+        customer_id: "",
+        payment_method: "credit",
+        notes: "",
+        draft: emptyDraft,
+        items: []
+      });
+      setInvoiceNumber(null);
+      setCurrentStatus(null);
+      setEditingIndex(null);
+      setAddAttempted(false);
+      setIsPriceModalOpen(false);
+      return;
+    }
+
     const createdInvoiceId = "invoice_id" in result ? result.invoice_id : undefined;
     if (!editId && !draftId && createdInvoiceId) {
       router.push(`/invoices/${createdInvoiceId}`);
@@ -780,7 +799,7 @@ export default function NewInvoicePage() {
 
             <div className="space-y-1 md:col-span-1">
               <label className="text-xs font-semibold text-muted-foreground">Payment Method</label>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
                   variant={watchedPaymentMethod === "credit" ? "default" : "outline"}
@@ -795,6 +814,16 @@ export default function NewInvoicePage() {
                 >
                   Cash
                 </Button>
+                {!editId && !draftId ? (
+                  <Button
+                    type="button"
+                    variant={openDetailsAfterSave ? "default" : "outline"}
+                    onClick={() => setOpenDetailsAfterSave((prev) => !prev)}
+                    className="ml-auto"
+                  >
+                    Open Details: {openDetailsAfterSave ? "On" : "Off"}
+                  </Button>
+                ) : null}
               </div>
               <input type="hidden" {...register("payment_method")} />
             </div>
