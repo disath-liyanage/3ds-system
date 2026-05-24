@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker, type DateRange } from "react-day-picker";
 
 import "react-day-picker/dist/style.css";
@@ -41,6 +41,7 @@ const statusOptions = [
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-LK", { style: "currency", currency: "LKR", maximumFractionDigits: 2 }).format(value);
+const PAGE_SIZE = 50;
 
 export default function CollectionsPage() {
   const searchParams = useSearchParams();
@@ -53,6 +54,7 @@ export default function CollectionsPage() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const [customerSearch, setCustomerSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("open");
   const [salesRepFilter, setSalesRepFilter] = useState("all");
   const [historyInvoiceId, setHistoryInvoiceId] = useState<string | null>(null);
@@ -183,6 +185,14 @@ export default function CollectionsPage() {
 
     return rows;
   }, [invoices, customerSearch, statusFilter, salesRepFilter, dateRange]);
+  const totalRows = filteredInvoices.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / PAGE_SIZE));
+  const startRow = totalRows === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const endRow = totalRows === 0 ? 0 : Math.min(page * PAGE_SIZE, totalRows);
+  const pagedInvoices = useMemo(
+    () => filteredInvoices.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filteredInvoices, page]
+  );
 
   const hasFilters =
     customerSearch !== "" ||
@@ -236,6 +246,10 @@ export default function CollectionsPage() {
       active = false;
     };
   }, [searchParams]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [customerSearch, statusFilter, salesRepFilter, dateRange?.from, dateRange?.to]);
 
   if (!isLoading && !canViewCollections) {
     return (
@@ -372,14 +386,14 @@ export default function CollectionsPage() {
                 Failed to load collections.
               </TableCell>
             </TableRow>
-          ) : filteredInvoices.length === 0 ? (
+          ) : pagedInvoices.length === 0 ? (
             <TableRow>
               <TableCell colSpan={8} className="text-sm text-muted-foreground">
                 No invoices match the current filters.
               </TableCell>
             </TableRow>
           ) : (
-            filteredInvoices.map((row) => (
+            pagedInvoices.map((row) => (
               <TableRow
                 key={row.id}
                 className={row.payment_status === "partially_paid" ? "hover:bg-muted/30" : undefined}
@@ -494,6 +508,27 @@ export default function CollectionsPage() {
           )}
         </TableBody>
       </Table>
+      <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+        <button
+          type="button"
+          onClick={() => setPage((prev) => prev - 1)}
+          aria-label="Previous page"
+          disabled={page <= 1 || isInvoicesLoading}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm transition hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span>{`Rows ${startRow} - ${endRow} of ${totalRows}`}</span>
+        <button
+          type="button"
+          onClick={() => setPage((prev) => prev + 1)}
+          aria-label="Next page"
+          disabled={page >= totalPages || isInvoicesLoading}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm transition hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
 
       <Dialog
         open={Boolean(historyInvoiceId)}
