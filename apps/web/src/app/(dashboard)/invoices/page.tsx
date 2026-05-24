@@ -16,12 +16,12 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useInvoices } from "@/hooks/useInvoices";
-import { useQuotations } from "@/hooks/useQuotations";
 import { formatDate } from "@/lib/utils";
+
+const PAGE_SIZE = 50;
 
 export default function InvoicesPage() {
   const { permissions, user, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
-  const { data: invoices, isLoading: isInvoicesLoading, isError, error } = useInvoices();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -35,9 +35,22 @@ export default function InvoicesPage() {
   const [maxTotal, setMaxTotal] = useState("");
   const [minInvoiceNo, setMinInvoiceNo] = useState("");
   const [maxInvoiceNo, setMaxInvoiceNo] = useState("");
+  const [page, setPage] = useState(1);
   const isAdminOrManager = user?.role === "admin" || user?.role === "manager";
-  const hasSearchQuery = customerSearch.trim().length > 0;
-  const { data: quotations } = useQuotations(Boolean(isAdminOrManager && hasSearchQuery));
+  const { data, isLoading: isInvoicesLoading, isError, error } = useInvoices({
+    page,
+    pageSize: PAGE_SIZE,
+    customerSearch: customerSearch.trim() || undefined,
+    status: statusFilter,
+    minTotal: minTotal === "" ? undefined : Number(minTotal),
+    maxTotal: maxTotal === "" ? undefined : Number(maxTotal),
+    minInvoiceNo: minInvoiceNo === "" ? undefined : Number(minInvoiceNo),
+    maxInvoiceNo: maxInvoiceNo === "" ? undefined : Number(maxInvoiceNo),
+    fromDate: dateRange?.from ? new Date(dateRange.from).toISOString() : undefined,
+    toDate: dateRange?.to
+      ? new Date(new Date(dateRange.to).setHours(23, 59, 59, 999)).toISOString()
+      : undefined
+  });
 
   const getStatusLabel = (status: string) => {
     if (status === "pending_approval") return "Pending approval";
@@ -74,76 +87,13 @@ export default function InvoicesPage() {
     setMaxInvoiceNo("");
   };
 
-  const filteredInvoices = useMemo(() => {
-    if (!invoices) return [];
-    const quotationCandidates = isAdminOrManager && hasSearchQuery ? quotations ?? [] : [];
-    let result = [...invoices, ...quotationCandidates];
+  const rows = data?.rows ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const startRow = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const endRow = total === 0 ? 0 : Math.min(page * PAGE_SIZE, total);
 
-    if (customerSearch) {
-      const lowerSearch = customerSearch.toLowerCase();
-      result = result.filter((inv) =>
-        inv.customer_name.toLowerCase().includes(lowerSearch) ||
-        String(inv.invoice_number).includes(lowerSearch) ||
-        `q${inv.quotation_number ?? ""}`.includes(lowerSearch)
-      );
-    }
-
-    if (dateRange?.from) {
-      const start = new Date(dateRange.from).getTime();
-      result = result.filter((inv) => new Date(inv.created_at).getTime() >= start);
-    }
-    if (dateRange?.to) {
-      const end = new Date(dateRange.to);
-      end.setHours(23, 59, 59, 999);
-      result = result.filter((inv) => new Date(inv.created_at).getTime() <= end.getTime());
-    }
-
-    if (statusFilter !== "all") {
-      if (statusFilter === "approved") {
-        result = result.filter((inv) => inv.status === "approved" || inv.status === "issued");
-      } else {
-        result = result.filter((inv) => inv.status === statusFilter);
-      }
-    }
-
-    if (minTotal) {
-      result = result.filter((inv) => inv.total_amount >= Number(minTotal));
-    }
-    if (maxTotal) {
-      result = result.filter((inv) => inv.total_amount <= Number(maxTotal));
-    }
-
-    if (minInvoiceNo) {
-      result = result.filter((inv) => (inv.quotation_number ?? inv.invoice_number) >= Number(minInvoiceNo));
-    }
-    if (maxInvoiceNo) {
-      result = result.filter((inv) => (inv.quotation_number ?? inv.invoice_number) <= Number(maxInvoiceNo));
-    }
-
-    return result;
-  }, [
-    invoices,
-    quotations,
-    isAdminOrManager,
-    hasSearchQuery,
-    customerSearch,
-    dateRange,
-    statusFilter,
-    minTotal,
-    maxTotal,
-    minInvoiceNo,
-    maxInvoiceNo
-  ]);
-
-  const sortedInvoices = useMemo(
-    () =>
-      [...filteredInvoices].sort(
-        (a, b) => (b.quotation_number ?? b.invoice_number) - (a.quotation_number ?? a.invoice_number)
-      ),
-    [filteredInvoices]
-  );
-
-  const handleRowClick = (row: (typeof sortedInvoices)[number]) => {
+  const handleRowClick = (row: (typeof rows)[number]) => {
     if (row.status === "draft") {
       router.push(`/invoices/new?draftId=${row.id}`);
       return;
@@ -178,6 +128,10 @@ export default function InvoicesPage() {
     });
     setFiltersOpen(true);
   }, [searchParams]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [customerSearch, dateRange?.from, dateRange?.to, statusFilter, minTotal, maxTotal, minInvoiceNo, maxInvoiceNo]);
 
   const dateRangeLabel = useMemo(() => {
     if (dateRange?.from && dateRange?.to) {
@@ -384,14 +338,14 @@ export default function InvoicesPage() {
                 Loading invoices...
               </TableCell>
             </TableRow>
-          ) : sortedInvoices.length === 0 ? (
+          ) : rows.length === 0 ? (
             <TableRow>
               <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
                 No invoices found matching criteria.
               </TableCell>
             </TableRow>
           ) : (
-            sortedInvoices.map((row) => (
+            rows.map((row) => (
               <TableRow
                 key={row.id}
                 onClick={() => handleRowClick(row)}
@@ -428,6 +382,20 @@ export default function InvoicesPage() {
           )}
         </TableBody>
       </Table>
+      <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+        <Button variant="outline" size="sm" onClick={() => setPage((prev) => prev - 1)} disabled={page <= 1 || isInvoicesLoading}>
+          {"<"}
+        </Button>
+        <span>{`Rows ${startRow} - ${endRow} of ${total}`}</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((prev) => prev + 1)}
+          disabled={page >= totalPages || isInvoicesLoading}
+        >
+          {">"}
+        </Button>
+      </div>
     </section>
   );
 }

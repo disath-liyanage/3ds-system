@@ -341,7 +341,22 @@ async function notifyInvoiceRequester(
   });
 }
 
-export async function listInvoices(): Promise<{ success: boolean; data?: InvoiceListRow[]; error?: string }> {
+export type ListInvoicesParams = {
+  page?: number;
+  pageSize?: number;
+  customerSearch?: string;
+  status?: string;
+  minTotal?: number;
+  maxTotal?: number;
+  minInvoiceNo?: number;
+  maxInvoiceNo?: number;
+  fromDate?: string;
+  toDate?: string;
+};
+
+export async function listInvoices(
+  params: ListInvoicesParams = {}
+): Promise<{ success: boolean; data?: InvoiceListRow[]; total?: number; error?: string }> {
   const access = await getCurrentUserProfile();
   if ("error" in access) return { success: false, error: access.error };
 
@@ -351,10 +366,16 @@ export async function listInvoices(): Promise<{ success: boolean; data?: Invoice
 
   const supabase = createClient();
 
+  const page = Math.max(1, Number(params.page ?? 1));
+  const pageSize = Math.max(1, Number(params.pageSize ?? 50));
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
   let query = adminClient
     .from("invoices")
     .select(
-      "id, invoice_number, quotation_number, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at, customer:customers(name), issuer:users_profile!invoices_issued_by_fkey(full_name)"
+      "id, invoice_number, quotation_number, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at, customer:customers(name), issuer:users_profile!invoices_issued_by_fkey(full_name)",
+      { count: "exact" }
     )
     .eq("invoice_kind", "invoice")
     .order("created_at", { ascending: false });
@@ -363,11 +384,43 @@ export async function listInvoices(): Promise<{ success: boolean; data?: Invoice
     query = query.or(`issued_by.eq.${access.profile.id},status.in.(approved,issued,paid)`);
   }
 
-  const { data, error } = await query;
+  if (params.customerSearch) {
+    const q = params.customerSearch.replace(/[%_]/g, "\\$&");
+    query = query.or(
+      `customer.name.ilike.%${q}%,invoice_number.ilike.%${q}%`
+    );
+  }
+  if (params.status && params.status !== "all") {
+    if (params.status === "approved") {
+      query = query.in("status", ["approved", "issued"]);
+    } else {
+      query = query.eq("status", params.status);
+    }
+  }
+  if (typeof params.minTotal === "number" && Number.isFinite(params.minTotal)) {
+    query = query.gte("total_amount", params.minTotal);
+  }
+  if (typeof params.maxTotal === "number" && Number.isFinite(params.maxTotal)) {
+    query = query.lte("total_amount", params.maxTotal);
+  }
+  if (typeof params.minInvoiceNo === "number" && Number.isFinite(params.minInvoiceNo)) {
+    query = query.gte("invoice_number", params.minInvoiceNo);
+  }
+  if (typeof params.maxInvoiceNo === "number" && Number.isFinite(params.maxInvoiceNo)) {
+    query = query.lte("invoice_number", params.maxInvoiceNo);
+  }
+  if (params.fromDate) {
+    query = query.gte("created_at", params.fromDate);
+  }
+  if (params.toDate) {
+    query = query.lte("created_at", params.toDate);
+  }
+
+  const { data, error, count } = await query.range(from, to);
 
   if (error) return { success: false, error: error.message };
 
-  let rows = (data ?? []).map((row: any) => {
+  const rows = (data ?? []).map((row: any) => {
     const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
     const issuer = Array.isArray(row.issuer) ? row.issuer[0] : row.issuer;
 
@@ -387,11 +440,7 @@ export async function listInvoices(): Promise<{ success: boolean; data?: Invoice
     } as InvoiceListRow;
   });
 
-  if (canViewAllInvoices(access.profile)) {
-    rows = rows.filter((row) => row.status !== "draft" || row.issued_by === access.profile.id);
-  }
-
-  return { success: true, data: rows };
+  return { success: true, data: rows, total: count ?? 0 };
 }
 
 export async function listQuotations(): Promise<{ success: boolean; data?: InvoiceListRow[]; error?: string }> {

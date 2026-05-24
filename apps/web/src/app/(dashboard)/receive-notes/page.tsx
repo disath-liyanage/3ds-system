@@ -16,8 +16,11 @@ import { formatDate } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import "react-day-picker/dist/style.css";
 
+const PAGE_SIZE = 50;
+
 export default function ReceiveNotesPage() {
   const router = useRouter();
+  const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
@@ -30,7 +33,17 @@ export default function ReceiveNotesPage() {
   const { permissions, isLoading } = useCurrentUserPermissions();
   const canManageReceiveNotes = permissions?.canManageReceiveNotes ?? false;
   const canViewReceiveNotes = permissions?.canViewReceiveNotes ?? false;
-  const { data: receiveNotes, isLoading: isReceiveNotesLoading } = useReceiveNotes();
+  const { data, isLoading: isReceiveNotesLoading } = useReceiveNotes({
+    page,
+    pageSize: PAGE_SIZE,
+    query: query.trim() || undefined,
+    grnFrom: grnRangeFrom === "" ? undefined : Number(grnRangeFrom),
+    grnTo: grnRangeTo === "" ? undefined : Number(grnRangeTo),
+    amountFrom: amountRangeFrom === "" ? undefined : Number(amountRangeFrom),
+    amountTo: amountRangeTo === "" ? undefined : Number(amountRangeTo),
+    fromDate: dateRange?.from ? new Date(dateRange.from).toISOString() : undefined,
+    toDate: dateRange?.to ? new Date(new Date(dateRange.to).setHours(23, 59, 59, 999)).toISOString() : undefined
+  });
 
   const normalizeNumber = (value: unknown) => {
     const parsed = Number(value);
@@ -52,55 +65,19 @@ export default function ReceiveNotesPage() {
 
   const notesWithTotals = useMemo(
     () =>
-      (receiveNotes ?? []).map((row) => ({
+      (data?.rows ?? []).map((row) => ({
         ...row,
         total_amount: (row.receive_note_items ?? []).reduce(
           (sum, item) => sum + normalizeNumber(item.qty) * normalizeNumber(item.unit_cost),
           0
         )
       })),
-    [receiveNotes]
+    [data?.rows]
   );
-
-  const filtered = useMemo(() => {
-    let rows = notesWithTotals;
-    if (query) {
-      const q = query.toLowerCase();
-      rows = rows.filter((row) =>
-        `${row.rn_number} ${row.invoice_number} ${row.supplier_name}`.toLowerCase().includes(q)
-      );
-    }
-
-    const grnFrom = Number(grnRangeFrom);
-    const grnTo = Number(grnRangeTo);
-    if (grnRangeFrom !== "" && Number.isFinite(grnFrom)) {
-      rows = rows.filter((row) => row.rn_number >= grnFrom);
-    }
-    if (grnRangeTo !== "" && Number.isFinite(grnTo)) {
-      rows = rows.filter((row) => row.rn_number <= grnTo);
-    }
-
-    const amountFrom = Number(amountRangeFrom);
-    const amountTo = Number(amountRangeTo);
-    if (amountRangeFrom !== "" && Number.isFinite(amountFrom)) {
-      rows = rows.filter((row) => row.total_amount >= amountFrom);
-    }
-    if (amountRangeTo !== "" && Number.isFinite(amountTo)) {
-      rows = rows.filter((row) => row.total_amount <= amountTo);
-    }
-
-    if (dateRange?.from) {
-      const start = new Date(dateRange.from).getTime();
-      rows = rows.filter((row) => new Date(row.created_at).getTime() >= start);
-    }
-    if (dateRange?.to) {
-      const end = new Date(dateRange.to);
-      end.setHours(23, 59, 59, 999);
-      rows = rows.filter((row) => new Date(row.created_at).getTime() <= end.getTime());
-    }
-
-    return rows;
-  }, [amountRangeFrom, amountRangeTo, dateRange, grnRangeFrom, grnRangeTo, notesWithTotals, query]);
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const startRow = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const endRow = total === 0 ? 0 : Math.min(page * PAGE_SIZE, total);
 
   const hasFilters =
     query !== "" ||
@@ -130,6 +107,10 @@ export default function ReceiveNotesPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDatePickerOpen]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, dateRange?.from, dateRange?.to, grnRangeFrom, grnRangeTo, amountRangeFrom, amountRangeTo]);
 
   if (!isLoading && !canViewReceiveNotes) {
     return (
@@ -259,14 +240,14 @@ export default function ReceiveNotesPage() {
                 Loading GRNs...
               </TableCell>
             </TableRow>
-          ) : filtered.length === 0 ? (
+          ) : notesWithTotals.length === 0 ? (
             <TableRow>
               <TableCell colSpan={5} className="text-sm text-muted-foreground">
                 No GRNs found.
               </TableCell>
             </TableRow>
           ) : (
-            filtered.map((row) => (
+            notesWithTotals.map((row) => (
               <TableRow 
                 key={row.id}
                 className="cursor-pointer transition hover:bg-muted/50"
@@ -289,6 +270,15 @@ export default function ReceiveNotesPage() {
           )}
         </TableBody>
       </Table>
+      <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+        <Button variant="outline" size="sm" onClick={() => setPage((prev) => prev - 1)} disabled={page <= 1 || isReceiveNotesLoading}>
+          {"<"}
+        </Button>
+        <span>{`Rows ${startRow} - ${endRow} of ${total}`}</span>
+        <Button variant="outline" size="sm" onClick={() => setPage((prev) => prev + 1)} disabled={page >= totalPages || isReceiveNotesLoading}>
+          {">"}
+        </Button>
+      </div>
     </section>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 
 import {
@@ -41,9 +41,11 @@ type CustomerRow = {
 const CUSTOMERS_QUERY_KEY = ["customers"] as const;
 const NOTIFICATIONS_QUERY_KEY = ["notifications"] as const;
 const NOTIFICATIONS_UNREAD_QUERY_KEY = ["notifications-unread-count"] as const;
+const PAGE_SIZE = 50;
 
 export default function CustomersPage() {
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [areaFilter, setAreaFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | CustomerRow["status"]>("all");
@@ -93,15 +95,27 @@ export default function CustomersPage() {
   });
 
   const customersQuery = useQuery({
-    queryKey: CUSTOMERS_QUERY_KEY,
+    queryKey: [...CUSTOMERS_QUERY_KEY, { page, query, areaFilter, statusFilter, balanceFilter }],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const from = (page - 1) * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+      let q = supabase
         .from("customers")
-        .select("id, name, phone, address, area, credit_limit, balance, status, created_by, sales_rep_id")
+        .select("id, name, phone, address, area, credit_limit, balance, status, created_by, sales_rep_id", { count: "exact" })
         .order("created_at", { ascending: false });
+      if (query.trim()) {
+        const search = query.trim().replace(/[%_]/g, "\\$&");
+        q = q.or(`name.ilike.%${search}%,phone.ilike.%${search}%,area.ilike.%${search}%`);
+      }
+      if (areaFilter) q = q.eq("area", areaFilter);
+      if (statusFilter !== "all") q = q.eq("status", statusFilter);
+      if (balanceFilter === "with_balance") q = q.gt("balance", 0);
+      if (balanceFilter === "zero_balance") q = q.eq("balance", 0);
+      if (balanceFilter === "credit_balance") q = q.lt("balance", 0);
+      const { data, error, count } = await q.range(from, to);
 
       if (error) throw new Error(error.message);
-      return (data || []) as CustomerRow[];
+      return { rows: (data || []) as CustomerRow[], total: count ?? 0 };
     }
   });
 
@@ -131,41 +145,18 @@ export default function CustomersPage() {
     [areasQuery.data]
   );
 
-  const filtered = useMemo(() => {
-    let rows = customersQuery.data || [];
-    const normalizedQuery = query.toLowerCase();
-
-    if (normalizedQuery) {
-      rows = rows.filter((customer) =>
-        `${customer.name} ${customer.phone} ${customer.area || ""}`.toLowerCase().includes(normalizedQuery)
-      );
-    }
-
-    if (areaFilter) {
-      rows = rows.filter((customer) => (customer.area || "") === areaFilter);
-    }
-
-    if (statusFilter !== "all") {
-      rows = rows.filter((customer) => customer.status === statusFilter);
-    }
-
-    if (balanceFilter === "with_balance") {
-      rows = rows.filter((customer) => Number(customer.balance) > 0);
-    } else if (balanceFilter === "zero_balance") {
-      rows = rows.filter((customer) => Number(customer.balance) === 0);
-    } else if (balanceFilter === "credit_balance") {
-      rows = rows.filter((customer) => Number(customer.balance) < 0);
-    }
-
-    return rows;
-  }, [customersQuery.data, query, areaFilter, statusFilter, balanceFilter]);
+  const filtered = customersQuery.data?.rows || [];
+  const total = customersQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const startRow = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const endRow = total === 0 ? 0 : Math.min(page * PAGE_SIZE, total);
 
   const hasFilters = areaFilter !== "" || statusFilter !== "all" || balanceFilter !== "all";
 
   const canViewCustomers = permissions?.canViewCustomers || permissions?.canManageCustomers;
   const canAddCustomers = Boolean(permissions?.canAddCustomers);
   const isAdminOrManager = user?.role === "admin" || user?.role === "manager";
-  const selectedCustomer = (customersQuery.data || []).find((customer) => customer.id === selectedCustomerId) || null;
+  const selectedCustomer = filtered.find((customer) => customer.id === selectedCustomerId) || null;
   const isOwnPendingSalesRepCustomer = Boolean(
     user?.role === "sales_rep" &&
       selectedCustomer?.status === "pending_approval" &&
@@ -183,7 +174,12 @@ export default function CustomersPage() {
     setAreaFilter("");
     setStatusFilter("all");
     setBalanceFilter("all");
+    setPage(1);
   };
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, areaFilter, statusFilter, balanceFilter]);
 
   if (!isLoading && !canViewCustomers) {
     return (
@@ -461,6 +457,20 @@ export default function CustomersPage() {
           ))}
         </TableBody>
       </Table>
+      <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+        <Button variant="outline" size="sm" onClick={() => setPage((prev) => prev - 1)} disabled={page <= 1 || customersQuery.isLoading}>
+          {"<"}
+        </Button>
+        <span>{`Rows ${startRow} - ${endRow} of ${total}`}</span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setPage((prev) => prev + 1)}
+          disabled={page >= totalPages || customersQuery.isLoading}
+        >
+          {">"}
+        </Button>
+      </div>
 
       <Dialog
         open={Boolean(selectedCustomerId)}

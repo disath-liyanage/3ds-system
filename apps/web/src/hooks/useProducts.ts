@@ -15,14 +15,64 @@ import { useRealtimeInvalidate } from "@/hooks/useRealtimeInvalidate";
 
 const PRODUCTS_QUERY_KEY = ["products"] as const;
 
-async function listProducts(supabase: ReturnType<typeof createClient>): Promise<Product[]> {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .order("created_at", { ascending: false });
+export type ProductsParams = {
+  page?: number;
+  pageSize?: number;
+  query?: string;
+  statusFilter?: string;
+  departmentFilter?: string;
+  categoryFilter?: string;
+  minPrice?: number;
+  maxPrice?: number;
+};
 
+export type ProductsPageResult = {
+  rows: Product[];
+  total: number;
+};
+
+async function listProducts(supabase: ReturnType<typeof createClient>): Promise<Product[]> {
+  const { data, error } = await supabase.from("products").select("*").order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []) as Product[];
+}
+
+async function listProductsPage(supabase: ReturnType<typeof createClient>, params: ProductsParams): Promise<ProductsPageResult> {
+  const page = Math.max(1, Number(params.page ?? 1));
+  const pageSize = Math.max(1, Number(params.pageSize ?? 50));
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = supabase
+    .from("products")
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false });
+
+  if (params.query) {
+    const q = params.query.replace(/[%_]/g, "\\$&");
+    query = query.or(`name.ilike.%${q}%,category.ilike.%${q}%,unit.ilike.%${q}%`);
+  }
+  if (params.departmentFilter && params.departmentFilter !== "all") query = query.ilike("category", `${params.departmentFilter} / %`);
+  if (params.categoryFilter && params.categoryFilter !== "all") query = query.ilike("category", `% / ${params.categoryFilter}%`);
+  if (typeof params.minPrice === "number" && Number.isFinite(params.minPrice)) query = query.gte("price", params.minPrice);
+  if (typeof params.maxPrice === "number" && Number.isFinite(params.maxPrice)) query = query.lte("price", params.maxPrice);
+
+  const { data, error, count } = await query.range(from, to);
+  if (error) throw error;
+
+  let rows = (data ?? []) as Product[];
+  if (params.statusFilter && params.statusFilter !== "all") {
+    rows = rows.filter((product) => {
+      const stock = Number(product.stock_qty ?? 0);
+      const threshold = Number(product.low_stock_threshold ?? 0);
+      if (params.statusFilter === "in_stock") return stock > threshold;
+      if (params.statusFilter === "out_of_stock") return stock <= 0;
+      if (params.statusFilter === "low_stock") return stock > 0 && stock <= threshold;
+      return true;
+    });
+  }
+
+  return { rows, total: count ?? 0 };
 }
 
 export function useProducts() {
@@ -87,4 +137,14 @@ export function useProducts() {
     updateProduct,
     deleteProduct
   };
+}
+
+export function usePaginatedProducts(params: ProductsParams) {
+  const supabase = useMemo(() => createClient(), []);
+  return useQuery({
+    queryKey: [...PRODUCTS_QUERY_KEY, params],
+    queryFn: () => listProductsPage(supabase, params),
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always"
+  });
 }

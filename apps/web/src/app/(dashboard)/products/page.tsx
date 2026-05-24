@@ -12,7 +12,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
-import { useProducts } from "@/hooks/useProducts";
+import { usePaginatedProducts, useProducts } from "@/hooks/useProducts";
 import { useProductStockByPrice } from "@/hooks/useProductStockByPrice";
 import { categoryOptions } from "@/lib/product-category-options";
 import { toast } from "@/lib/toast";
@@ -1531,6 +1531,8 @@ function DuplicateProductDialog({ open, onOpenChange, product, onChooseRename, o
   );
 }
 
+const PAGE_SIZE = 50;
+
 export default function ProductsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1558,10 +1560,26 @@ export default function ProductsPage() {
   const [minPrice, setMinPrice] = useState("");
   const [maxPrice, setMaxPrice] = useState("");
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [page, setPage] = useState(1);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
 
   const canManageProducts = permissions?.canManageProducts ?? false;
   const canAddProducts = canManageProducts;
+  const pagedProductsQuery = usePaginatedProducts({
+    page,
+    pageSize: PAGE_SIZE,
+    query: query.trim() || undefined,
+    statusFilter,
+    departmentFilter,
+    categoryFilter,
+    minPrice: minPrice === "" ? undefined : Number(minPrice),
+    maxPrice: maxPrice === "" ? undefined : Number(maxPrice)
+  });
+  const pagedProducts = pagedProductsQuery.data?.rows ?? [];
+  const totalProducts = pagedProductsQuery.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalProducts / PAGE_SIZE));
+  const startRow = totalProducts === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const endRow = totalProducts === 0 ? 0 : Math.min(page * PAGE_SIZE, totalProducts);
 
   const hasFilters =
     statusFilter !== "all" ||
@@ -1576,6 +1594,7 @@ export default function ProductsPage() {
     setCategoryFilter("all");
     setMinPrice("");
     setMaxPrice("");
+    setPage(1);
   };
 
   const departmentFilterOptions = useMemo(() => {
@@ -1629,39 +1648,7 @@ export default function ProductsPage() {
   }, [searchParams]);
 
   const sortedProducts = useMemo(() => {
-    let list = [...products];
-
-    if (query) {
-      const q = query.toLowerCase();
-      list = list.filter((p) => `${p.name} ${p.category} ${p.unit}`.toLowerCase().includes(q));
-    }
-
-    if (statusFilter !== "all") {
-      list = list.filter((product) => {
-        const status = getStockStatus(product.stock_qty, product.low_stock_threshold).label;
-        if (statusFilter === "in_stock") return status === "In Stock";
-        if (statusFilter === "out_of_stock") return status === "Out of Stock";
-        if (statusFilter === "low_stock") return status === "Low Stock";
-        return true;
-      });
-    }
-
-    if (departmentFilter !== "all") {
-      list = list.filter((product) => splitCategory(product.category).department === departmentFilter);
-    }
-
-    if (categoryFilter !== "all") {
-      list = list.filter((product) => splitCategory(product.category).category === categoryFilter);
-    }
-
-    if (minPrice !== "") {
-      list = list.filter((product) => toNumber(product.price) >= Number(minPrice));
-    }
-
-    if (maxPrice !== "") {
-      list = list.filter((product) => toNumber(product.price) <= Number(maxPrice));
-    }
-
+    let list = [...pagedProducts];
     if (!sortState) {
       return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
@@ -1687,7 +1674,11 @@ export default function ProductsPage() {
           return 0;
       }
     });
-  }, [products, sortState, query, statusFilter, departmentFilter, categoryFilter, minPrice, maxPrice]);
+  }, [pagedProducts, sortState]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [query, statusFilter, departmentFilter, categoryFilter, minPrice, maxPrice]);
 
   const handleSort = (key: SortKey) => {
     setSortState((prev) => {
@@ -2154,6 +2145,15 @@ export default function ProductsPage() {
               )}
             </TableBody>
           </Table>
+          <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+            <Button variant="outline" size="sm" onClick={() => setPage((prev) => prev - 1)} disabled={page <= 1 || pagedProductsQuery.isLoading}>
+              {"<"}
+            </Button>
+            <span>{`Rows ${startRow} - ${endRow} of ${totalProducts}`}</span>
+            <Button variant="outline" size="sm" onClick={() => setPage((prev) => prev + 1)} disabled={page >= totalPages || pagedProductsQuery.isLoading}>
+              {">"}
+            </Button>
+          </div>
         </div>
       )}
 
