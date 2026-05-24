@@ -10,5 +10,8 @@
   },
   "devDependencies": {
     "typescript": "^5.4.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["unrs-resolver"]
   }
 }
