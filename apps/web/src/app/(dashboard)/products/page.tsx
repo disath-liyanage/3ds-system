@@ -4,7 +4,7 @@ import type { FormEvent } from "react";
 import type { Product } from "@paintdist/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -2146,13 +2146,25 @@ export default function ProductsPage() {
             </TableBody>
           </Table>
           <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-            <Button variant="outline" size="sm" onClick={() => setPage((prev) => prev - 1)} disabled={page <= 1 || pagedProductsQuery.isLoading}>
-              {"<"}
-            </Button>
+            <button
+              type="button"
+              onClick={() => setPage((prev) => prev - 1)}
+              aria-label="Previous page"
+              disabled={page <= 1 || pagedProductsQuery.isLoading}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm transition hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
             <span>{`Rows ${startRow} - ${endRow} of ${totalProducts}`}</span>
-            <Button variant="outline" size="sm" onClick={() => setPage((prev) => prev + 1)} disabled={page >= totalPages || pagedProductsQuery.isLoading}>
-              {">"}
-            </Button>
+            <button
+              type="button"
+              onClick={() => setPage((prev) => prev + 1)}
+              aria-label="Next page"
+              disabled={page >= totalPages || pagedProductsQuery.isLoading}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm transition hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
         </div>
       )}

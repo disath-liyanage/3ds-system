@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
-import { ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker, type DateRange } from "react-day-picker";
 
 import "react-day-picker/dist/style.css";
@@ -383,18 +383,25 @@ export default function InvoicesPage() {
         </TableBody>
       </Table>
       <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-        <Button variant="outline" size="sm" onClick={() => setPage((prev) => prev - 1)} disabled={page <= 1 || isInvoicesLoading}>
-          {"<"}
-        </Button>
-        <span>{`Rows ${startRow} - ${endRow} of ${total}`}</span>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setPage((prev) => prev + 1)}
-          disabled={page >= totalPages || isInvoicesLoading}
+        <button
+          type="button"
+          onClick={() => setPage((prev) => prev - 1)}
+          aria-label="Previous page"
+          disabled={page <= 1 || isInvoicesLoading}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm transition hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
         >
-          {">"}
-        </Button>
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span>{`Rows ${startRow} - ${endRow} of ${total}`}</span>
+        <button
+          type="button"
+          onClick={() => setPage((prev) => prev + 1)}
+          aria-label="Next page"
+          disabled={page >= totalPages || isInvoicesLoading}
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm transition hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
       </div>
     </section>
   );
