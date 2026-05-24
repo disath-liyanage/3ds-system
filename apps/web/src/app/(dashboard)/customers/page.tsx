@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useMemo, useState } from "react";
+import { ChevronRight } from "lucide-react";
 
 import {
   approvePendingCustomer,
@@ -17,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Select } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useRealtimeInvalidate } from "@/hooks/useRealtimeInvalidate";
@@ -42,6 +44,10 @@ const NOTIFICATIONS_UNREAD_QUERY_KEY = ["notifications-unread-count"] as const;
 
 export default function CustomersPage() {
   const [query, setQuery] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [areaFilter, setAreaFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | CustomerRow["status"]>("all");
+  const [balanceFilter, setBalanceFilter] = useState<"all" | "with_balance" | "zero_balance" | "credit_balance">("all");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isAddAreaOpen, setIsAddAreaOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -99,13 +105,62 @@ export default function CustomersPage() {
     }
   });
 
-  const filtered = useMemo(
-    () =>
-      (customersQuery.data || []).filter((customer) =>
-        `${customer.name} ${customer.phone} ${customer.area || ""}`.toLowerCase().includes(query.toLowerCase())
-      ),
-    [customersQuery.data, query]
+  const statusOptions = useMemo(
+    () => [
+      { value: "all", label: "All statuses" },
+      { value: "active", label: "Approved" },
+      { value: "pending_approval", label: "Pending Approval" },
+      { value: "rejected", label: "Rejected" }
+    ],
+    []
   );
+  const balanceOptions = useMemo(
+    () => [
+      { value: "all", label: "All balances" },
+      { value: "with_balance", label: "With balance" },
+      { value: "zero_balance", label: "Zero balance" },
+      { value: "credit_balance", label: "Credit balance" }
+    ],
+    []
+  );
+  const areaOptions = useMemo(
+    () => [
+      { value: "", label: "All areas" },
+      ...(areasQuery.data || []).map((area) => ({ value: area.name, label: area.name }))
+    ],
+    [areasQuery.data]
+  );
+
+  const filtered = useMemo(() => {
+    let rows = customersQuery.data || [];
+    const normalizedQuery = query.toLowerCase();
+
+    if (normalizedQuery) {
+      rows = rows.filter((customer) =>
+        `${customer.name} ${customer.phone} ${customer.area || ""}`.toLowerCase().includes(normalizedQuery)
+      );
+    }
+
+    if (areaFilter) {
+      rows = rows.filter((customer) => (customer.area || "") === areaFilter);
+    }
+
+    if (statusFilter !== "all") {
+      rows = rows.filter((customer) => customer.status === statusFilter);
+    }
+
+    if (balanceFilter === "with_balance") {
+      rows = rows.filter((customer) => Number(customer.balance) > 0);
+    } else if (balanceFilter === "zero_balance") {
+      rows = rows.filter((customer) => Number(customer.balance) === 0);
+    } else if (balanceFilter === "credit_balance") {
+      rows = rows.filter((customer) => Number(customer.balance) < 0);
+    }
+
+    return rows;
+  }, [customersQuery.data, query, areaFilter, statusFilter, balanceFilter]);
+
+  const hasFilters = areaFilter !== "" || statusFilter !== "all" || balanceFilter !== "all";
 
   const canViewCustomers = permissions?.canViewCustomers || permissions?.canManageCustomers;
   const canAddCustomers = Boolean(permissions?.canAddCustomers);
@@ -123,6 +178,12 @@ export default function CustomersPage() {
   );
   const canRemoveApprovedSelected = Boolean(selectedCustomer?.status === "active" && isAdminOrManager);
   const isPendingSelected = selectedCustomer?.status === "pending_approval";
+
+  const handleResetFilters = () => {
+    setAreaFilter("");
+    setStatusFilter("all");
+    setBalanceFilter("all");
+  };
 
   if (!isLoading && !canViewCustomers) {
     return (
@@ -307,8 +368,65 @@ export default function CustomersPage() {
         </div>
       </header>
 
-      <div className="max-w-sm">
-        <Input placeholder="Search customers..." value={query} onChange={(event) => setQuery(event.target.value)} />
+      <div className="flex flex-col gap-3 rounded-md border border-border bg-white p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-1 items-center gap-3">
+            <Input
+              placeholder="Search customers..."
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="lg:max-w-md"
+            />
+            {hasFilters ? <span className="text-xs text-muted-foreground">Filters active</span> : null}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="ghost" onClick={() => setFiltersOpen((prev) => !prev)}>
+              <span className="flex items-center gap-2">
+                <ChevronRight
+                  className={
+                    filtersOpen
+                      ? "h-4 w-4 rotate-90 transition-transform"
+                      : "h-4 w-4 rotate-0 transition-transform"
+                  }
+                />
+                {filtersOpen ? "Hide filters" : "Show filters"}
+              </span>
+            </Button>
+            <Button variant={hasFilters ? "default" : "outline"} size="sm" onClick={handleResetFilters} disabled={!hasFilters}>
+              Reset
+            </Button>
+          </div>
+        </div>
+
+        {filtersOpen ? (
+          <div className="grid grid-cols-1 gap-4 rounded-md border border-border bg-muted/30 p-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Area</label>
+              <SearchableSelect
+                placeholder={areasQuery.isLoading ? "Loading areas..." : "Select area"}
+                options={areaOptions}
+                value={areaFilter}
+                onChange={setAreaFilter}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Balance</label>
+              <Select
+                options={balanceOptions}
+                value={balanceFilter}
+                onChange={(event) => setBalanceFilter(event.target.value as typeof balanceFilter)}
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-muted-foreground">Status</label>
+              <Select
+                options={statusOptions}
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}
+              />
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <Table>
