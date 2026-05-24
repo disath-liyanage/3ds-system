@@ -208,12 +208,12 @@ export default function InvoiceDetailsPage() {
         <Table className="border border-black" containerClassName="rounded-none border-0 bg-transparent">
           <TableHeader>
             <TableRow className="border-black border-b">
-              <TableHead className="py-0 text-center bg-transparent border-r border-black">Product</TableHead>
-              <TableHead className="py-0 text-center bg-transparent border-r border-black">Qty</TableHead>
-              <TableHead className="py-0 text-center bg-transparent border-r border-black">F QTY</TableHead>
-              <TableHead className="py-0 text-center bg-transparent border-r border-black">U Price</TableHead>
-              <TableHead className="py-0 text-center bg-transparent border-r border-l border-black">DSCNT</TableHead>
-              <TableHead className="py-0 text-center bg-transparent">Amount</TableHead>
+              <TableHead className="!py-0 text-center bg-transparent border-r border-black">Product</TableHead>
+              <TableHead className="!py-0 text-center bg-transparent border-r border-black">Qty</TableHead>
+              <TableHead className="!py-0 text-center bg-transparent border-r border-black">F QTY</TableHead>
+              <TableHead className="!py-0 text-center bg-transparent border-r border-black">U Price</TableHead>
+              <TableHead className="!py-0 text-center bg-transparent border-r border-l border-black">DSCNT</TableHead>
+              <TableHead className="!py-0 text-center bg-transparent">Amount</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -224,20 +224,20 @@ export default function InvoiceDetailsPage() {
 
               return (
                 <TableRow key={item.id} className="border-b border-black">
-                  <TableCell className={`py-0 font-medium border-r border-black border-b border-black ${firstRowTopBorder}`}>
+                  <TableCell className={`!py-0 font-medium border-r border-black border-b border-black ${firstRowTopBorder}`}>
                     {item.product_name} <span className="text-muted-foreground text-xs">({item.product_unit})</span>
                   </TableCell>
-                  <TableCell className={`py-0 text-right border-r border-black border-b border-black ${firstRowTopBorder}`}>{item.qty}</TableCell>
-                  <TableCell className={`py-0 text-right border-r border-black border-b border-black ${firstRowTopBorder}`}>{item.free_qty || 0}</TableCell>
-                  <TableCell className={`py-0 text-right border-r border-black border-b border-black ${firstRowTopBorder}`}>
+                  <TableCell className={`!py-0 text-right border-r border-black border-b border-black ${firstRowTopBorder}`}>{item.qty}</TableCell>
+                  <TableCell className={`!py-0 text-right border-r border-black border-b border-black ${firstRowTopBorder}`}>{item.free_qty || 0}</TableCell>
+                  <TableCell className={`!py-0 text-right border-r border-black border-b border-black ${firstRowTopBorder}`}>
                     {formatAmount(item.unit_price)}
                   </TableCell>
-                  <TableCell className={`py-0 text-right border-r border-l border-black border-b border-black ${firstRowTopBorder}`}>
+                  <TableCell className={`!py-0 text-right border-r border-l border-black border-b border-black ${firstRowTopBorder}`}>
                     {item.discount_type === "percent"
                       ? `${item.discount_value}%`
                       : formatAmount(Number(item.discount_value) || 0)}
                   </TableCell>
-                  <TableCell className={`py-0 text-right font-medium border-b border-black ${firstRowTopBorder}`}>
+                  <TableCell className={`!py-0 text-right font-medium border-b border-black ${firstRowTopBorder}`}>
                     {formatAmount(item.qty * effectiveUnitPrice)}
                   </TableCell>
                 </TableRow>
@@ -292,27 +292,27 @@ export default function InvoiceDetailsPage() {
             <Table className="border border-black" containerClassName="rounded-none border-0 bg-transparent">
               <TableHeader>
                 <TableRow className="border-black border-b">
-                  <TableHead className="py-0 text-center bg-transparent border-r border-black">Invoice Date</TableHead>
-                  <TableHead className="py-0 text-center bg-transparent border-r border-black">Invoice No</TableHead>
-                  <TableHead className="py-0 text-center bg-transparent border-r border-black">Net Amount</TableHead>
-                  <TableHead className="py-0 text-center bg-transparent border-r border-black">Credit Amount</TableHead>
-                  <TableHead className="py-0 text-center bg-transparent border-r border-black">Settled Amount</TableHead>
-                  <TableHead className="py-0 text-center bg-transparent">Due Amount</TableHead>
+                  <TableHead className="!py-0 text-center bg-transparent border-r border-black">Invoice Date</TableHead>
+                  <TableHead className="!py-0 text-center bg-transparent border-r border-black">Invoice No</TableHead>
+                  <TableHead className="!py-0 text-center bg-transparent border-r border-black">Net Amount</TableHead>
+                  <TableHead className="!py-0 text-center bg-transparent border-r border-black">Credit Amount</TableHead>
+                  <TableHead className="!py-0 text-center bg-transparent border-r border-black">Settled Amount</TableHead>
+                  <TableHead className="!py-0 text-center bg-transparent">Due Amount</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {outstandingRows.map((row, idx) => (
                   <TableRow key={row.id} className={`border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>
-                    <TableCell className={`py-0 border-r border-black border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>{new Date(row.created_at).toLocaleDateString("en-GB")}</TableCell>
-                    <TableCell className={`py-0 border-r border-black border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>
+                    <TableCell className={`!py-0 border-r border-black border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>{new Date(row.created_at).toLocaleDateString("en-GB")}</TableCell>
+                    <TableCell className={`!py-0 border-r border-black border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>
                       <Link href={`/invoices/${row.id}`} className="hover:underline">
                         {row.invoice_number}
                       </Link>
                     </TableCell>
-                    <TableCell className={`py-0 text-right border-r border-black border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>{formatAmount(row.net_amount)}</TableCell>
-                    <TableCell className={`py-0 text-right border-r border-black border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>{formatAmount(row.credit_amount)}</TableCell>
-                    <TableCell className={`py-0 text-right border-r border-black border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>{formatAmount(row.settled_amount)}</TableCell>
-                    <TableCell className={`py-0 text-right font-semibold border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>{formatAmount(row.due_amount)}</TableCell>
+                    <TableCell className={`!py-0 text-right border-r border-black border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>{formatAmount(row.net_amount)}</TableCell>
+                    <TableCell className={`!py-0 text-right border-r border-black border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>{formatAmount(row.credit_amount)}</TableCell>
+                    <TableCell className={`!py-0 text-right border-r border-black border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>{formatAmount(row.settled_amount)}</TableCell>
+                    <TableCell className={`!py-0 text-right font-semibold border-b border-black ${idx === 0 ? "border-t border-black" : ""}`}>{formatAmount(row.due_amount)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
