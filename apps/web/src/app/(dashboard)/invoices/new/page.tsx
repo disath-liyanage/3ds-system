@@ -65,7 +65,7 @@ export default function NewInvoicePage() {
   const searchParams = useSearchParams();
   const draftId = searchParams.get("draftId");
   const editId = searchParams.get("editId");
-  const isQuotationMode = searchParams.get("kind") === "quotation";
+  const initialQuotationMode = searchParams.get("kind") === "quotation";
   const { permissions, user, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
   const { data: products, isLoading: isProductsLoading } = useProducts();
   const { data: customers, isLoading: isCustomersLoading } = useCustomers();
@@ -78,6 +78,8 @@ export default function NewInvoicePage() {
   const [currentStatus, setCurrentStatus] = useState<string | null>(null);
   const [productSearchMode, setProductSearchMode] = useState<"all" | "name" | "price">("all");
   const [openDetailsAfterSave, setOpenDetailsAfterSave] = useState(true);
+  const [isQuotationRecord, setIsQuotationRecord] = useState(initialQuotationMode);
+  const isQuotationMode = initialQuotationMode || isQuotationRecord;
 
   const {
     control,
@@ -294,6 +296,7 @@ export default function NewInvoicePage() {
 
       setInvoiceNumber(result.data.invoice_number);
       setCurrentStatus(result.data.status);
+      setIsQuotationRecord(result.data.invoice_kind === "quotation");
 
       setValue("customer_id", result.data.customer_id, { shouldDirty: true });
       setValue("payment_method", result.data.payment_method as InvoiceForm["payment_method"], { shouldDirty: true });
@@ -354,6 +357,7 @@ export default function NewInvoicePage() {
 
       setInvoiceNumber(result.data.invoice_number);
       setCurrentStatus(result.data.status);
+      setIsQuotationRecord(result.data.invoice_kind === "quotation");
       setValue("customer_id", result.data.customer_id, { shouldDirty: true });
       setValue("payment_method", result.data.payment_method as InvoiceForm["payment_method"], { shouldDirty: true });
       setValue("notes", result.data.notes ?? "", { shouldDirty: true });
@@ -481,6 +485,7 @@ export default function NewInvoicePage() {
       });
       setInvoiceNumber(null);
       setCurrentStatus(null);
+      setIsQuotationRecord(initialQuotationMode);
       setEditingIndex(null);
       setAddAttempted(false);
       setIsPriceModalOpen(false);
