@@ -79,6 +79,8 @@ export const productSchema = z.object({
   category: z.string().min(1),
   unit: z.string().min(1),
   price: z.number(),
+  discount_type: z.enum(["percent", "amount"]),
+  discount_value: z.number().nonnegative(),
   stock_qty: z.number(),
   low_stock_threshold: z.number(),
   created_at: z.string()
