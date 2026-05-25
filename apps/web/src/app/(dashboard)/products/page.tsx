@@ -13,10 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { usePaginatedProducts, useProducts } from "@/hooks/useProducts";
-import { useProductStockByPrice } from "@/hooks/useProductStockByPrice";
 import { categoryOptions } from "@/lib/product-category-options";
 import { toast } from "@/lib/toast";
-import { updateProductGRNPrices, updateProductGRNStock } from "@/app/actions/update-grn-prices";
 
 function UnifiedSizeEditor({ 
   item, 
@@ -26,108 +24,23 @@ function UnifiedSizeEditor({
 }: { 
   item: ExistingSizeFormState; 
   priceIndex: number; 
-  handleExistingSizeChange: (id: string, field: "price" | "stock_qty" | "low_stock_threshold" | "unit", value: string) => void; 
+  handleExistingSizeChange: (id: string, field: "stock_qty" | "low_stock_threshold" | "unit", value: string) => void; 
   handleToggleRemoveSize: (id: string) => void; 
 }) {
-  const { data: stockByPrice, isLoading, refetch } = useProductStockByPrice(item.id.startsWith("new-") ? undefined : item.id);
-  const [editingPrice, setEditingPrice] = useState<Record<number, string>>({});
-  const [editingStock, setEditingStock] = useState<Record<number, string>>({});
-  const [isSaving, setIsSaving] = useState(false);
-
-  const handleSave = async (oldPrice: number) => {
-    setIsSaving(true);
-    let success = true;
-
-    const newPriceStr = editingPrice[oldPrice];
-    if (newPriceStr !== undefined) {
-      const newPrice = Number(newPriceStr);
-      if (!isNaN(newPrice) && newPrice !== oldPrice) {
-        const result = await updateProductGRNPrices([{ productId: item.id, oldSellingPrice: oldPrice, newSellingPrice: newPrice }]);
-        if (!result.success) {
-          toast({ title: "Failed to update price", description: result.error, variant: "error" });
-          success = false;
-        }
-      }
-    }
-
-    const newStockStr = editingStock[oldPrice];
-    if (newStockStr !== undefined) {
-      const newStock = Number(newStockStr);
-      const oldStock = stockByPrice?.find(r => r.selling_price === oldPrice)?.total_qty || 0;
-      if (!isNaN(newStock) && newStock !== oldStock) {
-        const targetPrice = newPriceStr && success ? Number(newPriceStr) : oldPrice;
-        const result = await updateProductGRNStock(item.id, targetPrice, newStock);
-        if (!result.success) {
-          toast({ title: "Failed to update stock", description: result.error, variant: "error" });
-          success = false;
-        }
-      }
-    }
-
-    if (success && (newPriceStr !== undefined || newStockStr !== undefined)) {
-      toast({ title: "Updated successfully", variant: "success" });
-      setEditingPrice(prev => { const n = {...prev}; delete n[oldPrice]; return n; });
-      setEditingStock(prev => { const n = {...prev}; delete n[oldPrice]; return n; });
-      await refetch();
-    }
-    
-    setIsSaving(false);
-  };
-
-  if (item.id.startsWith("new-") || (!isLoading && (!stockByPrice || stockByPrice.length === 0))) {
-    return (
-      <div className="rounded-md border border-border/50 bg-muted/30 p-3">
-        <div className="flex justify-between items-center mb-3">
-           <p className="text-sm font-medium">Price {priceIndex + 1}</p>
-           <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleToggleRemoveSize(item.id)}>
-            {item.isRemoved ? "Undo" : "Remove"}
-           </Button>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1">
-            <label htmlFor={`existing-product-price-${item.id}`} className="text-xs font-medium">Price in LKR</label>
-            <Input id={`existing-product-price-${item.id}`} required type="number" min={0} step="0.01" disabled={item.isRemoved} value={item.price} onChange={(event) => handleExistingSizeChange(item.id, "price", event.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <label htmlFor={`existing-product-stock-${item.id}`} className="text-xs font-medium">Stock Qty</label>
-            <Input id={`existing-product-stock-${item.id}`} required type="number" min={0} step="0.01" disabled={item.isRemoved} value={item.stock_qty} onChange={(event) => handleExistingSizeChange(item.id, "stock_qty", event.target.value)} />
-          </div>
+  return (
+    <div className="rounded-md border border-border/50 bg-muted/30 p-3">
+      <div className="flex justify-between items-center mb-3">
+         <p className="text-sm font-medium">Stock Entry {priceIndex + 1}</p>
+         <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleToggleRemoveSize(item.id)}>
+          {item.isRemoved ? "Undo" : "Remove"}
+         </Button>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1">
+          <label htmlFor={`existing-product-stock-${item.id}`} className="text-xs font-medium">Stock Qty</label>
+          <Input id={`existing-product-stock-${item.id}`} required type="number" min={0} step="0.01" disabled={item.isRemoved} value={item.stock_qty} onChange={(event) => handleExistingSizeChange(item.id, "stock_qty", event.target.value)} />
         </div>
       </div>
-    );
-  }
-
-  if (isLoading) return <div className="text-xs text-muted-foreground mt-2">Loading pricing...</div>;
-
-  return (
-    <div className="space-y-3">
-      {stockByPrice?.map((row, index) => {
-        const currentEditingPrice = editingPrice[row.selling_price] ?? row.selling_price.toString();
-        const currentEditingStock = editingStock[row.selling_price] ?? row.total_qty.toString();
-        const isChanged = currentEditingPrice !== row.selling_price.toString() || currentEditingStock !== row.total_qty.toString();
-
-        return (
-          <div key={row.selling_price} className="rounded-md border border-border/50 bg-muted/30 p-3">
-            <div className="flex justify-between items-center mb-3">
-               <p className="text-sm font-medium">Price {priceIndex + 1 + index}</p>
-               <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2 text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => handleToggleRemoveSize(item.id)}>
-                {item.isRemoved ? "Undo" : "Remove"}
-               </Button>
-            </div>
-            <div className="grid grid-cols-[1fr_1fr_auto] gap-3 items-end">
-              <div className="space-y-1">
-                <label className="text-xs font-medium">Price in LKR</label>
-                <Input className="bg-white text-xs h-9" type="number" min={0} step="0.01" disabled={item.isRemoved} value={currentEditingPrice} onChange={e => setEditingPrice(prev => ({...prev, [row.selling_price]: e.target.value}))} />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium">Stock Qty</label>
-                <Input className="bg-white text-xs h-9" type="number" min={0} step="0.01" disabled={item.isRemoved} value={currentEditingStock} onChange={e => setEditingStock(prev => ({...prev, [row.selling_price]: e.target.value}))} />
-              </div>
-              <Button type="button" size="sm" className="h-9" variant={isChanged ? "default" : "outline"} disabled={!isChanged || isSaving || item.isRemoved} onClick={() => handleSave(row.selling_price)}>Save</Button>
-            </div>
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -137,14 +50,14 @@ type ProductFormState = {
   category: string;
   subCategory: string;
   unit: string;
-  price: string;
+  discount_type: "percent" | "amount";
+  discount_value: string;
   stock_qty: string;
   low_stock_threshold: string;
 };
 
 type ProductSizeFormState = {
   unit: string;
-  price: string;
   stock_qty: string;
   low_stock_threshold: string;
 };
@@ -175,7 +88,8 @@ type ProductFormPayload = {
   name: string;
   category: string;
   unit: string;
-  price: number;
+  discount_type: "percent" | "amount";
+  discount_value: number;
   stock_qty: number;
   low_stock_threshold: number;
 };
@@ -217,14 +131,14 @@ const initialProductFormState: ProductFormState = {
   category: "",
   subCategory: "",
   unit: "",
-  price: "",
+  discount_type: "percent",
+  discount_value: "0",
   stock_qty: "0",
   low_stock_threshold: "10"
 };
 
 const initialProductSizeState: ProductSizeFormState = {
   unit: "",
-  price: "",
   stock_qty: "0",
   low_stock_threshold: "10"
 };
@@ -485,7 +399,8 @@ function toProductFormState(product: Product): ProductFormState {
     category,
     subCategory,
     unit: product.unit,
-    price: toNumber(product.price).toString(),
+    discount_type: product.discount_type === "percent" ? "percent" : "amount",
+    discount_value: toNumber(product.discount_value).toString(),
     stock_qty: toNumber(product.stock_qty).toString(),
     low_stock_threshold: toNumber(product.low_stock_threshold).toString()
   };
@@ -533,7 +448,6 @@ function ProductFormDialog({
       relatedProducts.map((item) => ({
         id: item.id,
         unit: item.unit,
-        price: toNumber(item.price).toString(),
         stock_qty: toNumber(item.stock_qty).toString(),
         low_stock_threshold: toNumber(item.low_stock_threshold).toString(),
         isRemoved: false,
@@ -626,19 +540,33 @@ function ProductFormDialog({
 
     if (isMultiSizeEdit) {
       const fallbackSize = existingSizes.find((item) => !item.isRemoved) || existingSizes[0];
+      const discountValueResult = parseNonNegativeNumber(form.discount_value, "Discount value");
+      if (!discountValueResult.ok) {
+        setSubmitError(discountValueResult.error);
+        return;
+      }
+      if (form.discount_type === "percent" && discountValueResult.value > 100) {
+        setSubmitError("Discount percentage cannot exceed 100");
+        return;
+      }
 
       payload = {
         name,
         category: composedCategory,
         unit: fallbackSize?.unit ?? unit,
-        price: toNumber(fallbackSize?.price ?? form.price),
+        discount_type: form.discount_type,
+        discount_value: discountValueResult.value,
         stock_qty: toNumber(fallbackSize?.stock_qty ?? form.stock_qty),
         low_stock_threshold: toNumber(fallbackSize?.low_stock_threshold ?? form.low_stock_threshold)
       };
     } else {
-      const priceResult = parseNonNegativeNumber(form.price, "Price");
-      if (!priceResult.ok) {
-        setSubmitError(priceResult.error);
+      const discountValueResult = parseNonNegativeNumber(form.discount_value, "Discount value");
+      if (!discountValueResult.ok) {
+        setSubmitError(discountValueResult.error);
+        return;
+      }
+      if (form.discount_type === "percent" && discountValueResult.value > 100) {
+        setSubmitError("Discount percentage cannot exceed 100");
         return;
       }
 
@@ -658,7 +586,8 @@ function ProductFormDialog({
         name,
         category: composedCategory,
         unit,
-        price: priceResult.value,
+        discount_type: form.discount_type,
+        discount_value: discountValueResult.value,
         stock_qty: stockResult.value,
         low_stock_threshold: thresholdResult.value
       };
@@ -703,9 +632,6 @@ function ProductFormDialog({
         }
         finalGroupUnits.add(finalUnit);
 
-        const extraPrice = parseNonNegativeNumber(size.price, `Extra size ${index + 1}: Price`);
-        if (!extraPrice.ok) { setSubmitError(extraPrice.error); return; }
-
         const extraStock = parseNonNegativeNumber(size.stock_qty, `Extra size ${index + 1}: Stock quantity`);
         if (!extraStock.ok) { setSubmitError(extraStock.error); return; }
 
@@ -714,7 +640,9 @@ function ProductFormDialog({
 
         extraPayloads.push({
           name, category: composedCategory, unit: extraUnit,
-          price: extraPrice.value, stock_qty: extraStock.value, low_stock_threshold: extraThreshold.value
+          discount_type: form.discount_type,
+          discount_value: toNumber(form.discount_value),
+          stock_qty: extraStock.value, low_stock_threshold: extraThreshold.value
         });
       }
 
@@ -728,9 +656,6 @@ function ProductFormDialog({
           continue;
         }
 
-        const priceResult = parseNonNegativeNumber(size.price, "Price");
-        if (!priceResult.ok) { setSubmitError(priceResult.error); return; }
-
         const stockResult = parseNonNegativeNumber(size.stock_qty, "Stock quantity");
         if (!stockResult.ok) { setSubmitError(stockResult.error); return; }
 
@@ -740,14 +665,18 @@ function ProductFormDialog({
         if (size.id.startsWith("new-")) {
           extraPayloads.push({
             name, category: composedCategory, unit: trimmedUnit,
-            price: priceResult.value, stock_qty: stockResult.value, low_stock_threshold: thresholdResult.value
+            discount_type: form.discount_type,
+            discount_value: toNumber(form.discount_value),
+            stock_qty: stockResult.value, low_stock_threshold: thresholdResult.value
           });
         } else {
           existingSizeEdits.push({
             id: size.id,
             payload: {
               name, category: composedCategory, unit: trimmedUnit,
-              price: priceResult.value, stock_qty: stockResult.value, low_stock_threshold: thresholdResult.value
+              discount_type: form.discount_type,
+              discount_value: toNumber(form.discount_value),
+              stock_qty: stockResult.value, low_stock_threshold: thresholdResult.value
             }
           });
         }
@@ -839,13 +768,12 @@ function ProductFormDialog({
     );
   };
 
-  const handleAddPriceToGroup = (groupKey: string, currentUnit: string) => {
+  const handleAddStockEntryToGroup = (groupKey: string, currentUnit: string) => {
     setExistingSizes((prev) => [
       ...prev,
       {
         id: `new-${Date.now()}-${Math.random()}`,
         unit: currentUnit,
-        price: "",
         stock_qty: "0",
         low_stock_threshold: "10",
         isRemoved: false,
@@ -863,8 +791,8 @@ function ProductFormDialog({
       title={isEditMode ? "Edit product" : "Add product"}
       description={
         isEditMode
-          ? "Update product details, pricing, and stock thresholds."
-          : "Add a new product with pricing and stock details."
+          ? "Update product details, discount, and stock thresholds."
+          : "Add a new product with discount and stock details."
       }
       maxWidthClassName="max-w-5xl"
       stickyHeader
@@ -925,6 +853,43 @@ function ProductFormDialog({
           </div>
         </div>
 
+        <div className="grid gap-3 md:grid-cols-12">
+          <div className="space-y-1 md:col-span-4">
+            <label htmlFor={`${mode}-product-discount-type`} className="text-sm font-medium">
+              Discount Type
+            </label>
+            <select
+              id={`${mode}-product-discount-type`}
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={form.discount_type}
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  discount_type: event.target.value === "percent" ? "percent" : "amount"
+                }))
+              }
+            >
+              <option value="percent">Percentage (%)</option>
+              <option value="amount">Fixed Amount (Rs.)</option>
+            </select>
+          </div>
+          <div className="space-y-1 md:col-span-4">
+            <label htmlFor={`${mode}-product-discount-value`} className="text-sm font-medium">
+              Discount Value
+            </label>
+            <Input
+              id={`${mode}-product-discount-value`}
+              required
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.discount_value}
+              onChange={(event) => setForm((prev) => ({ ...prev, discount_value: event.target.value }))}
+              placeholder={form.discount_type === "percent" ? "e.g. 10" : "e.g. 50"}
+            />
+          </div>
+        </div>
+
         {!isEditMode ? (
           <>
             <div className="grid gap-3 md:grid-cols-12">
@@ -938,21 +903,6 @@ function ProductFormDialog({
                   value={form.unit}
                   onChange={(event) => setForm((prev) => ({ ...prev, unit: event.target.value }))}
                   placeholder="e.g. can, litre, kg"
-                />
-              </div>
-
-              <div className="space-y-1 md:col-span-5">
-                <label htmlFor={`${mode}-product-price`} className="text-sm font-medium">
-                  Price in LKR
-                </label>
-                <Input
-                  id={`${mode}-product-price`}
-                  required
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={form.price}
-                  onChange={(event) => setForm((prev) => ({ ...prev, price: event.target.value }))}
                 />
               </div>
 
@@ -1035,7 +985,7 @@ function ProductFormDialog({
                       </div>
 
                       <div className="space-y-3 pt-2">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Prices \u0026 Stock for this size</p>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Stock for this size</p>
                         {sizes.map((item, priceIndex) => (
                           <UnifiedSizeEditor 
                             key={item.id} 
@@ -1052,9 +1002,9 @@ function ProductFormDialog({
                             variant="outline"
                             size="sm"
                             disabled={isAllRemoved}
-                            onClick={() => handleAddPriceToGroup(originalUnitKey, currentUnit)}
+                            onClick={() => handleAddStockEntryToGroup(originalUnitKey, currentUnit)}
                           >
-                            Add Price
+                            Add Stock Entry
                           </Button>
                         </div>
                       </div>
@@ -1103,20 +1053,6 @@ function ProductFormDialog({
                           value={size.unit}
                           onChange={(event) => handleExtraSizeChange(index, "unit", event.target.value)}
                           placeholder="e.g. 1L, 5L"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label htmlFor={`extra-product-price-${index}`} className="text-sm font-medium">
-                          Price in LKR
-                        </label>
-                        <Input
-                          id={`extra-product-price-${index}`}
-                          required
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          value={size.price}
-                          onChange={(event) => handleExtraSizeChange(index, "price", event.target.value)}
                         />
                       </div>
                       <div className="space-y-1">
@@ -1225,6 +1161,8 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
   const [department, setDepartment] = useState("");
   const [category, setCategory] = useState("");
   const [subCategory, setSubCategory] = useState("");
+  const [discountType, setDiscountType] = useState<"percent" | "amount">("percent");
+  const [discountValue, setDiscountValue] = useState("0");
   const [sizes, setSizes] = useState<ProductSizeFormState[]>([initialProductSizeState]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1235,6 +1173,8 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
     setDepartment("");
     setCategory("");
     setSubCategory("");
+    setDiscountType("percent");
+    setDiscountValue("0");
     setSizes([initialProductSizeState]);
     setSubmitError(null);
     setIsSubmitting(false);
@@ -1294,6 +1234,15 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
       setSubmitError("Add at least one size");
       return;
     }
+    const discountValueResult = parseNonNegativeNumber(discountValue, "Discount value");
+    if (!discountValueResult.ok) {
+      setSubmitError(discountValueResult.error);
+      return;
+    }
+    if (discountType === "percent" && discountValueResult.value > 100) {
+      setSubmitError("Discount percentage cannot exceed 100");
+      return;
+    }
 
     const payloads: ProductFormPayload[] = [];
 
@@ -1302,12 +1251,6 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
 
       if (!unit) {
         setSubmitError(`Size ${index + 1}: Unit is required`);
-        return;
-      }
-
-      const priceResult = parseNonNegativeNumber(size.price, `Size ${index + 1}: Price`);
-      if (!priceResult.ok) {
-        setSubmitError(priceResult.error);
         return;
       }
 
@@ -1330,7 +1273,8 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
         name: trimmedName,
         category: composeCategory(trimmedDepartment, trimmedCategory, trimmedSubCategory),
         unit,
-        price: priceResult.value,
+        discount_type: discountType,
+        discount_value: discountValueResult.value,
         stock_qty: stockResult.value,
         low_stock_threshold: thresholdResult.value
       });
@@ -1362,7 +1306,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
       open={open}
       onOpenChange={handleOpenChange}
       title="Add product"
-      description="Add a product with one or more size and price variants."
+      description="Add a product with one or more size variants."
       maxWidthClassName="max-w-5xl"
       stickyHeader
       showBottomClose={false}
@@ -1425,9 +1369,41 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
           </div>
         </div>
 
+        <div className="grid gap-3 md:grid-cols-12">
+          <div className="space-y-1 md:col-span-4">
+            <label htmlFor="multi-product-discount-type" className="text-sm font-medium">
+              Discount Type
+            </label>
+            <select
+              id="multi-product-discount-type"
+              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              value={discountType}
+              onChange={(event) => setDiscountType(event.target.value === "percent" ? "percent" : "amount")}
+            >
+              <option value="percent">Percentage (%)</option>
+              <option value="amount">Fixed Amount (Rs.)</option>
+            </select>
+          </div>
+          <div className="space-y-1 md:col-span-4">
+            <label htmlFor="multi-product-discount-value" className="text-sm font-medium">
+              Discount Value
+            </label>
+            <Input
+              id="multi-product-discount-value"
+              required
+              type="number"
+              min={0}
+              step="0.01"
+              value={discountValue}
+              onChange={(event) => setDiscountValue(event.target.value)}
+              placeholder={discountType === "percent" ? "e.g. 10" : "e.g. 50"}
+            />
+          </div>
+        </div>
+
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold">Sizes & pricing</p>
+            <p className="text-sm font-semibold">Sizes & stock</p>
             <Button type="button" variant="outline" size="sm" onClick={handleAddSize}>
               Add size
             </Button>
@@ -1455,20 +1431,6 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
                       value={size.unit}
                       onChange={(event) => handleSizeChange(index, "unit", event.target.value)}
                       placeholder="e.g. 1L, 5L"
-                    />
-                  </div>
-                  <div className="space-y-1 md:col-span-5">
-                    <label htmlFor={`multi-product-price-${index}`} className="text-sm font-medium">
-                      Price in LKR
-                    </label>
-                    <Input
-                      id={`multi-product-price-${index}`}
-                      required
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={size.price}
-                      onChange={(event) => handleSizeChange(index, "price", event.target.value)}
                     />
                   </div>
                   <div className="space-y-1 md:col-span-4">

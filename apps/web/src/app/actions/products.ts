@@ -16,7 +16,8 @@ export type ProductInput = {
   name: string;
   category: string;
   unit: string;
-  price: number;
+  discount_type: "percent" | "amount";
+  discount_value: number;
   stock_qty: number;
   low_stock_threshold?: number;
 };
@@ -35,6 +36,8 @@ type NormalizedProductInput = {
   category: string;
   unit: string;
   price: number;
+  discount_type: "percent" | "amount";
+  discount_value: number;
   stock_qty: number;
   low_stock_threshold: number;
 };
@@ -122,8 +125,15 @@ function normalizeProductInput(data: ProductInput): { data?: NormalizedProductIn
   if (!category) return { error: "Category is required" };
   if (!unit) return { error: "Unit is required" };
 
-  const priceResult = parseNonNegativeNumber(data.price, "Price");
-  if (!priceResult.ok) return { error: priceResult.error };
+  if (data.discount_type !== "percent" && data.discount_type !== "amount") {
+    return { error: "Discount type must be percent or amount" };
+  }
+
+  const discountValueResult = parseNonNegativeNumber(data.discount_value, "Discount value");
+  if (!discountValueResult.ok) return { error: discountValueResult.error };
+  if (data.discount_type === "percent" && discountValueResult.value > 100) {
+    return { error: "Discount percentage cannot exceed 100" };
+  }
 
   const stockQtyResult = parseNonNegativeNumber(data.stock_qty, "Stock quantity");
   if (!stockQtyResult.ok) return { error: stockQtyResult.error };
@@ -136,7 +146,9 @@ function normalizeProductInput(data: ProductInput): { data?: NormalizedProductIn
       name,
       category,
       unit,
-      price: priceResult.value,
+      price: 0,
+      discount_type: data.discount_type,
+      discount_value: discountValueResult.value,
       stock_qty: stockQtyResult.value,
       low_stock_threshold: thresholdResult.value
     }

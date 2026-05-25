@@ -77,6 +77,8 @@ export interface Product {
   category: string;
   unit: string;
   price: number;
+  discount_type: "percent" | "amount";
+  discount_value: number;
   stock_qty: number;
   low_stock_threshold: number;
   created_at: string;
