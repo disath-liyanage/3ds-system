@@ -853,8 +853,8 @@ function ProductFormDialog({
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-12">
-          <div className="space-y-1 md:col-span-4">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1">
             <label htmlFor={`${mode}-product-discount-type`} className="text-sm font-medium">
               Discount Type
             </label>
@@ -873,7 +873,7 @@ function ProductFormDialog({
               <option value="amount">Fixed Amount (Rs.)</option>
             </select>
           </div>
-          <div className="space-y-1 md:col-span-4">
+          <div className="space-y-1">
             <label htmlFor={`${mode}-product-discount-value`} className="text-sm font-medium">
               Discount Value
             </label>
@@ -882,7 +882,7 @@ function ProductFormDialog({
               required
               type="number"
               min={0}
-              step="0.01"
+              step="1"
               value={form.discount_value}
               onChange={(event) => setForm((prev) => ({ ...prev, discount_value: event.target.value }))}
               placeholder={form.discount_type === "percent" ? "e.g. 10" : "e.g. 50"}
@@ -892,8 +892,8 @@ function ProductFormDialog({
 
         {!isEditMode ? (
           <>
-            <div className="grid gap-3 md:grid-cols-12">
-              <div className="space-y-1 md:col-span-3">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1">
                 <label htmlFor={`${mode}-product-unit`} className="text-sm font-medium">
                   Unit
                 </label>
@@ -906,7 +906,7 @@ function ProductFormDialog({
                 />
               </div>
 
-              <div className="space-y-1 md:col-span-4">
+              <div className="space-y-1">
                 <label htmlFor={`${mode}-product-threshold`} className="text-sm font-medium">
                   Low Stock Threshold
                 </label>
@@ -1369,8 +1369,8 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-12">
-          <div className="space-y-1 md:col-span-4">
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-1">
             <label htmlFor="multi-product-discount-type" className="text-sm font-medium">
               Discount Type
             </label>
@@ -1384,7 +1384,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
               <option value="amount">Fixed Amount (Rs.)</option>
             </select>
           </div>
-          <div className="space-y-1 md:col-span-4">
+          <div className="space-y-1">
             <label htmlFor="multi-product-discount-value" className="text-sm font-medium">
               Discount Value
             </label>
@@ -1420,8 +1420,8 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
                     </Button>
                   ) : null}
                 </div>
-                <div className="grid gap-3 md:grid-cols-12">
-                  <div className="space-y-1 md:col-span-3">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1">
                     <label htmlFor={`multi-product-unit-${index}`} className="text-sm font-medium">
                       Unit
                     </label>
@@ -1433,7 +1433,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
                       placeholder="e.g. 1L, 5L"
                     />
                   </div>
-                  <div className="space-y-1 md:col-span-4">
+                  <div className="space-y-1">
                     <label htmlFor={`multi-product-threshold-${index}`} className="text-sm font-medium">
                       Low Stock Threshold
                     </label>
