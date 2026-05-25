@@ -217,12 +217,18 @@ export default function NewInvoicePage() {
   }, []);
 
   const handleDraftProductChange = useCallback((productId: string) => {
+    const product = (products ?? []).find((item) => item.id === productId);
+    const productDiscountType = product?.discount_type === "amount" ? "amount" : "percent";
+    const productDiscountValue = Number(product?.discount_value) || 0;
+
     setValue("draft.product_id", productId, { shouldDirty: true, shouldValidate: true });
     setValue("draft.unit_price", undefined, { shouldDirty: true, shouldValidate: true });
     setValue("draft.unit_cost", undefined, { shouldDirty: true });
+    setValue("draft.discount_type", productDiscountType, { shouldDirty: true, shouldValidate: true });
+    setValue("draft.discount_value", productDiscountValue, { shouldDirty: true, shouldValidate: true });
     setIsPriceModalOpen(false);
     focusQtyField();
-  }, [setValue, focusQtyField]);
+  }, [focusQtyField, products, setValue]);
 
   const cycleProductSearchMode = useCallback(() => {
     setProductSearchMode((prev) => (prev === "all" ? "name" : prev === "name" ? "price" : "all"));
