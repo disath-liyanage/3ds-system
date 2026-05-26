@@ -788,7 +788,7 @@ function ProductFormDialog({
     <Dialog
       open={open}
       onOpenChange={handleOpenChange}
-      title={isEditMode ? "Edit product" : "Add product"}
+      title={isEditMode ? "Edit product" : "Add p roduct"}
       description={
         isEditMode
           ? "Update product details, discount, and stock thresholds."
@@ -1299,13 +1299,13 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
     handleOpenChange(false);
   };
 
-  const submitLabel = sizes.length > 1 ? "Add products" : "Add product";
+  const submitLabel = sizes.length > 1 ? "Add Products" : "Add Product";
 
   return (
     <Dialog
       open={open}
       onOpenChange={handleOpenChange}
-      title="Add product"
+      title="Add Product"
       description="Add a product with one or more size variants."
       maxWidthClassName="max-w-5xl"
       stickyHeader
