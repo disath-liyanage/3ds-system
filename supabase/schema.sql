@@ -53,6 +53,8 @@ create table if not exists public.products (
   category text not null,
   unit text not null,
   price numeric(12, 2) not null check (price >= 0),
+  discount_type text not null default 'percent' check (discount_type in ('percent', 'amount')),
+  discount_value numeric(12, 2) not null default 0 check (discount_value >= 0),
   stock_qty numeric(12, 2) not null default 0,
   low_stock_threshold numeric(12, 2) not null default 0,
   created_at timestamptz not null default now()

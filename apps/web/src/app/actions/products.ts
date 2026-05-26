@@ -16,6 +16,7 @@ export type ProductInput = {
   name: string;
   category: string;
   unit: string;
+  price?: number;
   discount_type: "percent" | "amount";
   discount_value: number;
   stock_qty: number;
@@ -116,7 +117,10 @@ function parseNonNegativeNumber(
   return { ok: true, value };
 }
 
-function normalizeProductInput(data: ProductInput): { data?: NormalizedProductInput; error?: string } {
+function normalizeProductInput(
+  data: ProductInput,
+  fallbackPrice: number
+): { data?: NormalizedProductInput; error?: string } {
   const name = data.name.trim();
   const category = data.category.trim();
   const unit = data.unit.trim();
@@ -138,6 +142,9 @@ function normalizeProductInput(data: ProductInput): { data?: NormalizedProductIn
   const stockQtyResult = parseNonNegativeNumber(data.stock_qty, "Stock quantity");
   if (!stockQtyResult.ok) return { error: stockQtyResult.error };
 
+  const resolvedPrice = Number.isFinite(data.price) ? (data.price as number) : fallbackPrice;
+  const priceResult = parseNonNegativeNumber(resolvedPrice, "Price");
+  if (!priceResult.ok) return { error: priceResult.error };
   const thresholdResult = parseNonNegativeNumber(data.low_stock_threshold ?? 10, "Low stock threshold");
   if (!thresholdResult.ok) return { error: thresholdResult.error };
 
@@ -146,7 +153,7 @@ function normalizeProductInput(data: ProductInput): { data?: NormalizedProductIn
       name,
       category,
       unit,
-      price: 0,
+      price: priceResult.value,
       discount_type: data.discount_type,
       discount_value: discountValueResult.value,
       stock_qty: stockQtyResult.value,
@@ -159,7 +166,7 @@ export async function createProduct(data: ProductInput): Promise<ActionResult> {
   const access = await requireManageProductsPermission();
   if ("error" in access) return { success: false, error: access.error };
 
-  const normalized = normalizeProductInput(data);
+  const normalized = normalizeProductInput(data, 0);
   if (!normalized.data) {
     return { success: false, error: normalized.error || "Invalid product data" };
   }
@@ -182,16 +189,17 @@ export async function updateProduct(id: string, data: ProductInput): Promise<Act
     return { success: false, error: "Product id is required" };
   }
 
-  const normalized = normalizeProductInput(data);
+  const { data: currentProduct } = await adminClient
+    .from("products")
+    .select("stock_qty, price")
+    .eq("id", id)
+    .maybeSingle();
+
+  const currentPrice = Number(currentProduct?.price) || 0;
+  const normalized = normalizeProductInput(data, currentPrice);
   if (!normalized.data) {
     return { success: false, error: normalized.error || "Invalid product data" };
   }
-
-  const { data: currentProduct } = await adminClient
-    .from("products")
-    .select("stock_qty")
-    .eq("id", id)
-    .maybeSingle();
 
   const stockBefore = Number(currentProduct?.stock_qty) || 0;
 
