@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 
@@ -48,6 +48,17 @@ type ReceiveNoteForm = {
   }>;
 };
 
+const draftFieldOrder = [
+  "draft.qty",
+  "draft.free_qty",
+  "draft.product_cost",
+  "draft.selling_price",
+  "draft.item_discount_percent",
+  "draft.item_discount_amount",
+  "draft.rep_sales_discount",
+  "draft.rep_collection"
+] as const;
+
 export default function NewReceiveNotePage() {
   const router = useRouter();
   const { permissions, isLoading } = useCurrentUserPermissions();
@@ -86,6 +97,26 @@ export default function NewReceiveNotePage() {
   const watchedDraft = useWatch({ control, name: "draft" });
   const draftErrors = formState.errors?.draft;
   const shouldValidateDraft = () => addAttempted || Boolean(getValues("draft.product_id"));
+  const handleDraftFieldEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter") return;
+
+    event.preventDefault();
+
+    const currentName = event.currentTarget.name;
+    const currentIndex = draftFieldOrder.indexOf(currentName as (typeof draftFieldOrder)[number]);
+    if (currentIndex === -1) return;
+
+    const nextFieldName = draftFieldOrder.slice(currentIndex + 1).find((fieldName) => {
+      const field = document.querySelector(`input[name="${fieldName}"]`) as HTMLInputElement | null;
+      return Boolean(field && !field.disabled);
+    });
+
+    if (!nextFieldName) return;
+
+    const nextField = document.querySelector(`input[name="${nextFieldName}"]`) as HTMLInputElement | null;
+    nextField?.focus();
+    nextField?.select();
+  };
   const costField = register("draft.product_cost", {
     validate: (value) =>
       shouldValidateDraft() && value === undefined ? "Cost is required" : true,
@@ -464,6 +495,7 @@ export default function NewReceiveNotePage() {
                       type="number"
                       step="1"
                       placeholder="Qty"
+                      onKeyDown={handleDraftFieldEnter}
                       {...register("draft.qty", {
                         validate: (value) =>
                           shouldValidateDraft() && value === undefined ? "Qty is required" : true,
@@ -480,6 +512,7 @@ export default function NewReceiveNotePage() {
                       type="number"
                       step="1"
                       placeholder="Free qty"
+                      onKeyDown={handleDraftFieldEnter}
                       {...register("draft.free_qty", {
                         setValueAs: (value) => (value === "" ? undefined : Number(value))
                       })}
@@ -493,6 +526,7 @@ export default function NewReceiveNotePage() {
                     type="number"
                     step="0.01"
                     placeholder="Cost"
+                    onKeyDown={handleDraftFieldEnter}
                     {...costField}
                     className={cn(
                       addAttempted && draftErrors?.product_cost ? "border-red-400 focus:ring-red-400/40" : ""
@@ -506,6 +540,7 @@ export default function NewReceiveNotePage() {
                     type="number"
                     step="0.01"
                     placeholder="Selling price"
+                    onKeyDown={handleDraftFieldEnter}
                     {...register("draft.selling_price", {
                       validate: (value) =>
                         shouldValidateDraft() && value === undefined
@@ -552,6 +587,7 @@ export default function NewReceiveNotePage() {
                         type="number"
                         step="0.01"
                         placeholder="Discount (%)"
+                        onKeyDown={handleDraftFieldEnter}
                         {...register("draft.item_discount_percent", {
                           setValueAs: (value) => (value === "" ? undefined : Number(value))
                         })}
@@ -561,6 +597,7 @@ export default function NewReceiveNotePage() {
                         type="text"
                         inputMode="decimal"
                         placeholder="Discount amount"
+                        onKeyDown={handleDraftFieldEnter}
                         value={watchedDraft?.item_discount_amount ?? ""}
                         onChange={(event) => {
                           const amountText = event.target.value;
@@ -586,6 +623,7 @@ export default function NewReceiveNotePage() {
                       type="number"
                       step="0.01"
                       placeholder="Sales rep discount"
+                      onKeyDown={handleDraftFieldEnter}
                       {...register("draft.rep_sales_discount", {
                         setValueAs: (value) => (value === "" ? undefined : Number(value))
                       })}
@@ -597,6 +635,7 @@ export default function NewReceiveNotePage() {
                       type="number"
                       step="0.01"
                       placeholder="Sales rep collection discount"
+                      onKeyDown={handleDraftFieldEnter}
                       {...register("draft.rep_collection", {
                         setValueAs: (value) => (value === "" ? undefined : Number(value))
                       })}
