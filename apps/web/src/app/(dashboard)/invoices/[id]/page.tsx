@@ -184,24 +184,76 @@ export default function InvoiceDetailsPage() {
         </div>
 
         <div className="grid grid-cols-[1.2fr_0.8fr] gap-4 text-sm mb-4">
-          <div className="space-y-0.5 border border-black px-2 py-1">
-            <p><span className="font-semibold">Customer Code &thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:  </span> {buildCustomerCode(invoice.customer_code || invoice.customer_id)}</p>
-            <p><span className="font-semibold">Customer Name &thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; :  </span> {invoice.customer_name}</p>
-            <p><span className="font-semibold">Customer Address&nbsp;&thinsp;&thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:  </span> {invoice.customer_address || "-"}</p>
-            <p><span className="font-semibold">Customer Contact No &thinsp;&thinsp;:  </span> {invoice.customer_phone || "-"}</p>
-            <p><span className="font-semibold">Total Outstanding &thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:  </span> {formatAmount(totalOutstandingAmount)}</p>
+          <div className="space-y-1 border border-black px-2 py-1">
+            <div className="grid grid-cols-[137px_10px_auto]">
+              <span className="font-semibold">Customer Code</span>
+              <span>:</span>
+              <span>{buildCustomerCode(invoice.customer_code || invoice.customer_id)}</span>
+            </div>
+            <div className="grid grid-cols-[137px_10px_auto]">
+              <span className="font-semibold">Customer Name</span>
+              <span>:</span>
+              <span>{invoice.customer_name}</span>
+            </div>
+            <div className="grid grid-cols-[137px_10px_auto]">
+              <span className="font-semibold">Customer Address</span>
+              <span>:</span>
+              <span>{invoice.customer_address || "-"}</span>
+            </div>
+            <div className="grid grid-cols-[137px_10px_auto]">
+              <span className="font-semibold">Customer Contact No</span>
+              <span>:</span>
+              <span>{invoice.customer_phone || "-"}</span>
+            </div>
+            <div className="grid grid-cols-[137px_10px_auto]">
+              <span className="font-semibold">Total Outstanding</span>
+              <span>:</span>
+              <span>{formatAmount(totalOutstandingAmount)}</span>
+            </div>
           </div>
-          <div className="space-y-0.5 border border-black px-2 py-1">
-            <p><span className="font-semibold">{isQuotation ? "Invoice Number :" : "Invoice Number :"}</span> {documentNumber}</p>
-            <p>
-              <span className="font-semibold">Invoice Date&thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span>{" "}
-              {createdDate.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit" })}{" "}
-              <span className="font-semibold"> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Time : </span>{" "}
-              {createdDate.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true })}
-            </p>
-            <p><span className="font-semibold">Sales Person&thinsp;&thinsp;&thinsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span> {invoice.sales_rep_name || "Unassigned"} {invoice.sales_rep_phone ? `(${invoice.sales_rep_phone})` : ""}</p>
-            <p><span className="font-semibold">Invoice Root&nbsp;&nbsp;&nbsp;&nbsp;&thinsp;&nbsp;&nbsp;&nbsp;:</span> {invoice.customer_route || "-"}</p>
-            <p><span className="font-semibold">Invoiced By&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span> {invoice.issued_by_name}</p>
+          <div className="space-y-1 border border-black px-2 py-1">
+            <div className="grid grid-cols-[102px_10px_auto]">
+              <span className="font-semibold">Invoice Number</span>
+              <span>:</span>
+              <span>{documentNumber}</span>
+            </div>
+            <div className="grid grid-cols-[102px_10px_auto]">
+              <span className="font-semibold">Invoice Date</span>
+              <span>:</span>
+
+              <span>
+                {createdDate.toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "2-digit",
+                  year: "2-digit",
+                })}
+
+                <span className="ml-6 font-semibold">Time :</span>
+
+                {" "}
+
+                {createdDate.toLocaleTimeString("en-US", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true,
+                })}
+              </span>
+            </div>
+            <div className="grid grid-cols-[102px_10px_auto]">
+              <span className="font-semibold">Sales Person</span>
+              <span>:</span>
+              <span>{invoice.sales_rep_name || "Unassigned"} {invoice.sales_rep_phone ? `(${invoice.sales_rep_phone})` : ""}</span>
+            </div>
+            <div className="grid grid-cols-[102px_10px_auto]">
+              <span className="font-semibold">Invoice Root</span>
+              <span>:</span>
+              <span>{invoice.customer_route || "-"}</span>
+            </div>
+            <div className="grid grid-cols-[102px_10px_auto]">
+              <span className="font-semibold">Invoiced By</span>
+              <span>:</span>
+              <span>{invoice.issued_by_name}</span>
+            </div>
           </div>
         </div>
 
