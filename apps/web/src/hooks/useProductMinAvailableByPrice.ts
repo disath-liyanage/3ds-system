@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 export type ProductMinAvailableByPrice = {
   price: number;
   stock: number;
+  hasGrnEntry: boolean;
 };
 
 const productMinAvailableByPriceKey = ["product-min-available-by-price"] as const;
@@ -22,10 +23,12 @@ function getSummedValue(row: any, primaryKey: string, fallbackKey: string): numb
 
 function buildMinAvailableMap(receivedRows: any[] | null | undefined, invoicedRows: any[] | null | undefined) {
   const byProductAndPrice = new Map<string, number>();
+  const productsWithGrn = new Set<string>();
 
   for (const row of receivedRows ?? []) {
     const productId = String((row as any).product_id || "");
     if (!productId) continue;
+    productsWithGrn.add(productId);
     const sellingPrice = Number((row as any).selling_price) || 0;
     const totalReceived =
       getSummedValue(row, "total_qty", "qty") + getSummedValue(row, "total_free_qty", "free_qty");
@@ -60,10 +63,21 @@ function buildMinAvailableMap(receivedRows: any[] | null | undefined, invoicedRo
 
   const out: Record<string, ProductMinAvailableByPrice> = {};
 
+  for (const productId of productsWithGrn) {
+    out[productId] = {
+      price: 0,
+      stock: 0,
+      hasGrnEntry: true
+    };
+  }
+
   for (const [productId, buckets] of byProduct.entries()) {
     if (buckets.length === 0) continue;
     const minBucket = buckets.reduce((min, bucket) => (bucket.price < min.price ? bucket : min));
-    out[productId] = minBucket;
+    out[productId] = {
+      ...minBucket,
+      hasGrnEntry: true
+    };
   }
 
   return out;

@@ -151,7 +151,7 @@ export default function NewInvoicePage() {
     if (!minPriceStockInfo) return "";
     if ("label" in minPriceStockInfo) return minPriceStockInfo.label;
 
-    return `Lowest Selling Price: Rs. ${minPriceStockInfo.price.toLocaleString(undefined, { minimumFractionDigits: 2 })} | Stock: ${minPriceStockInfo.stock} units`;
+    return `Lowest Price: Rs. ${minPriceStockInfo.price.toLocaleString(undefined, { minimumFractionDigits: 2 })} | Stock: ${minPriceStockInfo.stock} units`;
   }, [minPriceStockInfo, watchedDraft?.product_id]);
 
   const availableQty = useMemo(() => {
@@ -263,11 +263,21 @@ export default function NewInvoicePage() {
     () =>
       [...(products ?? [])]
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
-        .map((product) => ({
-          value: product.id,
-          label: `${product.name} · ${product.unit}`,
-          meta: `Lowest Selling Price: Rs. ${Number(minAvailableByProduct?.[product.id]?.price || 0).toFixed(2)} | Stock: ${Number(minAvailableByProduct?.[product.id]?.stock || 0)} units`
-        })),
+        .map((product) => {
+          const minMeta = minAvailableByProduct?.[product.id];
+          let meta = "No GRN Entry";
+          if (minMeta?.hasGrnEntry) {
+            meta = Number(minMeta.stock) > 0
+              ? `Lowest Price: Rs. ${Number(minMeta.price || 0).toFixed(2)} | Stock: ${Number(minMeta.stock || 0)} units`
+              : "Out of Stock";
+          }
+
+          return {
+            value: product.id,
+            label: `${product.name} · ${product.unit}`,
+            meta
+          };
+        }),
     [minAvailableByProduct, products]
   );
 
