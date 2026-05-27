@@ -251,8 +251,6 @@ export default function NewReceiveNotePage() {
     if (isDiscountApplied && discountPercent !== lastDiscountRef.current) {
       const calculatedCost = sellingPrice - (sellingPrice * discountPercent) / 100;
       setValue("draft.product_cost", Number(calculatedCost.toFixed(2)), { shouldDirty: true });
-    } else if (sellingPrice > 0 && discountPercent === 0) {
-      setValue("draft.product_cost", Number(sellingPrice.toFixed(2)), { shouldDirty: true });
     }
 
     lastDiscountRef.current = discountPercent;
