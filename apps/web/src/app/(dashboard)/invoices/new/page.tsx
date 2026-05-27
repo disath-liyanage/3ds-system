@@ -231,11 +231,13 @@ export default function NewInvoicePage() {
 
   const productOptions = useMemo<SearchableSelectOption[]>(
     () =>
-      (products ?? []).map((product) => ({
-        value: product.id,
-        label: `${product.name} · ${product.unit}`,
-        meta: `Lowest Selling Price: Rs. ${Number(minAvailableByProduct?.[product.id]?.price || 0).toFixed(2)} | Stock: ${Number(minAvailableByProduct?.[product.id]?.stock || 0)} units`
-      })),
+      [...(products ?? [])]
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+        .map((product) => ({
+          value: product.id,
+          label: `${product.name} · ${product.unit}`,
+          meta: `Lowest Selling Price: Rs. ${Number(minAvailableByProduct?.[product.id]?.price || 0).toFixed(2)} | Stock: ${Number(minAvailableByProduct?.[product.id]?.stock || 0)} units`
+        })),
     [minAvailableByProduct, products]
   );
 
