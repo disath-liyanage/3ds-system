@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { useQueryClient } from "@tanstack/react-query";
@@ -60,6 +60,13 @@ function toPriceKey(value: number | string | null | undefined): string {
   if (!Number.isFinite(amount)) return "";
   return amount.toFixed(2);
 }
+
+const draftFieldOrder = [
+  "draft.qty",
+  "draft.free_qty",
+  "draft.unit_price",
+  "draft.discount_value"
+] as const;
 
 export default function NewInvoicePage() {
   const router = useRouter();
@@ -204,6 +211,25 @@ export default function NewInvoicePage() {
   }, []);
 
   const shouldValidateDraft = () => addAttempted || Boolean(getValues("draft.product_id"));
+  const handleDraftFieldEnter = useCallback(
+    (event: KeyboardEvent<HTMLInputElement>) => {
+      if (event.key !== "Enter") return;
+
+      event.preventDefault();
+
+      const currentName = event.currentTarget.name;
+      const currentIndex = draftFieldOrder.indexOf(currentName as (typeof draftFieldOrder)[number]);
+      if (currentIndex === -1) return;
+
+      const nextFieldName = draftFieldOrder[currentIndex + 1];
+      if (!nextFieldName) return;
+
+      const nextField = document.querySelector(`input[name="${nextFieldName}"]`) as HTMLInputElement | null;
+      nextField?.focus();
+      nextField?.select();
+    },
+    []
+  );
   const focusQtyField = useCallback(() => {
     setTimeout(() => {
       const qtyInput = document.querySelector('input[name="draft.qty"]') as HTMLInputElement | null;
@@ -905,6 +931,7 @@ export default function NewInvoicePage() {
                       type="number"
                       step="1"
                       placeholder="Qty"
+                      onKeyDown={handleDraftFieldEnter}
                       {...register("draft.qty", {
                         validate: (value) =>
                           shouldValidateDraft() && (value === undefined || value <= 0) ? "Qty is required" : true,
@@ -923,6 +950,7 @@ export default function NewInvoicePage() {
                       type="number"
                       step="1"
                       placeholder="Free"
+                      onKeyDown={handleDraftFieldEnter}
                       {...register("draft.free_qty", {
                         validate: (value) => (value === undefined || value >= 0 ? true : "Free qty must be 0 or more"),
                         setValueAs: (value) => (value === "" ? undefined : Number(value))
@@ -940,6 +968,7 @@ export default function NewInvoicePage() {
                         type="number"
                         step="1"
                         placeholder="Price"
+                        onKeyDown={handleDraftFieldEnter}
                         {...register("draft.unit_price", {
                           validate: (value) =>
                             shouldValidateDraft() && (value === undefined || value < 0) ? "Price is required" : true,
@@ -967,6 +996,7 @@ export default function NewInvoicePage() {
                         type="number"
                         step="0.01"
                         placeholder="0"
+                        onKeyDown={handleDraftFieldEnter}
                         {...register("draft.discount_value", {
                           validate: (value) => (value === undefined || value >= 0 ? true : "Discount must be 0 or more"),
                           setValueAs: (value) => (value === "" ? undefined : Number(value))
