@@ -125,14 +125,16 @@ export default function NewReceiveNotePage() {
 
   const productOptions = useMemo<SearchableSelectOption[]>(
     () =>
-      (products ?? []).map((product) => ({
-        value: product.id,
-        label: `${product.name} · ${product.unit}`,
-        subLabel:
-          product.id in latestCostsByProduct
-            ? `Cost: LKR ${Number(latestCostsByProduct[product.id] || 0).toFixed(2)}`
-            : undefined
-      })),
+      [...(products ?? [])]
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+        .map((product) => ({
+          value: product.id,
+          label: `${product.name} · ${product.unit}`,
+          subLabel:
+            product.id in latestCostsByProduct
+              ? `Cost: LKR ${Number(latestCostsByProduct[product.id] || 0).toFixed(2)}`
+              : undefined
+        })),
     [latestCostsByProduct, products]
   );
 
