@@ -16,6 +16,7 @@ import { Select } from "@/components/ui/select";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useProducts } from "@/hooks/useProducts";
 import { useProductStockByPrice } from "@/hooks/useProductStockByPrice";
+import { useProductMinAvailableByPrice } from "@/hooks/useProductMinAvailableByPrice";
 import { useCustomers } from "@/hooks/useCustomers";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -68,6 +69,7 @@ export default function NewInvoicePage() {
   const initialQuotationMode = searchParams.get("kind") === "quotation";
   const { permissions, user, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
   const { data: products, isLoading: isProductsLoading } = useProducts();
+  const { data: minAvailableByProduct } = useProductMinAvailableByPrice();
   const { data: customers, isLoading: isCustomersLoading } = useCustomers();
 
   const queryClient = useQueryClient();
@@ -109,23 +111,17 @@ export default function NewInvoicePage() {
   const isAdminOrManager = user?.role === "admin" || user?.role === "manager";
 
   const { data: stockByPrice, isLoading: isStockLoading } = useProductStockByPrice(watchedDraft?.product_id);
-  const selectedProduct = useMemo(
-    () => (products ?? []).find((product) => product.id === watchedDraft?.product_id),
-    [products, watchedDraft?.product_id]
-  );
-
   const minPriceStockInfo = useMemo(() => {
     if (!watchedDraft?.product_id) return null;
     if (isStockLoading) {
       return { label: "Loading stock..." } as const;
     }
 
-    const bucketsWithStock = (stockByPrice ?? []).filter((bucket) => Number(bucket.received_qty) > 0);
+    const bucketsWithStock = (stockByPrice ?? []).filter((bucket) => Number(bucket.total_qty) > 0);
     if (bucketsWithStock.length === 0) {
-      if (!selectedProduct) return null;
       return {
-        price: Number(selectedProduct.price) || 0,
-        stock: Number(selectedProduct.stock_qty) || 0
+        price: 0,
+        stock: 0
       } as const;
     }
 
@@ -135,16 +131,16 @@ export default function NewInvoicePage() {
 
     return {
       price: Number(minBucket.selling_price) || 0,
-      stock: Number(minBucket.received_qty) || 0
+      stock: Number(minBucket.total_qty) || 0
     } as const;
-  }, [isStockLoading, selectedProduct, stockByPrice, watchedDraft?.product_id]);
+  }, [isStockLoading, stockByPrice, watchedDraft?.product_id]);
 
   const productMinPriceMeta = useMemo(() => {
     if (!watchedDraft?.product_id) return "";
     if (!minPriceStockInfo) return "";
     if ("label" in minPriceStockInfo) return minPriceStockInfo.label;
 
-    return `Min LKR ${minPriceStockInfo.price.toLocaleString(undefined, { minimumFractionDigits: 2 })} · Stock ${minPriceStockInfo.stock}`;
+    return `Lowest Selling Price: Rs. ${minPriceStockInfo.price.toLocaleString(undefined, { minimumFractionDigits: 2 })} | Stock: ${minPriceStockInfo.stock} units`;
   }, [minPriceStockInfo, watchedDraft?.product_id]);
 
   const availableQty = useMemo(() => {
@@ -152,7 +148,7 @@ export default function NewInvoicePage() {
     if (isStockLoading) return 0;
 
     const priceBuckets = stockByPrice ?? [];
-    if (priceBuckets.length === 0) return Number(selectedProduct?.stock_qty) || 0;
+    if (priceBuckets.length === 0) return 0;
 
     const selectedPriceKey = toPriceKey(watchedDraft.unit_price);
     const hasSelectedPrice = selectedPriceKey.length > 0;
@@ -160,7 +156,7 @@ export default function NewInvoicePage() {
 
     if (hasSelectedPrice) {
       const bucket = bucketByPriceKey.get(selectedPriceKey);
-      const bucketTotal = bucket ? Number(bucket.received_qty) || 0 : 0;
+      const bucketTotal = bucket ? Number(bucket.total_qty) || 0 : 0;
 
       const allocatedToSameBucket = (watchedItems ?? []).reduce((sum, item, index) => {
         if (editingIndex !== null && index === editingIndex) return sum;
@@ -172,7 +168,7 @@ export default function NewInvoicePage() {
       return Math.max(0, bucketTotal - allocatedToSameBucket);
     }
 
-    const totalByProduct = priceBuckets.reduce((sum, b) => sum + (Number(b.received_qty) || 0), 0);
+    const totalByProduct = priceBuckets.reduce((sum, b) => sum + (Number(b.total_qty) || 0), 0);
     const allocatedToProduct = (watchedItems ?? []).reduce((sum, item, index) => {
       if (editingIndex !== null && index === editingIndex) return sum;
       if (item.product_id !== watchedDraft.product_id) return sum;
@@ -183,7 +179,6 @@ export default function NewInvoicePage() {
   }, [
     editingIndex,
     isStockLoading,
-    selectedProduct?.stock_qty,
     stockByPrice,
     watchedDraft?.product_id,
     watchedDraft?.unit_price,
@@ -239,9 +234,9 @@ export default function NewInvoicePage() {
       (products ?? []).map((product) => ({
         value: product.id,
         label: `${product.name} · ${product.unit}`,
-        meta: `Min LKR ${Number(product.price || 0).toFixed(2)} · Stock ${Number(product.stock_qty || 0)}`
+        meta: `Lowest Selling Price: Rs. ${Number(minAvailableByProduct?.[product.id]?.price || 0).toFixed(2)} | Stock: ${Number(minAvailableByProduct?.[product.id]?.stock || 0)} units`
       })),
-    [products]
+    [minAvailableByProduct, products]
   );
 
   const productSearchLabel =
@@ -1011,7 +1006,7 @@ export default function NewInvoicePage() {
                             className="flex flex-col items-start px-4 py-3 border rounded-lg bg-muted/20 hover:bg-muted/60 transition text-left"
                           >
                             <span className="font-semibold text-primary text-base">LKR {bucket.selling_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                            <span className="text-xs text-muted-foreground mt-1">Stock Available: {bucket.received_qty}</span>
+                            <span className="text-xs text-muted-foreground mt-1">Stock Available: {bucket.total_qty}</span>
                           </button>
                         ))}
                       </div>
