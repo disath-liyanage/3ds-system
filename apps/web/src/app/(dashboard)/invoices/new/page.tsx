@@ -118,13 +118,17 @@ export default function NewInvoicePage() {
   const isAdminOrManager = user?.role === "admin" || user?.role === "manager";
 
   const { data: stockByPrice, isLoading: isStockLoading } = useProductStockByPrice(watchedDraft?.product_id);
+  const stockByPriceWithAvailability = useMemo(
+    () => (stockByPrice ?? []).filter((bucket) => Number(bucket.total_qty) > 0),
+    [stockByPrice]
+  );
   const minPriceStockInfo = useMemo(() => {
     if (!watchedDraft?.product_id) return null;
     if (isStockLoading) {
       return { label: "Loading stock..." } as const;
     }
 
-    const bucketsWithStock = (stockByPrice ?? []).filter((bucket) => Number(bucket.total_qty) > 0);
+    const bucketsWithStock = stockByPriceWithAvailability;
     if (bucketsWithStock.length === 0) {
       return {
         price: 0,
@@ -140,7 +144,7 @@ export default function NewInvoicePage() {
       price: Number(minBucket.selling_price) || 0,
       stock: Number(minBucket.total_qty) || 0
     } as const;
-  }, [isStockLoading, stockByPrice, watchedDraft?.product_id]);
+  }, [isStockLoading, stockByPriceWithAvailability, watchedDraft?.product_id]);
 
   const productMinPriceMeta = useMemo(() => {
     if (!watchedDraft?.product_id) return "";
@@ -416,17 +420,17 @@ export default function NewInvoicePage() {
   // When a product is selected in the draft and no price is set, determine price modal behavior
   useEffect(() => {
     if (watchedDraft?.product_id && watchedDraft?.unit_price === undefined && !isStockLoading) {
-      if (stockByPrice && stockByPrice.length === 1) {
-        const bucket = stockByPrice[0];
+      if (stockByPriceWithAvailability.length === 1) {
+        const bucket = stockByPriceWithAvailability[0];
         setValue("draft.unit_price", bucket.selling_price, { shouldValidate: true, shouldDirty: true });
         setValue("draft.unit_cost", bucket.unit_cost);
         setIsPriceModalOpen(false);
         focusQtyField();
-      } else if (stockByPrice) {
+      } else if (stockByPriceWithAvailability.length > 1) {
         setIsPriceModalOpen(true);
       }
     }
-  }, [watchedDraft?.product_id, watchedDraft?.unit_price, isStockLoading, stockByPrice, setValue, focusQtyField]);
+  }, [watchedDraft?.product_id, watchedDraft?.unit_price, isStockLoading, stockByPriceWithAvailability, setValue, focusQtyField]);
 
   const hasDraftData = (draft: InvoiceForm["draft"]) =>
     Boolean(
@@ -1021,11 +1025,11 @@ export default function NewInvoicePage() {
                   <div className="py-2">
                     {isStockLoading ? (
                       <p className="text-sm text-muted-foreground">Loading stock details...</p>
-                    ) : !stockByPrice || stockByPrice.length === 0 ? (
+                    ) : stockByPriceWithAvailability.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No receive history found for this product.</p>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {stockByPrice.map((bucket) => (
+                        {stockByPriceWithAvailability.map((bucket) => (
                           <button
                             key={bucket.selling_price}
                             type="button"
