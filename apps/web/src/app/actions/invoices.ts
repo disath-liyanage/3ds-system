@@ -291,6 +291,12 @@ function getDiscountPerUnit(unitPrice: number, discountType: "percent" | "amount
   return discountValue;
 }
 
+function toPriceKey(value: number | string | null | undefined): string {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "";
+  return amount.toFixed(2);
+}
+
 async function notifyInvoiceApprovers(
   invoiceId: string,
   invoiceNumber: number,
@@ -1252,7 +1258,7 @@ export async function approveInvoice(invoiceId: string, notificationId?: string)
 
   const { data: invoiceItems, error: itemsError } = await adminClient
     .from("invoice_items")
-    .select("product_id, qty")
+    .select("product_id, qty, free_qty, unit_price")
     .eq("invoice_id", invoiceId);
 
   if (itemsError) {
@@ -1260,9 +1266,21 @@ export async function approveInvoice(invoiceId: string, notificationId?: string)
   }
 
   const qtyByProduct = new Map<string, number>();
+  const qtyByProductAndPrice = new Map<string, { productId: string; priceKey: string; requestedQty: number }>();
   for (const item of invoiceItems ?? []) {
     const current = qtyByProduct.get(item.product_id) ?? 0;
-    qtyByProduct.set(item.product_id, current + Number(item.qty));
+    const requestedQty = (Number(item.qty) || 0) + (Number(item.free_qty) || 0);
+    qtyByProduct.set(item.product_id, current + requestedQty);
+
+    const priceKey = toPriceKey(item.unit_price);
+    const bucketKey = `${item.product_id}::${priceKey}`;
+    const bucket = qtyByProductAndPrice.get(bucketKey) ?? {
+      productId: item.product_id,
+      priceKey,
+      requestedQty: 0
+    };
+    bucket.requestedQty += requestedQty;
+    qtyByProductAndPrice.set(bucketKey, bucket);
   }
 
   const productIds = Array.from(qtyByProduct.keys());
@@ -1283,15 +1301,62 @@ export async function approveInvoice(invoiceId: string, notificationId?: string)
     return { success: false, error: "One or more products are missing for this invoice." };
   }
 
-  for (const product of products ?? []) {
-    const requestedQty = qtyByProduct.get(product.id) ?? 0;
-    const availableQty = Number(product.stock_qty);
-    if (requestedQty > availableQty) {
-      return {
-        success: false,
-        error: `Insufficient stock for ${product.name}. Requested ${requestedQty}, available ${availableQty}.`
-      };
+  const { data: receivedRows, error: receivedError } = await adminClient
+    .from("receive_note_items")
+    .select("product_id, selling_price, qty, free_qty")
+    .in("product_id", productIds);
+
+  if (receivedError) {
+    return { success: false, error: receivedError.message };
+  }
+
+  const { data: soldRows, error: soldError } = await adminClient
+    .from("invoice_items")
+    .select("product_id, unit_price, qty, free_qty, invoice:invoices!inner(status)")
+    .in("product_id", productIds)
+    .in("invoice.status", ["approved", "issued", "paid"]);
+
+  if (soldError) {
+    return { success: false, error: soldError.message };
+  }
+
+  const availableByProductAndPrice = new Map<string, number>();
+  for (const row of receivedRows ?? []) {
+    const productId = String((row as any).product_id || "");
+    const priceKey = toPriceKey((row as any).selling_price);
+    if (!productId || !priceKey) continue;
+    const key = `${productId}::${priceKey}`;
+    const receivedQty = (Number((row as any).qty) || 0) + (Number((row as any).free_qty) || 0);
+    availableByProductAndPrice.set(key, (availableByProductAndPrice.get(key) ?? 0) + receivedQty);
+  }
+
+  for (const row of soldRows ?? []) {
+    const productId = String((row as any).product_id || "");
+    const priceKey = toPriceKey((row as any).unit_price);
+    if (!productId || !priceKey) continue;
+    const key = `${productId}::${priceKey}`;
+    const soldQty = (Number((row as any).qty) || 0) + (Number((row as any).free_qty) || 0);
+    availableByProductAndPrice.set(key, Math.max(0, (availableByProductAndPrice.get(key) ?? 0) - soldQty));
+  }
+
+  const productNameById = new Map((products ?? []).map((product) => [String(product.id), String(product.name)]));
+  const stockErrors: string[] = [];
+  for (const bucket of qtyByProductAndPrice.values()) {
+    const bucketKey = `${bucket.productId}::${bucket.priceKey}`;
+    const availableQty = availableByProductAndPrice.get(bucketKey) ?? 0;
+    if (bucket.requestedQty > availableQty) {
+      const productName = productNameById.get(bucket.productId) ?? "Unknown Product";
+      stockErrors.push(
+        `${productName} at LKR ${Number(bucket.priceKey).toLocaleString(undefined, { minimumFractionDigits: 2 })}: requested ${bucket.requestedQty}, available ${availableQty}`
+      );
     }
+  }
+
+  if (stockErrors.length > 0) {
+    return {
+      success: false,
+      error: `Approval blocked. Reduce these item quantities to available stock before approving: ${stockErrors.join("; ")}.`
+    };
   }
 
   const { error: updateError } = await adminClient
