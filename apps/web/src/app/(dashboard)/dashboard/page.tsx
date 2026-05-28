@@ -76,8 +76,8 @@ export default async function DashboardPage() {
           .maybeSingle(),
         adminClient
           .from("invoices")
-          .select("total_amount")
-          .eq("issued_by", profile.id)
+          .select("total_amount, customer:customers!inner(sales_rep_id)")
+          .eq("customer.sales_rep_id", profile.id)
           .in("status", ["approved", "issued", "paid"])
           .gte("created_at", monthStart.toISOString())
           .lte("created_at", monthEnd.toISOString()),
@@ -177,8 +177,8 @@ export default async function DashboardPage() {
           ? (
               await adminClient
                 .from("invoices")
-                .select("issued_by, total_amount")
-                .in("issued_by", repIds)
+                .select("total_amount, customer:customers!inner(sales_rep_id)")
+                .in("customer.sales_rep_id", repIds)
                 .in("status", ["approved", "issued", "paid"])
                 .gte("created_at", monthStart.toISOString())
                 .lte("created_at", monthEnd.toISOString())
@@ -187,7 +187,9 @@ export default async function DashboardPage() {
 
       const salesByRep = new Map<string, number>();
       for (const row of repSalesRows as any[]) {
-        const repId = row.issued_by as string;
+        const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
+        const repId = customer?.sales_rep_id as string | undefined;
+        if (!repId) continue;
         salesByRep.set(repId, (salesByRep.get(repId) ?? 0) + (Number(row.total_amount) || 0));
       }
 
