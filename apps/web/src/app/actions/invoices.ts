@@ -47,6 +47,11 @@ export type InvoiceListRow = {
   payment_method: string;
   status: "draft" | "pending_approval" | "approved" | "rejected" | "issued" | "paid";
   created_at: string;
+  is_settled?: boolean;
+  settled_at?: string | null;
+  collected_total?: number;
+  remaining_amount?: number;
+  payment_status?: "unpaid" | "partially_paid" | "paid";
 };
 
 export type InvoiceDetailRow = InvoiceListRow & {
@@ -382,7 +387,7 @@ export async function listInvoices(
   let query = adminClient
     .from("invoices")
     .select(
-      "id, invoice_number, quotation_number, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at, customer:customers(name), issuer:users_profile!invoices_issued_by_fkey(full_name)",
+      "id, invoice_number, quotation_number, order_id, customer_id, issued_by, total_amount, payment_method, status, created_at, is_settled, settled_at, customer:customers(name), issuer:users_profile!invoices_issued_by_fkey(full_name)",
       { count: "exact" }
     )
     .eq("invoice_kind", "invoice")
@@ -428,9 +433,34 @@ export async function listInvoices(
 
   if (error) return { success: false, error: error.message };
 
+  const invoiceIds = (data ?? []).map((row: any) => String(row.id)).filter(Boolean);
+  const collectionTotals = new Map<string, number>();
+  if (invoiceIds.length > 0) {
+    const { data: collections } = await adminClient
+      .from("collections")
+      .select("invoice_id, amount, status")
+      .in("invoice_id", invoiceIds);
+
+    for (const entry of collections ?? []) {
+      if (entry.status === "rejected") continue;
+      const invoiceId = String(entry.invoice_id || "");
+      if (!invoiceId) continue;
+      collectionTotals.set(invoiceId, (collectionTotals.get(invoiceId) ?? 0) + Number(entry.amount || 0));
+    }
+  }
+
   const rows = (data ?? []).map((row: any) => {
     const customer = Array.isArray(row.customer) ? row.customer[0] : row.customer;
     const issuer = Array.isArray(row.issuer) ? row.issuer[0] : row.issuer;
+    const totalAmount = Number(row.total_amount) || 0;
+    const collectedTotal = collectionTotals.get(String(row.id)) ?? 0;
+    const remainingAmount = Math.max(0, totalAmount - collectedTotal);
+    const isSettled = Boolean(row.is_settled) || remainingAmount <= 0 || row.status === "paid";
+    const paymentStatus: InvoiceListRow["payment_status"] = isSettled
+      ? "paid"
+      : collectedTotal > 0
+        ? "partially_paid"
+        : "unpaid";
 
     return {
       id: row.id,
@@ -441,10 +471,15 @@ export async function listInvoices(
       customer_name: customer?.name ?? "Unknown Customer",
       issued_by: row.issued_by,
       issued_by_name: issuer?.full_name ?? "Unknown",
-      total_amount: Number(row.total_amount),
+      total_amount: totalAmount,
       payment_method: row.payment_method,
       status: row.status,
-      created_at: row.created_at
+      created_at: row.created_at,
+      is_settled: isSettled,
+      settled_at: row.settled_at ?? null,
+      collected_total: collectedTotal,
+      remaining_amount: remainingAmount,
+      payment_status: paymentStatus
     } as InvoiceListRow;
   });
 

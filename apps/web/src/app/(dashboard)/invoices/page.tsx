@@ -53,7 +53,7 @@ export default function InvoicesPage() {
   });
 
   const getStatusLabel = (status: string) => {
-    if (status === "pending_approval") return "Pending approval";
+    if (status === "pending_approval") return "Pending";
     if (status === "approved") return "Approved";
     if (status === "rejected") return "Rejected";
     if (status === "issued") return "Approved";
@@ -65,6 +65,22 @@ export default function InvoicesPage() {
     if (status === "rejected") return "danger";
     if (status === "pending_approval" || status === "draft") return "warning";
     return "default";
+  };
+
+  const getInvoiceStatusBadge = (row: (typeof rows)[number]) => {
+    const isCredit = row.payment_method === "credit";
+    const paymentStatus = row.payment_status ?? (row.status === "paid" ? "paid" : "unpaid");
+    const isPaid = row.status === "paid" || (isCredit && paymentStatus === "paid");
+    const isPartiallyPaid = isCredit && paymentStatus === "partially_paid";
+    const isApprovedUnsettledCredit =
+      isCredit && (row.status === "approved" || row.status === "issued") && paymentStatus === "unpaid";
+
+    if (isPaid) return { label: "Paid", variant: "success-dark" } as const;
+    if (isPartiallyPaid) return { label: "P. Paid", variant: "warning" } as const;
+    if (isApprovedUnsettledCredit) return { label: "Approved", variant: "success" } as const;
+    if (row.status === "pending_approval") return { label: "Pending", variant: "default" } as const;
+
+    return { label: getStatusLabel(row.status), variant: getStatusVariant(row.status) } as const;
   };
 
   const hasFilters = 
@@ -365,7 +381,10 @@ export default function InvoicesPage() {
                 <TableCell className="capitalize">{row.payment_method}</TableCell>
                 <TableCell>LKR {row.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                 <TableCell>
-                  <Badge variant={getStatusVariant(row.status)}>{getStatusLabel(row.status)}</Badge>
+                  {(() => {
+                    const badge = getInvoiceStatusBadge(row);
+                    return <Badge variant={badge.variant}>{badge.label}</Badge>;
+                  })()}
                 </TableCell>
                 <TableCell>
                   <Button asChild size="sm" variant="outline">
