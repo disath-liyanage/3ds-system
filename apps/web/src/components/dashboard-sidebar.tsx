@@ -13,7 +13,6 @@ import {
   ReceiptText,
   UserCircle2,
   Users,
-  ContactRound,
   UserRound
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -48,10 +47,7 @@ const baseNavItems: SidebarItem[] = [
   { href: "/reports", label: "Reports", icon: BarChart3 }
 ];
 
-const adminNavItems: SidebarItem[] = [
-  { href: "/admin/users", label: "Users", icon: ContactRound },
-  { href: "/admin/workers", label: "Workers", icon: UserRound }
-];
+const adminNavItems: SidebarItem[] = [{ href: "/admin/workers", label: "Workers", icon: UserRound }];
 
 export function DashboardSidebar({ isAdmin, isManager, user }: DashboardSidebarProps) {
   const [isSigningOut, setIsSigningOut] = useState(false);

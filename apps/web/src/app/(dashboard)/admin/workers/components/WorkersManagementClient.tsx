@@ -84,6 +84,10 @@ export function WorkersManagementClient({ workers, currentUser }: WorkersManagem
     router.refresh();
   };
 
+  const handleGoUsers = () => {
+    router.push("/admin/users");
+  };
+
   const handleOpenCreate = () => {
     setEditingWorker(null);
     setIsDialogOpen(true);
@@ -170,7 +174,16 @@ export function WorkersManagementClient({ workers, currentUser }: WorkersManagem
       <PageHeader
         title="Workers"
         description="Manage worker salary setup and link each worker to only one system user."
-        actions={canManageWorkerMaster ? <Button onClick={handleOpenCreate}>Add Worker</Button> : null}
+        actions={
+          canManageWorkerMaster ? (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={handleGoUsers}>
+                Users
+              </Button>
+              <Button onClick={handleOpenCreate}>Add Worker</Button>
+            </div>
+          ) : null
+        }
       />
 
       <Table>
