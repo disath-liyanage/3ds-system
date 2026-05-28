@@ -688,10 +688,14 @@ export default function NewReceiveNotePage() {
           </CardContent>
         </Card>
 
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "Saving..." : "Add GRN"}
-        </Button>
-        <div className="text-right text-base font-semibold">Total Amount: {formatCurrency(grandTotal)}</div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Saving..." : "Add GRN"}
+          </Button>
+          <div className="text-right text-base font-semibold">
+            Total Amount: {formatCurrency(grandTotal)}
+          </div>
+        </div>
       </form>
     </section>
   );
