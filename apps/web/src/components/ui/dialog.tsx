@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 
 type DialogProps = {
   open: boolean;
-  title: string;
+  title: ReactNode;
   description?: string;
   children: ReactNode;
   onOpenChange: (open: boolean) => void;
