@@ -473,8 +473,8 @@ export default function CollectionsPage() {
                       row.payment_status === "paid"
                         ? "success"
                         : row.payment_status === "partially_paid"
-                          ? "default"
-                          : "warning"
+                          ? "warning"
+                          : "default"
                     }
                   >
                     {row.payment_status === "paid"
