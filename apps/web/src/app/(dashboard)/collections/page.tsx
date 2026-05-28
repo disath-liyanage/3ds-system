@@ -42,6 +42,7 @@ const statusOptions = [
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-LK", { style: "currency", currency: "LKR", maximumFractionDigits: 2 }).format(value);
 const PAGE_SIZE = 50;
+const invoiceLinkClassName = "font-medium text-primary underline-offset-2 hover:underline";
 
 export default function CollectionsPage() {
   const searchParams = useSearchParams();
@@ -409,7 +410,15 @@ export default function CollectionsPage() {
                       : undefined
                   }
                 >
-                  {row.invoice_number}
+                  <Link
+                    href={`/invoices/${row.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={invoiceLinkClassName}
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {row.invoice_number}
+                  </Link>
                 </TableCell>
                 <TableCell
                   className={row.payment_status === "partially_paid" ? "cursor-pointer" : undefined}
@@ -539,7 +548,23 @@ export default function CollectionsPage() {
             setFocusedCollectionId(null);
           }
         }}
-        title={historyInvoiceNumber ? `Collection History · Invoice #${historyInvoiceNumber}` : "Collection History"}
+        title={
+          historyInvoiceId && historyInvoiceNumber ? (
+            <>
+              Collection History · Invoice{" "}
+              <Link
+                href={`/invoices/${historyInvoiceId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={invoiceLinkClassName}
+              >
+                #{historyInvoiceNumber}
+              </Link>
+            </>
+          ) : (
+            "Collection History"
+          )
+        }
         description="View how this invoice was collected."
         showBottomClose={false}
       >
