@@ -1050,8 +1050,10 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
       if (workerUserId) {
         const { data: invoiceItems, error: invoiceItemsError } = await adminClient
           .from("invoice_items")
-          .select("qty, product_id, invoice:invoices!inner(created_at, status, issued_by)")
-          .eq("invoice.issued_by", workerUserId)
+          .select(
+            "qty, unit_price, discount_type, discount_value, product_id, invoice:invoices!inner(created_at, status, customer:customers!inner(sales_rep_id))"
+          )
+          .eq("invoice.customer.sales_rep_id", workerUserId)
           .in("invoice.status", ["approved", "issued", "paid"])
           .gte("invoice.created_at", fromMonthIso)
           .lte("invoice.created_at", toMonthIso);
@@ -1083,9 +1085,16 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         }
         for (const item of invoiceItems ?? []) {
           const qty = Number((item as any).qty) || 0;
+          const unitPrice = Number((item as any).unit_price) || 0;
+          const discountType = (item as any).discount_type === "percent" ? "percent" : "amount";
+          const discountValue = Number((item as any).discount_value) || 0;
           const productId = String((item as any).product_id || "");
           const rate = rateMap.get(productId) ?? 0;
-          salesCommission += qty * rate;
+          if (qty <= 0 || unitPrice <= 0 || rate <= 0) continue;
+          const discountPerUnit = discountType === "percent" ? (unitPrice * discountValue) / 100 : discountValue;
+          const effectiveUnitPrice = Math.max(0, unitPrice - discountPerUnit);
+          const lineTotal = qty * effectiveUnitPrice;
+          salesCommission += lineTotal * (rate / 100);
         }
       }
 

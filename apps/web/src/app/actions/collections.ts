@@ -739,7 +739,7 @@ export async function recordCollection(input: RecordCollectionInput): Promise<Ac
   const { data: invoice, error: invoiceError } = await adminClient
     .from("invoices")
     .select(
-      "id, invoice_number, customer_id, total_amount, status, is_settled, customer:customers(name, balance, sales_rep_id), invoice_items(id, product_id, qty)"
+      "id, invoice_number, customer_id, total_amount, status, is_settled, customer:customers(name, balance, sales_rep_id), invoice_items(id, product_id, qty, unit_price, discount_type, discount_value)"
     )
     .eq("id", input.invoice_id)
     .maybeSingle();
@@ -825,28 +825,45 @@ export async function recordCollection(input: RecordCollectionInput): Promise<Ac
     }
 
     const rateMap = pickLatestRates(rateRows ?? []);
-    const incentives = invoiceItems.map((item) => {
-      const rate = rateMap.get(item.product_id) ?? 0;
+    const lineTotals = invoiceItems.map((item) => {
       const qty = Number(item.qty) || 0;
-      const amount = qty * rate;
-      incentiveTotal += amount;
-
-      return {
-        collection_id: collection.id,
-        sales_rep_id: incentiveRecipientId,
-        invoice_id: invoice.id,
-        invoice_item_id: item.id,
-        product_id: item.product_id,
-        qty,
-        rate,
-        amount
-      };
+      const unitPrice = Number((item as any).unit_price) || 0;
+      const discountType = (item as any).discount_type === "percent" ? "percent" : "amount";
+      const discountValue = Number((item as any).discount_value) || 0;
+      const discountPerUnit = discountType === "percent" ? (unitPrice * discountValue) / 100 : discountValue;
+      const effectiveUnitPrice = Math.max(0, unitPrice - discountPerUnit);
+      return qty * effectiveUnitPrice;
     });
+    const invoiceNetTotal = lineTotals.reduce((sum, lineTotal) => sum + lineTotal, 0);
 
-    if (incentives.length > 0) {
-      const { error: incentivesError } = await adminClient.from("collection_incentives").insert(incentives);
-      if (incentivesError) {
-        return { success: false, error: incentivesError.message };
+    if (invoiceNetTotal > 0) {
+      const incentives = invoiceItems
+        .map((item, index) => {
+          const rate = rateMap.get(item.product_id) ?? 0;
+          const qty = Number(item.qty) || 0;
+          const lineTotal = lineTotals[index] ?? 0;
+          if (rate <= 0 || lineTotal <= 0) return null;
+          const collectedShare = (lineTotal / invoiceNetTotal) * amount;
+          const incentiveAmount = collectedShare * (rate / 100);
+          incentiveTotal += incentiveAmount;
+          return {
+            collection_id: collection.id,
+            sales_rep_id: incentiveRecipientId,
+            invoice_id: invoice.id,
+            invoice_item_id: item.id,
+            product_id: item.product_id,
+            qty,
+            rate,
+            amount: incentiveAmount
+          };
+        })
+        .filter(Boolean);
+
+      if (incentives.length > 0) {
+        const { error: incentivesError } = await adminClient.from("collection_incentives").insert(incentives);
+        if (incentivesError) {
+          return { success: false, error: incentivesError.message };
+        }
       }
     }
   }
