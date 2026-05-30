@@ -11,6 +11,7 @@ import {
   getAreas,
   getSalesReps
 } from "@/app/actions/customers";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,12 @@ const CUSTOMERS_QUERY_KEY = ["customers"] as const;
 const NOTIFICATIONS_QUERY_KEY = ["notifications"] as const;
 const NOTIFICATIONS_UNREAD_QUERY_KEY = ["notifications-unread-count"] as const;
 const PAGE_SIZE = 50;
+
+function getCustomerStatusBadge(status: CustomerRow["status"]) {
+  if (status === "pending_approval") return { label: "Pending", variant: "warning" as const };
+  if (status === "rejected") return { label: "Rejected", variant: "danger" as const };
+  return { label: "Approved", variant: "success" as const };
+}
 
 export default function CustomersPage() {
   const [query, setQuery] = useState("");
@@ -298,11 +305,10 @@ export default function CustomersPage() {
               <TableCell>{customer.area || "-"}</TableCell>
               <TableCell>LKR {Number(customer.balance).toLocaleString()}</TableCell>
               <TableCell>
-                {customer.status === "pending_approval"
-                  ? "Pending Approval"
-                  : customer.status === "rejected"
-                    ? "Rejected"
-                    : "Approved"}
+                {(() => {
+                  const badge = getCustomerStatusBadge(customer.status);
+                  return <Badge variant={badge.variant}>{badge.label}</Badge>;
+                })()}
               </TableCell>
             </TableRow>
           ))}
