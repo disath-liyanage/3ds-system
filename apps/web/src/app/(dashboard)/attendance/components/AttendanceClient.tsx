@@ -25,9 +25,20 @@ type AttendanceRow = {
   note: string | null;
 };
 
+type ChequeDepositRow = {
+  id: string;
+  collection_number: number;
+  amount: number;
+  deposit_date: string;
+  status: "pending" | "validated" | "rejected";
+  customer_name: string;
+  invoice_number: number | null;
+};
+
 type AttendanceClientProps = {
   workers: Worker[];
   initialAttendance: AttendanceRow[];
+  chequeDeposits: ChequeDepositRow[];
   initialYear: number;
   initialMonth: number;
 };
@@ -65,9 +76,18 @@ function getDefaultSelectedDay(year: number, month: number, todayDateKey: string
   return null;
 }
 
+function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-LK", {
+    style: "currency",
+    currency: "LKR",
+    maximumFractionDigits: 2
+  }).format(amount);
+}
+
 export function AttendanceClient({
   workers,
   initialAttendance,
+  chequeDeposits,
   initialYear,
   initialMonth
 }: AttendanceClientProps) {
@@ -110,8 +130,16 @@ export function AttendanceClient({
     () => Object.fromEntries(getSriLankaHolidays(year).map((item) => [item.date, item.name])),
     [year]
   );
+  const chequeDepositMap = useMemo(() => {
+    return chequeDeposits.reduce<Record<string, ChequeDepositRow[]>>((map, deposit) => {
+      const dateKey = deposit.deposit_date.slice(0, 10);
+      map[dateKey] = [...(map[dateKey] ?? []), deposit];
+      return map;
+    }, {});
+  }, [chequeDeposits]);
 
   const selectedDateKey = selectedDay ? toDateKey(year, month, selectedDay) : null;
+  const selectedChequeDeposits = selectedDateKey ? chequeDepositMap[selectedDateKey] ?? [] : [];
 
   const monthLabel = new Intl.DateTimeFormat("en-GB", {
     month: "long",
@@ -255,11 +283,19 @@ export function AttendanceClient({
                 }, 0);
                 const isFullyMarkedAsHoliday = workers.length > 0 && holidayMarkedCount === workers.length;
                 const shouldUseHolidayShade = isHoliday || isFullyMarkedAsHoliday;
+                const chequeDepositsForDate = chequeDepositMap[dateKey] ?? [];
+                const chequeTitle = chequeDepositsForDate
+                  .map((deposit) => {
+                    const invoiceLabel = deposit.invoice_number ? `Invoice #${deposit.invoice_number}` : "No invoice";
+                    return `${deposit.customer_name} · ${formatCurrency(deposit.amount)} · ${invoiceLabel} · Collection #${deposit.collection_number}`;
+                  })
+                  .join("\n");
 
                 return (
                   <button
                     key={dateKey}
                     type="button"
+                    title={chequeTitle || undefined}
                     onClick={() => setSelectedDay(day)}
                     className={cn(
                       "rounded-md border px-2 py-2 text-left text-xs transition",
@@ -277,6 +313,11 @@ export function AttendanceClient({
                     {isHoliday ? <div className="mt-1 text-[10px] text-amber-700">Holiday</div> : null}
                     {!isHoliday && isFullyMarkedAsHoliday ? (
                       <div className="mt-1 text-[10px] text-amber-700">All marked holiday</div>
+                    ) : null}
+                    {chequeDepositsForDate.length ? (
+                      <div className="mt-1 rounded bg-emerald-100 px-1 py-0.5 text-[10px] font-medium text-emerald-800">
+                        Cheque {chequeDepositsForDate.length}
+                      </div>
                     ) : null}
                     <div className="mt-1 text-[10px] text-slate-600">{markedCount}/{workers.length} marked</div>
                   </button>
@@ -296,6 +337,30 @@ export function AttendanceClient({
           <CardContent className="space-y-3">
             {selectedDateKey && holidayMap[selectedDateKey] ? (
               <Badge className="bg-amber-100 text-amber-700">{holidayMap[selectedDateKey]}</Badge>
+            ) : null}
+            {selectedChequeDeposits.length ? (
+              <div className="space-y-2 rounded-md border border-emerald-200 bg-emerald-50 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium text-emerald-900">Cheque deposits due</p>
+                  <Badge className="bg-emerald-100 text-emerald-800">{selectedChequeDeposits.length}</Badge>
+                </div>
+                <div className="space-y-2">
+                  {selectedChequeDeposits.map((deposit) => (
+                    <div key={deposit.id} className="rounded border border-emerald-200 bg-white px-2 py-1.5 text-xs">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-medium text-slate-900">{deposit.customer_name}</p>
+                          <p className="text-muted-foreground">
+                            Collection #{deposit.collection_number}
+                            {deposit.invoice_number ? ` · Invoice #${deposit.invoice_number}` : ""}
+                          </p>
+                        </div>
+                        <p className="font-semibold text-emerald-800">{formatCurrency(deposit.amount)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : null}
 
             <Button

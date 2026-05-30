@@ -40,6 +40,7 @@ export type RecordCollectionInput = {
 type DueChequeReminderCandidate = {
   id: string;
   invoice_id: string | null;
+  amount: number;
   cheque_deposit_date: string | null;
   invoice: { invoice_number: number; customer: { name: string | null } | null } | null;
 };
@@ -301,7 +302,7 @@ export async function createDueChequeDepositReminders(): Promise<{ success: bool
 
   const { data: candidates, error: candidatesError } = await adminClient
     .from("collections")
-    .select("id, invoice_id, cheque_deposit_date, invoice:invoices(invoice_number, customer:customers(name))")
+    .select("id, invoice_id, amount, cheque_deposit_date, invoice:invoices(invoice_number, customer:customers(name))")
     .eq("payment_type", "cheque")
     .in("status", ["pending", "validated"])
     .not("cheque_deposit_date", "is", null)
@@ -322,31 +323,55 @@ export async function createDueChequeDepositReminders(): Promise<{ success: bool
     return { success: true };
   }
 
+  const { data: recipients, error: recipientsError } = await adminClient
+    .from("users_profile")
+    .select("id")
+    .in("role", ["admin", "manager"]);
+
+  if (recipientsError) {
+    return { success: false, error: recipientsError.message };
+  }
+
+  const recipientIds = (recipients ?? []).map((recipient) => recipient.id).filter(Boolean);
+  if (recipientIds.length === 0) {
+    return { success: true };
+  }
+
   const { data: existingReminders, error: existingError } = await adminClient
     .from("notifications")
-    .select("message")
-    .eq("recipient_id", access.profile.id)
+    .select("recipient_id, message")
+    .in("recipient_id", recipientIds)
     .eq("type", "cheque_deposit_reminder");
 
   if (existingError) {
     return { success: false, error: existingError.message };
   }
 
-  const existingMessages = new Set((existingReminders ?? []).map((row) => (row as { message: string }).message));
-  const notifications = dueRows
-    .map((row) => {
-      const customerName = row.invoice?.customer?.name ?? "Unknown customer";
-      const message = `Cheque collection for invoice #${row.invoice?.invoice_number ?? "-"} (${customerName}) is due for deposit today. Ref ${row.id.slice(0, 8)}.`;
-      return {
-        recipient_id: access.profile.id,
+  const existingMessages = new Set(
+    (existingReminders ?? []).map((row) => {
+      const reminder = row as { recipient_id: string; message: string };
+      return `${reminder.recipient_id}:${reminder.message}`;
+    })
+  );
+  const notifications = dueRows.flatMap((row) => {
+    const customerName = row.invoice?.customer?.name ?? "Unknown customer";
+    const amount = new Intl.NumberFormat("en-LK", {
+      style: "currency",
+      currency: "LKR",
+      maximumFractionDigits: 2
+    }).format(Number(row.amount));
+    const message = `Cheque collection for invoice #${row.invoice?.invoice_number ?? "-"} (${customerName}) is due for deposit today. Amount ${amount}. Ref ${row.id.slice(0, 8)}.`;
+    return recipientIds
+      .filter((recipientId) => !existingMessages.has(`${recipientId}:${message}`))
+      .map((recipientId) => ({
+        recipient_id: recipientId,
         title: "Cheque deposit reminder",
         message,
         type: "cheque_deposit_reminder",
         invoice_id: row.invoice_id,
         created_by: access.profile.id
-      };
-    })
-    .filter((row) => !existingMessages.has(row.message));
+      }));
+  });
 
   if (notifications.length === 0) {
     return { success: true };
