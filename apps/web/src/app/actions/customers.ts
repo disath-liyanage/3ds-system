@@ -36,6 +36,43 @@ export type CreateCustomerInput = {
 
 export type UpdateCustomerInput = CreateCustomerInput;
 
+export type CustomerDetailRow = {
+  id: string;
+  name: string;
+  phone: string;
+  address: string;
+  area: string | null;
+  credit_limit: number;
+  balance: number;
+  status: "pending_approval" | "active" | "rejected";
+  created_by: string | null;
+  created_by_name: string | null;
+  approved_by: string | null;
+  approved_by_name: string | null;
+  approved_at: string | null;
+  sales_rep_id: string | null;
+  sales_rep_name: string | null;
+  created_at: string;
+};
+
+export type CustomerInvoiceRow = {
+  id: string;
+  invoice_number: number;
+  total_amount: number;
+  payment_method: string;
+  status: "draft" | "pending_approval" | "approved" | "rejected" | "issued" | "paid";
+  created_at: string;
+  collected_total: number;
+  remaining_amount: number;
+  payment_status: "unpaid" | "partially_paid" | "paid";
+};
+
+export type CustomerDetailData = {
+  customer: CustomerDetailRow;
+  outstanding_invoices: CustomerInvoiceRow[];
+  current_month_invoices: CustomerInvoiceRow[];
+};
+
 async function getCurrentUserProfile() {
   const supabase = createClient();
 
@@ -95,6 +132,136 @@ export async function getAreas(): Promise<{ id: string; name: string }[]> {
     return [];
   }
   return data || [];
+}
+
+export async function getCustomerDetail(customerId: string): Promise<{
+  success: boolean;
+  data?: CustomerDetailData | null;
+  error?: string;
+}> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!customerId) {
+    return { success: false, error: "Customer id is required" };
+  }
+
+  const { data: customerRow, error: customerError } = await adminClient
+    .from("customers")
+    .select("id, name, phone, address, area, credit_limit, balance, status, created_by, approved_by, approved_at, sales_rep_id, created_at")
+    .eq("id", customerId)
+    .maybeSingle();
+
+  if (customerError) return { success: false, error: customerError.message };
+  if (!customerRow) return { success: true, data: null };
+
+  const profileIds = [
+    customerRow.sales_rep_id,
+    customerRow.created_by,
+    customerRow.approved_by
+  ].filter(Boolean) as string[];
+  const profileNames = new Map<string, string | null>();
+  if (profileIds.length > 0) {
+    const { data: profiles } = await adminClient
+      .from("users_profile")
+      .select("id, full_name")
+      .in("id", Array.from(new Set(profileIds)));
+    for (const profile of profiles ?? []) {
+      profileNames.set(String(profile.id), profile.full_name ?? null);
+    }
+  }
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+  const { data: invoiceRows, error: invoicesError } = await adminClient
+    .from("invoices")
+    .select("id, invoice_number, total_amount, payment_method, status, created_at, is_settled")
+    .eq("customer_id", customerId)
+    .eq("invoice_kind", "invoice")
+    .order("created_at", { ascending: false });
+
+  if (invoicesError) return { success: false, error: invoicesError.message };
+
+  const invoiceIds = (invoiceRows ?? []).map((row: any) => String(row.id)).filter(Boolean);
+  const collectionTotals = new Map<string, number>();
+  if (invoiceIds.length > 0) {
+    const { data: collections, error: collectionsError } = await adminClient
+      .from("collections")
+      .select("invoice_id, amount, status")
+      .in("invoice_id", invoiceIds);
+    if (collectionsError) return { success: false, error: collectionsError.message };
+
+    for (const entry of collections ?? []) {
+      if (entry.status === "rejected") continue;
+      const invoiceKey = String(entry.invoice_id || "");
+      if (!invoiceKey) continue;
+      collectionTotals.set(invoiceKey, (collectionTotals.get(invoiceKey) ?? 0) + Number(entry.amount || 0));
+    }
+  }
+
+  const invoices: CustomerInvoiceRow[] = (invoiceRows ?? []).map((row: any) => {
+    const totalAmount = Number(row.total_amount) || 0;
+    const collectedTotal = collectionTotals.get(String(row.id)) ?? 0;
+    const remainingAmount = Math.max(0, totalAmount - collectedTotal);
+    const isSettled = Boolean(row.is_settled) || remainingAmount <= 0 || row.status === "paid";
+    const paymentStatus: CustomerInvoiceRow["payment_status"] = isSettled
+      ? "paid"
+      : collectedTotal > 0
+        ? "partially_paid"
+        : "unpaid";
+
+    return {
+      id: String(row.id),
+      invoice_number: Number(row.invoice_number) || 0,
+      total_amount: totalAmount,
+      payment_method: String(row.payment_method || ""),
+      status: row.status,
+      created_at: String(row.created_at || ""),
+      collected_total: collectedTotal,
+      remaining_amount: remainingAmount,
+      payment_status: paymentStatus
+    };
+  });
+
+  const outstandingInvoices = invoices.filter(
+    (invoice) =>
+      invoice.payment_method === "credit" &&
+      ["approved", "issued", "paid"].includes(invoice.status) &&
+      invoice.remaining_amount > 0
+  );
+
+  const currentMonthInvoices = invoices.filter((invoice) => {
+    const issuedAt = new Date(invoice.created_at);
+    return issuedAt >= monthStart && issuedAt < nextMonthStart;
+  });
+
+  return {
+    success: true,
+    data: {
+      customer: {
+        id: String(customerRow.id),
+        name: String(customerRow.name || ""),
+        phone: String(customerRow.phone || ""),
+        address: String(customerRow.address || ""),
+        area: customerRow.area ?? null,
+        credit_limit: Number(customerRow.credit_limit) || 0,
+        balance: Number(customerRow.balance) || 0,
+        status: customerRow.status,
+        created_by: customerRow.created_by ?? null,
+        created_by_name: customerRow.created_by ? profileNames.get(customerRow.created_by) ?? null : null,
+        approved_by: customerRow.approved_by ?? null,
+        approved_by_name: customerRow.approved_by ? profileNames.get(customerRow.approved_by) ?? null : null,
+        approved_at: customerRow.approved_at ?? null,
+        sales_rep_id: customerRow.sales_rep_id ?? null,
+        sales_rep_name: customerRow.sales_rep_id ? profileNames.get(customerRow.sales_rep_id) ?? null : null,
+        created_at: String(customerRow.created_at || "")
+      },
+      outstanding_invoices: outstandingInvoices,
+      current_month_invoices: currentMonthInvoices
+    }
+  };
 }
 
 export async function createArea(name: string): Promise<ActionResult> {
@@ -445,6 +612,7 @@ export async function updateCustomer(customerId: string, input: UpdateCustomerIn
   }
 
   revalidatePath("/customers");
+  revalidatePath(`/customers/${customerId}`);
   return { success: true, message: "Customer updated successfully." };
 }
 
@@ -478,6 +646,7 @@ export async function deleteCustomer(customerId: string): Promise<ActionResult> 
   }
 
   revalidatePath("/customers");
+  revalidatePath(`/customers/${customerId}`);
   return { success: true, message: "Customer deleted successfully." };
 }
 

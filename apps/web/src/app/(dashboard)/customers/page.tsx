@@ -1,18 +1,15 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import {
-  approvePendingCustomer,
   createArea,
   createCustomer,
-  deleteCustomer,
   getAreas,
-  getSalesReps,
-  removePendingCustomer,
-  updateCustomer
+  getSalesReps
 } from "@/app/actions/customers";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -55,9 +52,6 @@ export default function CustomersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAreaSubmitting, setIsAreaSubmitting] = useState(false);
   const [areaName, setAreaName] = useState("");
-  const [processingCustomerId, setProcessingCustomerId] = useState<string | null>(null);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -66,18 +60,10 @@ export default function CustomersPage() {
     credit_limit: "0",
     sales_rep_id: ""
   });
-  const [editForm, setEditForm] = useState({
-    name: "",
-    phone: "",
-    address: "",
-    area: "",
-    credit_limit: "0",
-    sales_rep_id: ""
-  });
 
+  const router = useRouter();
   const { permissions, isLoading, user } = useCurrentUserPermissions();
   const supabase = useMemo(() => createClient(), []);
-  const queryClient = useQueryClient();
 
   const salesRepsQuery = useQuery({
     queryKey: ["sales-reps"],
@@ -156,19 +142,6 @@ export default function CustomersPage() {
   const canViewCustomers = permissions?.canViewCustomers || permissions?.canManageCustomers;
   const canAddCustomers = Boolean(permissions?.canAddCustomers);
   const isAdminOrManager = user?.role === "admin" || user?.role === "manager";
-  const selectedCustomer = filtered.find((customer) => customer.id === selectedCustomerId) || null;
-  const isOwnPendingSalesRepCustomer = Boolean(
-    user?.role === "sales_rep" &&
-      selectedCustomer?.status === "pending_approval" &&
-      selectedCustomer?.created_by === user?.id
-  );
-  const canEditSelected = Boolean(selectedCustomer && (isAdminOrManager || isOwnPendingSalesRepCustomer));
-  const canApproveSelected = Boolean(isAdminOrManager && selectedCustomer?.status === "pending_approval");
-  const canDeletePendingSelected = Boolean(
-    selectedCustomer?.status === "pending_approval" && (isAdminOrManager || isOwnPendingSalesRepCustomer)
-  );
-  const canRemoveApprovedSelected = Boolean(selectedCustomer?.status === "active" && isAdminOrManager);
-  const isPendingSelected = selectedCustomer?.status === "pending_approval";
 
   const handleResetFilters = () => {
     setAreaFilter("");
@@ -222,129 +195,7 @@ export default function CustomersPage() {
   };
 
   const openCustomerDialog = (customer: CustomerRow) => {
-    setSelectedCustomerId(customer.id);
-    setEditForm({
-      name: customer.name,
-      phone: customer.phone,
-      address: customer.address,
-      area: customer.area || "",
-      credit_limit: String(customer.credit_limit ?? 0),
-      sales_rep_id: customer.sales_rep_id || ""
-    });
-    setIsEditing(false);
-  };
-
-  const handleSaveCustomer = async () => {
-    if (!selectedCustomer) return;
-    
-    if (isAdminOrManager && !editForm.sales_rep_id) {
-      toast({ title: "Validation error", description: "Please select a sales rep.", variant: "error" });
-      return;
-    }
-
-    setProcessingCustomerId(selectedCustomer.id);
-    const result = await updateCustomer(selectedCustomer.id, {
-      name: editForm.name,
-      phone: editForm.phone,
-      address: editForm.address,
-      area: editForm.area,
-      credit_limit: Number(editForm.credit_limit || 0),
-      sales_rep_id: editForm.sales_rep_id || undefined
-    });
-    setProcessingCustomerId(null);
-
-    if (!result.success) {
-      toast({ title: "Update failed", description: result.error, variant: "error" });
-      return;
-    }
-
-    toast({ title: "Customer updated", description: result.message, variant: "success" });
-    setIsEditing(false);
-    await customersQuery.refetch();
-  };
-
-  const handleApproveFromCustomers = async (customerId: string) => {
-    setProcessingCustomerId(customerId);
-    const result = await approvePendingCustomer(customerId);
-    setProcessingCustomerId(null);
-    if (!result.success) {
-      toast({ title: "Approve failed", description: result.error, variant: "error" });
-      return;
-    }
-    toast({ title: "Customer approved", description: result.message, variant: "success" });
-    setIsEditing(false);
-    await queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
-    await queryClient.invalidateQueries({ queryKey: ["notifications"] });
-    await customersQuery.refetch();
-  };
-
-  const handleSaveAndApprove = async () => {
-    if (!selectedCustomer) return;
-    const customerId = selectedCustomer.id;
-
-    if (isAdminOrManager && !editForm.sales_rep_id) {
-      toast({ title: "Validation error", description: "Please select a sales rep.", variant: "error" });
-      return;
-    }
-
-    setProcessingCustomerId(customerId);
-    const saveResult = await updateCustomer(customerId, {
-      name: editForm.name,
-      phone: editForm.phone,
-      address: editForm.address,
-      area: editForm.area,
-      credit_limit: Number(editForm.credit_limit || 0),
-      sales_rep_id: editForm.sales_rep_id || undefined
-    });
-
-    if (!saveResult.success) {
-      setProcessingCustomerId(null);
-      toast({ title: "Update failed", description: saveResult.error, variant: "error" });
-      return;
-    }
-
-    const approveResult = await approvePendingCustomer(customerId);
-    setProcessingCustomerId(null);
-    if (!approveResult.success) {
-      toast({ title: "Approve failed", description: approveResult.error, variant: "error" });
-      return;
-    }
-
-    toast({
-      title: "Customer updated and approved",
-      description: approveResult.message,
-      variant: "success"
-    });
-    setIsEditing(false);
-    await queryClient.invalidateQueries({ queryKey: ["notifications-unread-count"] });
-    await queryClient.invalidateQueries({ queryKey: ["notifications"] });
-    await customersQuery.refetch();
-  };
-
-  const handleDeletePendingCustomer = async (customerId: string) => {
-    setProcessingCustomerId(customerId);
-    const result = await (isAdminOrManager ? removePendingCustomer(customerId) : deleteCustomer(customerId));
-    setProcessingCustomerId(null);
-    if (!result.success) {
-      toast({ title: "Delete failed", description: result.error, variant: "error" });
-      return;
-    }
-    toast({ title: "Customer removed", description: result.message, variant: "success" });
-    if (selectedCustomerId === customerId) setSelectedCustomerId(null);
-    await customersQuery.refetch();
-  };
-
-  const handleRemoveApprovedCustomer = async (customerId: string) => {
-    setProcessingCustomerId(customerId);
-    const result = await deleteCustomer(customerId);
-    setProcessingCustomerId(null);
-    if (!result.success) {
-      toast({ title: "Remove failed", description: result.error, variant: "error" });
-      return;
-    }
-    toast({ title: "Customer removed", description: result.message, variant: "success" });
-    if (selectedCustomerId === customerId) setSelectedCustomerId(null);
-    await customersQuery.refetch();
+    router.push(`/customers/${customer.id}`);
   };
 
   return (
@@ -478,143 +329,6 @@ export default function CustomersPage() {
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
-
-      <Dialog
-        open={Boolean(selectedCustomerId)}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedCustomerId(null);
-            setIsEditing(false);
-          }
-        }}
-        title="Customer details"
-        description="Edit details and manage approval state."
-      >
-        {selectedCustomer ? (
-          <div className="space-y-3">
-            <Input
-              placeholder="Name"
-              value={editForm.name}
-              disabled={!isEditing}
-              onChange={(event) => setEditForm((prev) => ({ ...prev, name: event.target.value }))}
-            />
-            <Input
-              placeholder="Phone"
-              value={editForm.phone}
-              disabled={!isEditing}
-              onChange={(event) => setEditForm((prev) => ({ ...prev, phone: event.target.value }))}
-            />
-            <Input
-              placeholder="Address"
-              value={editForm.address}
-              disabled={!isEditing}
-              onChange={(event) => setEditForm((prev) => ({ ...prev, address: event.target.value }))}
-            />
-            <SearchableSelect
-              placeholder={areasQuery.isLoading ? "Loading areas..." : "Select Area"}
-              options={(areasQuery.data || []).map((area) => ({ value: area.name, label: area.name }))}
-              value={editForm.area || ""}
-              disabled={!isEditing}
-              onChange={(value) => setEditForm((prev) => ({ ...prev, area: value }))}
-            />
-            <Input
-              type="number"
-              min={0}
-              step="0.01"
-              placeholder="Credit limit"
-              value={editForm.credit_limit}
-              disabled={!isEditing}
-              onChange={(event) => setEditForm((prev) => ({ ...prev, credit_limit: event.target.value }))}
-            />
-
-            {isAdminOrManager ? (
-              <SearchableSelect
-                placeholder="Select Sales Rep"
-                options={(salesRepsQuery.data || []).map((rep) => ({ value: rep.id, label: rep.full_name }))}
-                value={editForm.sales_rep_id}
-                onChange={(value) => setEditForm((prev) => ({ ...prev, sales_rep_id: value }))}
-                disabled={!isEditing}
-              />
-            ) : null}
-
-            <div className="flex flex-wrap gap-2">
-              {canEditSelected && !isEditing ? (
-                <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
-                  Edit
-                </Button>
-              ) : null}
-
-              {isEditing && isPendingSelected && canApproveSelected ? (
-                <>
-                  <Button
-                    size="sm"
-                    disabled={processingCustomerId === selectedCustomer.id}
-                    onClick={handleSaveAndApprove}
-                  >
-                    Edit & Approve
-                  </Button>
-                  {canDeletePendingSelected ? (
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      disabled={processingCustomerId === selectedCustomer.id}
-                      onClick={() => handleDeletePendingCustomer(selectedCustomer.id)}
-                    >
-                      Delete
-                    </Button>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  {canEditSelected && isEditing ? (
-                    <Button
-                      size="sm"
-                      disabled={processingCustomerId === selectedCustomer.id}
-                      onClick={handleSaveCustomer}
-                    >
-                      Save Changes
-                    </Button>
-                  ) : null}
-
-                  {canApproveSelected ? (
-                    <Button
-                      size="sm"
-                      disabled={processingCustomerId === selectedCustomer.id}
-                      onClick={() => handleApproveFromCustomers(selectedCustomer.id)}
-                    >
-                      Approve
-                    </Button>
-                  ) : null}
-
-                  {canDeletePendingSelected ? (
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      disabled={processingCustomerId === selectedCustomer.id}
-                      onClick={() => handleDeletePendingCustomer(selectedCustomer.id)}
-                    >
-                      Delete
-                    </Button>
-                  ) : null}
-
-                  {canRemoveApprovedSelected ? (
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      disabled={processingCustomerId === selectedCustomer.id}
-                      onClick={() => handleRemoveApprovedCustomer(selectedCustomer.id)}
-                    >
-                      Remove Customer
-                    </Button>
-                  ) : null}
-                </>
-              )}
-            </div>
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">Customer not found.</p>
-        )}
-      </Dialog>
 
       <Dialog
         open={isAddOpen}
