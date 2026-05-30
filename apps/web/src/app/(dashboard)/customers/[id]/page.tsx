@@ -66,6 +66,14 @@ function getCustomerStatusVariant(status: CustomerDetailRow["status"]) {
   return "success" as const;
 }
 
+function buildCustomerCode(rawId?: string | null) {
+  if (!rawId) return "C001";
+  const digits = rawId.replace(/\D/g, "");
+  if (!digits) return "C001";
+  const num = (Number(digits.slice(-6)) % 999) + 1;
+  return `C${String(num).padStart(3, "0")}`;
+}
+
 function toFormState(customer: CustomerDetailRow): CustomerFormState {
   return {
     name: customer.name,
@@ -177,20 +185,15 @@ export default function CustomerDetailPage() {
   const detailFields = useMemo(() => {
     if (!customer) return [];
     return [
-      ["Customer ID", customer.id],
-      ["Name", customer.name],
+      ["Customer ID", buildCustomerCode(customer.id)],
+      ["Balance", formatCurrencyLKR(customer.balance)],
+      ["Sales Rep", customer.sales_rep_name || "-"],
       ["Phone", customer.phone],
+      ["Credit Limit", formatCurrencyLKR(customer.credit_limit)],
+      ["Created By", customer.created_by_name || customer.created_by || "-"],
       ["Address", customer.address],
       ["Area", customer.area || "-"],
-      ["Credit Limit", formatCurrencyLKR(customer.credit_limit)],
-      ["Balance", formatCurrencyLKR(customer.balance)],
-      ["Status", formatStatusLabel(customer.status)],
-      ["Sales Rep", customer.sales_rep_name || "-"],
-      ["Sales Rep ID", customer.sales_rep_id || "-"],
-      ["Created By", customer.created_by_name || customer.created_by || "-"],
-      ["Approved By", customer.approved_by_name || customer.approved_by || "-"],
-      ["Approved At", customer.approved_at ? formatDate(customer.approved_at) : "-"],
-      ["Created", customer.created_at ? formatDate(customer.created_at) : "-"]
+      ["Approved By", customer.approved_by_name || customer.approved_by || "-"]
     ];
   }, [customer]);
 
