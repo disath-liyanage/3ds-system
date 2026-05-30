@@ -74,6 +74,37 @@ function buildCustomerCode(rawId?: string | null) {
   return `C${String(num).padStart(3, "0")}`;
 }
 
+function getInvoiceStatusLabel(status: string) {
+  if (status === "pending_approval") return "Pending";
+  if (status === "approved") return "Approved";
+  if (status === "rejected") return "Rejected";
+  if (status === "issued") return "Approved";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+function getInvoiceStatusVariant(status: string) {
+  if (status === "paid" || status === "approved" || status === "issued") return "success" as const;
+  if (status === "rejected") return "danger" as const;
+  if (status === "pending_approval" || status === "draft") return "warning" as const;
+  return "default" as const;
+}
+
+function getInvoiceStatusBadge(row: CustomerInvoiceRow) {
+  const isCredit = row.payment_method === "credit";
+  const paymentStatus = row.payment_status ?? (row.status === "paid" ? "paid" : "unpaid");
+  const isPaid = row.status === "paid" || (isCredit && paymentStatus === "paid");
+  const isPartiallyPaid = isCredit && paymentStatus === "partially_paid";
+  const isApprovedUnsettledCredit =
+    isCredit && (row.status === "approved" || row.status === "issued") && paymentStatus === "unpaid";
+
+  if (isPaid) return { label: "Paid", variant: "success-dark" as const };
+  if (isPartiallyPaid) return { label: "P. Paid", variant: "warning" as const };
+  if (isApprovedUnsettledCredit) return { label: "Approved", variant: "success" as const };
+  if (row.status === "pending_approval") return { label: "Pending", variant: "default" as const };
+
+  return { label: getInvoiceStatusLabel(row.status), variant: getInvoiceStatusVariant(row.status) };
+}
+
 function toFormState(customer: CustomerDetailRow): CustomerFormState {
   return {
     name: customer.name,
@@ -124,7 +155,12 @@ function InvoiceTable({
             <TableCell>{formatCurrencyLKR(invoice.collected_total)}</TableCell>
             {showRemaining ? <TableCell>{formatCurrencyLKR(invoice.remaining_amount)}</TableCell> : null}
             <TableCell className="capitalize">{invoice.payment_method || "-"}</TableCell>
-            <TableCell>{formatStatusLabel(invoice.status)}</TableCell>
+            <TableCell>
+              {(() => {
+                const badge = getInvoiceStatusBadge(invoice);
+                return <Badge variant={badge.variant}>{badge.label}</Badge>;
+              })()}
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
