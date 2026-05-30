@@ -76,7 +76,11 @@ export default function NewInvoicePage() {
   const initialQuotationMode = searchParams.get("kind") === "quotation";
   const { permissions, user, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
   const { data: products, isLoading: isProductsLoading } = useProducts();
-  const { data: minAvailableByProduct } = useProductMinAvailableByPrice();
+  const {
+    data: minAvailableByProduct,
+    isLoading: isMinAvailableLoading,
+    isError: isMinAvailableError
+  } = useProductMinAvailableByPrice();
   const { data: customers, isLoading: isCustomersLoading } = useCustomers();
 
   const queryClient = useQueryClient();
@@ -116,16 +120,11 @@ export default function NewInvoicePage() {
   const watchedDraft = useWatch({ control, name: "draft" });
   const draftErrors = formState.errors?.draft;
   const isAdminOrManager = user?.role === "admin" || user?.role === "manager";
-  const isSalesRep = user?.role === "sales_rep";
 
   const { data: stockByPrice, isLoading: isStockLoading } = useProductStockByPrice(watchedDraft?.product_id);
   const stockByPriceWithAvailability = useMemo(
     () => (stockByPrice ?? []).filter((bucket) => Number(bucket.total_qty) > 0),
     [stockByPrice]
-  );
-  const selectableStockByPrice = useMemo(
-    () => (isSalesRep ? stockByPrice ?? [] : stockByPriceWithAvailability),
-    [isSalesRep, stockByPrice, stockByPriceWithAvailability]
   );
   const minPriceStockInfo = useMemo(() => {
     if (!watchedDraft?.product_id) return null;
@@ -270,7 +269,12 @@ export default function NewInvoicePage() {
         .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
         .map((product) => {
           const minMeta = minAvailableByProduct?.[product.id];
-          let meta = "No GRN Entry";
+          let meta = isMinAvailableLoading
+            ? "Loading stock..."
+            : isMinAvailableError
+              ? "Stock unavailable"
+              : "No GRN Entry";
+
           if (minMeta?.hasGrnEntry) {
             meta = Number(minMeta.stock) > 0
               ? `Lowest Price: Rs. ${Number(minMeta.price || 0).toFixed(2)} | Stock: ${Number(minMeta.stock || 0)} units`
@@ -283,7 +287,7 @@ export default function NewInvoicePage() {
             meta
           };
         }),
-    [minAvailableByProduct, products]
+    [isMinAvailableError, isMinAvailableLoading, minAvailableByProduct, products]
   );
 
   const productSearchLabel =
@@ -435,17 +439,17 @@ export default function NewInvoicePage() {
   // When a product is selected in the draft and no price is set, determine price modal behavior
   useEffect(() => {
     if (watchedDraft?.product_id && watchedDraft?.unit_price === undefined && !isStockLoading) {
-      if (selectableStockByPrice.length === 1) {
-        const bucket = selectableStockByPrice[0];
+      if (stockByPriceWithAvailability.length === 1) {
+        const bucket = stockByPriceWithAvailability[0];
         setValue("draft.unit_price", bucket.selling_price, { shouldValidate: true, shouldDirty: true });
         setValue("draft.unit_cost", bucket.unit_cost);
         setIsPriceModalOpen(false);
         focusQtyField();
-      } else if (selectableStockByPrice.length > 1) {
+      } else if (stockByPriceWithAvailability.length > 1) {
         setIsPriceModalOpen(true);
       }
     }
-  }, [watchedDraft?.product_id, watchedDraft?.unit_price, isStockLoading, selectableStockByPrice, setValue, focusQtyField]);
+  }, [watchedDraft?.product_id, watchedDraft?.unit_price, isStockLoading, stockByPriceWithAvailability, setValue, focusQtyField]);
 
   const hasDraftData = (draft: InvoiceForm["draft"]) =>
     Boolean(
@@ -648,7 +652,7 @@ export default function NewInvoicePage() {
 
     const requestedTotalQty = draftQty + draftFreeQty;
     const effectiveAvailableQty = availableQty ?? 0;
-    if (!isSalesRep && requestedTotalQty > effectiveAvailableQty) {
+    if (requestedTotalQty > effectiveAvailableQty) {
       window.alert(`No stock available for requested quantity. Available: ${effectiveAvailableQty}`);
       return;
     }
@@ -1040,11 +1044,13 @@ export default function NewInvoicePage() {
                   <div className="py-2">
                     {isStockLoading ? (
                       <p className="text-sm text-muted-foreground">Loading stock details...</p>
-                    ) : selectableStockByPrice.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No receive history found for this product.</p>
+                    ) : stockByPriceWithAvailability.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        {(stockByPrice ?? []).length > 0 ? "Out of stock for this product." : "No receive history found for this product."}
+                      </p>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {selectableStockByPrice.map((bucket) => (
+                        {stockByPriceWithAvailability.map((bucket) => (
                           <button
                             key={bucket.selling_price}
                             type="button"
