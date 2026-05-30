@@ -299,18 +299,10 @@ export default function CustomerDetailPage() {
         description="Review customer information, outstanding invoices, and this month's invoices."
         actions={
           <>
-            <Button variant="outline" onClick={() => router.push("/customers")}>
-              Back to Customers
-            </Button>
             {canEditCustomer ? <Button onClick={() => setIsEditOpen(true)}>Edit Customer</Button> : null}
             {canApproveCustomer ? (
               <Button variant="outline" onClick={handleApprove} disabled={isApproving}>
                 {isApproving ? "Approving..." : "Approve"}
-              </Button>
-            ) : null}
-            {canDeleteCustomer ? (
-              <Button variant="danger" onClick={() => setIsDeleteOpen(true)}>
-                Delete Customer
               </Button>
             ) : null}
           </>
@@ -449,10 +441,19 @@ export default function CustomerDetailPage() {
 
           {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
 
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setIsEditOpen(false)} disabled={isSubmitting}>
-              Close
-            </Button>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {canDeleteCustomer ? (
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => setIsDeleteOpen(true)}
+                disabled={isSubmitting}
+              >
+                Delete Customer
+              </Button>
+            ) : (
+              <span />
+            )}
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Saving changes..." : "Save changes"}
             </Button>
