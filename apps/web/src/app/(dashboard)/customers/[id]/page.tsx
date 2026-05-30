@@ -55,7 +55,8 @@ function formatCurrencyLKR(value: number | string | null | undefined) {
 }
 
 function formatStatusLabel(status: string) {
-  if (status === "pending_approval") return "Pending Approval";
+  if (status === "pending_approval") return "Pending";
+  if (status === "active") return "Approved";
   if (status === "rejected") return "Rejected";
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
