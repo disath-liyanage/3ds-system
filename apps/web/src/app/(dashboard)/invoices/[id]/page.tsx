@@ -184,7 +184,7 @@ export default function InvoiceDetailsPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-[1.2fr_0.8fr] gap-4 text-sm mb-4">
+        <div className="invoice-details-grid grid grid-cols-[1.2fr_0.8fr] gap-4 text-sm mb-4">
           <div className="space-y-1 border border-black px-2 py-1">
             <div className="grid grid-cols-[137px_10px_auto]">
               <span className="font-semibold">Customer Code</span>
@@ -258,7 +258,7 @@ export default function InvoiceDetailsPage() {
           </div>
         </div>
 
-        <Table className="border border-black" containerClassName="rounded-none border-0 bg-transparent">
+        <Table className="invoice-products-table border border-black" containerClassName="rounded-none border-0 bg-transparent">
           <TableHeader>
             <TableRow className="border-black border-b">
               <TableHead className="!py-0 text-center bg-transparent border-r border-black">Product</TableHead>
@@ -301,7 +301,7 @@ export default function InvoiceDetailsPage() {
 
         <div className="mt-1 mb-2 text-sm">{paymentTermsText}</div>
         
-        <div className="mb-4 -mt-[33px] ml-auto w-[42%] border border-black">
+        <div className="invoice-totals-box mb-4 -mt-[33px] ml-auto w-[42%] border border-black">
           <div className="grid grid-cols-[1fr_auto]">
             <div className="px-3 py-0 font-semibold">Total Amount</div>
             <div className="px-3 py-0 text-right font-semibold">{formatAmount(invoice.total_amount)}</div>
@@ -338,7 +338,7 @@ export default function InvoiceDetailsPage() {
         {outstandingRows.length > 0 ? (
           <div className="mt-4">
             <h3 className="font-semibold text-sm mb-2">Customer Available Credit Invoice List</h3>
-            <Table className="border border-black" containerClassName="rounded-none border-0 bg-transparent">
+            <Table className="invoice-credit-table border border-black" containerClassName="rounded-none border-0 bg-transparent">
               <TableHeader>
                 <TableRow className="border-black border-b">
                   <TableHead className="!py-0 text-center bg-transparent border-r border-black">Invoice Date</TableHead>
@@ -448,6 +448,16 @@ export default function InvoiceDetailsPage() {
               line-height: 1 !important;
               text-align: left !important;
               transform: translateX(20mm) !important;
+            }
+            .invoice-totals-box {
+              margin-right: 2px !important;
+            }
+            .invoice-credit-table {
+              width: calc(100% - 2px) !important;
+            }
+            .invoice-details-grid,
+            .invoice-products-table {
+              width: calc(100% - 2px) !important;
             }
           }
         `}</style>
