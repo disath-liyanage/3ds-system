@@ -121,6 +121,7 @@ export default function InvoiceDetailsPage() {
   }, 0);
   const netAmount = Math.max(0, Number(invoice.total_amount) - totalDiscountAmount);
   const paymentTermsText = invoice.payment_method === "credit" ? <strong>14 Days Credit Only</strong> : <strong>Cash on Delivery Only</strong>;
+  const salesRepDisplayName = invoice.sales_rep_name?.trim().split(/\s+/)[0] || "Unassigned";
   const outstandingRows = invoice.outstanding_invoices ?? [];
   const totalOutstandingAmount = outstandingRows.reduce((sum, row) => sum + (Number(row.due_amount) || 0), 0);
 
@@ -243,7 +244,10 @@ export default function InvoiceDetailsPage() {
             <div className="grid grid-cols-[102px_10px_auto]">
               <span className="font-semibold">Sales Person</span>
               <span>:</span>
-              <span>{invoice.sales_rep_name || "Unassigned"} {invoice.sales_rep_phone ? `(${invoice.sales_rep_phone})` : ""}</span>
+              <span className="whitespace-nowrap">
+                {salesRepDisplayName}
+                {invoice.sales_rep_phone ? <span className="ml-9">{invoice.sales_rep_phone}</span> : null}
+              </span>
             </div>
             <div className="grid grid-cols-[102px_10px_auto]">
               <span className="font-semibold">Invoice Root</span>
