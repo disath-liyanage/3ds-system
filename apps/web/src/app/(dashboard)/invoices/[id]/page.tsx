@@ -186,7 +186,7 @@ export default function InvoiceDetailsPage() {
         </div>
 
         <div className="invoice-details-grid grid grid-cols-[1.2fr_0.8fr] gap-4 text-sm mb-4">
-          <div className="space-y-1 border border-black px-2 py-1">
+          <div className="space-y-1 border border-black px-2 py-0.5 leading-[1.1]">
             <div className="grid grid-cols-[137px_10px_auto]">
               <span className="font-semibold">Customer Code</span>
               <span>:</span>
@@ -213,7 +213,7 @@ export default function InvoiceDetailsPage() {
               <span>{formatAmount(totalOutstandingAmount)}</span>
             </div>
           </div>
-          <div className="space-y-1 border border-black px-2 py-1">
+          <div className="space-y-1 border border-black px-2 py-0.5 leading-[1.1]">
             <div className="grid grid-cols-[102px_10px_auto]">
               <span className="font-semibold">Invoice Number</span>
               <span>:</span>
