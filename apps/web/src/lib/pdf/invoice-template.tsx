@@ -63,6 +63,10 @@ function formatCurrency(amount: number): string {
   return `LKR ${amount.toFixed(2)}`;
 }
 
+function getInvoicePaymentTerms(invoice: Invoice): string {
+  return (invoice as { payment_method?: string }).payment_method === "credit" ? "14 Days Credit Only" : "Cash on Delivery";
+}
+
 export function InvoiceTemplate({ invoice, items, companyName }: InvoiceTemplateProps) {
   const total = items.reduce((sum, item) => sum + item.qty * item.unitPrice, 0);
 
@@ -115,11 +119,7 @@ export function InvoiceTemplate({ invoice, items, companyName }: InvoiceTemplate
 
         <View style={styles.totalsRow}>
           <View style={styles.totalsLeft}>
-            {(invoice as { payment_method?: string }).payment_method === "credit" ? (
-              <Text style={styles.note}>
-                Cheques to be written in favor of : SANULA PAINTS HUB (PVT)LTD & CROSSED as A/C PAYEE ONLY
-              </Text>
-            ) : null}
+            <Text style={styles.note}>{getInvoicePaymentTerms(invoice)}</Text>
           </View>
           <Text style={styles.totalsLabel}>Total Amount</Text>
           <Text style={styles.totalsAmount}>{formatCurrency(total)}</Text>

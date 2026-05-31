@@ -120,6 +120,7 @@ export default function InvoiceDetailsPage() {
     return sum + (Number(item.qty) || 0) * discountPerUnit;
   }, 0);
   const netAmount = Math.max(0, Number(invoice.total_amount) - totalDiscountAmount);
+  const paymentTermsText = invoice.payment_method === "credit" ? <strong>14 Days Credit Only</strong> : <strong>Cash on Delivery Only</strong>;
   const outstandingRows = invoice.outstanding_invoices ?? [];
   const totalOutstandingAmount = outstandingRows.reduce((sum, row) => sum + (Number(row.due_amount) || 0), 0);
 
@@ -298,13 +299,9 @@ export default function InvoiceDetailsPage() {
           </TableBody>
         </Table>
 
-        <div className="mt-1 mb-2 text-sm">
-          Cheques to be written in favor of :
-          <br />
-          <strong>SANULA PAINTS HUB (PVT)LTD &amp; CROSSED</strong> as <strong>A/C PAYEE ONLY</strong>
-        </div>
+        <div className="mt-1 mb-2 text-sm">{paymentTermsText}</div>
         
-        <div className="mb-4 -mt-[53px] ml-auto w-[42%] border border-black">
+        <div className="mb-4 -mt-[33px] ml-auto w-[42%] border border-black">
           <div className="grid grid-cols-[1fr_auto]">
             <div className="px-3 py-0 font-semibold">Total Amount</div>
             <div className="px-3 py-0 text-right font-semibold">{formatAmount(invoice.total_amount)}</div>
