@@ -38,6 +38,7 @@ export type ReportQueryInput = {
   workerId?: string;
   route?: string;
   customer?: string;
+  customers?: string[];
   department?: string;
   category?: string;
   subcategory?: string;
@@ -620,7 +621,16 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
 
       const routeQueryRaw = String(input.route || "").trim();
       const routeQuery = routeQueryRaw.toUpperCase() === "ALL" ? "" : routeQueryRaw.toLowerCase();
-      const customerQuery = String(input.customer || "").trim().toLowerCase();
+      const customerQueries = Array.from(
+        new Set(
+          [
+            ...(Array.isArray(input.customers) ? input.customers : []),
+            input.customer
+          ]
+            .map((value) => String(value || "").trim().toLowerCase())
+            .filter(Boolean)
+        )
+      );
 
       const invoiceIds = (invoices ?? []).map((invoice: any) => String(invoice.id)).filter(Boolean);
       const collectionTotals = new Map<string, number>();
@@ -670,7 +680,9 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
           balance: Number(r.balance) || 0
         }))
         .filter((row) => (routeQuery ? String(row.area).trim().toLowerCase() === routeQuery : true))
-        .filter((row) => (customerQuery ? String(row.name).trim().toLowerCase() === customerQuery : true));
+        .filter((row) =>
+          customerQueries.length > 0 ? customerQueries.includes(String(row.name).trim().toLowerCase()) : true
+        );
 
       for (const customer of filteredCustomers) {
         const customerInvoices = (invoicesByCustomer.get(customer.id) ?? []).sort((a, b) => a.invoice_number - b.invoice_number);
