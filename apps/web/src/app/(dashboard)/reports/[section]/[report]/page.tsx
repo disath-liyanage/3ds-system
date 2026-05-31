@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import type { KeyboardEvent } from "react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { format } from "date-fns";
-import { Download, Printer } from "lucide-react";
+import { Check, Download, Printer, X } from "lucide-react";
 import { DayPicker, type DateRange } from "react-day-picker";
 import { pdf } from "@react-pdf/renderer";
 import "react-day-picker/dist/style.css";
@@ -23,6 +24,7 @@ import {
 } from "@/app/actions/reports";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select";
 import { Select } from "@/components/ui/select";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
@@ -36,6 +38,162 @@ type ReportDetailPageProps = {
     report: string;
   };
 };
+
+type MultiSearchableSelectProps = {
+  value: string[];
+  options: SearchableSelectOption[];
+  placeholder?: string;
+  onChange: (value: string[]) => void;
+};
+
+function MultiSearchableSelect({ value, options, placeholder, onChange }: MultiSearchableSelectProps) {
+  const [query, setQuery] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const valueSet = useMemo(() => new Set(value), [value]);
+  const selectedOptions = useMemo(() => options.filter((option) => valueSet.has(option.value)), [options, valueSet]);
+  const displayValue =
+    selectedOptions.length === 0
+      ? ""
+      : selectedOptions.length === 1
+        ? selectedOptions[0].label
+        : `${selectedOptions.length} customers selected`;
+
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return options;
+    return options.filter((option) => option.label.toLowerCase().includes(normalizedQuery));
+  }, [options, query]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setHighlightedIndex(0);
+  }, [query, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!containerRef.current || containerRef.current.contains(event.target as Node)) return;
+      setIsOpen(false);
+      setQuery("");
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isOpen]);
+
+  const toggleOption = (option: SearchableSelectOption) => {
+    if (valueSet.has(option.value)) {
+      onChange(value.filter((item) => item !== option.value));
+      return;
+    }
+    onChange([...value, option.value]);
+  };
+
+  const removeOption = (optionValue: string) => {
+    onChange(value.filter((item) => item !== optionValue));
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (!isOpen && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+      setIsOpen(true);
+      return;
+    }
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setHighlightedIndex((prev) => (prev + 1) % Math.max(filteredOptions.length, 1));
+    }
+
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setHighlightedIndex((prev) => (prev - 1 + Math.max(filteredOptions.length, 1)) % Math.max(filteredOptions.length, 1));
+    }
+
+    if (event.key === "Enter") {
+      if (!isOpen) return;
+      event.preventDefault();
+      const option = filteredOptions[highlightedIndex];
+      if (option) {
+        toggleOption(option);
+        setQuery("");
+      }
+    }
+
+    if (event.key === "Escape") {
+      setIsOpen(false);
+      setQuery("");
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <Input
+        value={isOpen ? query : displayValue}
+        placeholder={placeholder}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setIsOpen(true);
+        }}
+        onFocus={() => {
+          setQuery("");
+          setIsOpen(true);
+        }}
+        onKeyDown={handleKeyDown}
+      />
+      {selectedOptions.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {selectedOptions.map((option) => (
+            <span
+              key={option.value}
+              className="inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-muted px-2 py-1 text-xs font-medium text-foreground"
+            >
+              <span className="truncate">{option.label}</span>
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => removeOption(option.value)}
+                aria-label={`Remove ${option.label}`}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {isOpen ? (
+        <div className="absolute z-20 mt-2 w-full rounded-md border border-border bg-white shadow-lg">
+          {filteredOptions.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-muted-foreground">No matches found.</div>
+          ) : (
+            <div className="max-h-56 overflow-auto py-1">
+              {filteredOptions.map((option, index) => {
+                const isSelected = valueSet.has(option.value);
+                return (
+                  <div
+                    key={option.value}
+                    className={`flex cursor-pointer items-center justify-between gap-3 px-3 py-2 text-sm transition ${index === highlightedIndex ? "bg-muted" : ""}`}
+                    onMouseEnter={() => setHighlightedIndex(index)}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      toggleOption(option);
+                      setQuery("");
+                    }}
+                  >
+                    <span className="font-medium text-foreground">{option.label}</span>
+                    {isSelected ? <Check className="h-4 w-4 text-primary" /> : null}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function todayDate() {
   const now = new Date();
@@ -102,6 +260,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   ]);
   const [subcategoryFilter, setSubcategoryFilter] = useState("ALL");
   const [customerFilter, setCustomerFilter] = useState("");
+  const [customerFilters, setCustomerFilters] = useState<string[]>([]);
   const [customerOptions, setCustomerOptions] = useState<SearchableSelectOption[]>([]);
   const [departmentSubcategoryPairs, setDepartmentSubcategoryPairs] = useState<
     Array<{ department: string; subcategory: string }>
@@ -386,7 +545,8 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
         workerId: isSalarySlipReport ? salaryWorkerId : undefined,
         toTimestamp: isCustomerDetailsReport ? runTimestamp : undefined,
         route: isRouteWiseSalesReport || isOutstandingStyleCustomerFilterReport ? routeFilter : undefined,
-        customer: isOutstandingStyleCustomerFilterReport ? customerFilter : undefined,
+        customer: isCustomerDetailsReport ? customerFilter : undefined,
+        customers: isCustomerOutstandingReport ? customerFilters : undefined,
         category: isDepartmentCategorySubcategoryFilterReport ? categoryFilter : undefined,
         subcategory: isDepartmentSubdepartmentFilterReport || isDepartmentCategorySubcategoryFilterReport ? subcategoryFilter : undefined,
         department: isDepartmentSubdepartmentFilterReport || isDepartmentCategorySubcategoryFilterReport ? departmentFilter : undefined,
@@ -632,25 +792,41 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                   placeholder="Search and select route"
                   onChange={(value) => {
                     setRouteFilter(value || "ALL");
-                    if (value) setCustomerFilter("");
+                    if (value) {
+                      setCustomerFilter("");
+                      setCustomerFilters([]);
+                    }
                   }}
                 />
                 <span className="px-1 text-sm text-muted-foreground text-center">/</span>
-                <SearchableSelect
-                  value={customerFilter}
-                  options={customerOptions}
-                  placeholder="Search and select customer"
-                  onChange={(value) => {
-                    setCustomerFilter(value);
-                    if (value) setRouteFilter("ALL");
-                  }}
-                />
+                {isCustomerOutstandingReport ? (
+                  <MultiSearchableSelect
+                    value={customerFilters}
+                    options={customerOptions}
+                    placeholder="Search and select customers"
+                    onChange={(values) => {
+                      setCustomerFilters(values);
+                      if (values.length > 0) setRouteFilter("ALL");
+                    }}
+                  />
+                ) : (
+                  <SearchableSelect
+                    value={customerFilter}
+                    options={customerOptions}
+                    placeholder="Search and select customer"
+                    onChange={(value) => {
+                      setCustomerFilter(value);
+                      if (value) setRouteFilter("ALL");
+                    }}
+                  />
+                )}
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => {
                     setRouteFilter("ALL");
                     setCustomerFilter("");
+                    setCustomerFilters([]);
                   }}
                 >
                   Reset
