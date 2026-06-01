@@ -743,7 +743,7 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
       const { data, error } = await adminClient
         .from("invoices")
         .select("invoice_number, total_amount, created_at, status, customer:customers(name)")
-        .eq("payment_method", "credit")
+        .in("payment_method", ["credit", "on_account"])
         .in("status", ["approved", "issued"])
         .gte("created_at", fromIso)
         .lte("created_at", toIso)

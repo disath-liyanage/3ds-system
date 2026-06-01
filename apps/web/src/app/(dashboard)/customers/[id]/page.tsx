@@ -91,12 +91,12 @@ function getInvoiceStatusVariant(status: string) {
 }
 
 function getInvoiceStatusBadge(row: CustomerInvoiceRow) {
-  const isCredit = row.payment_method === "credit";
+  const isOutstandingInvoice = row.payment_method === "credit" || row.payment_method === "on_account";
   const paymentStatus = row.payment_status ?? (row.status === "paid" ? "paid" : "unpaid");
-  const isPaid = row.status === "paid" || (isCredit && paymentStatus === "paid");
-  const isPartiallyPaid = isCredit && paymentStatus === "partially_paid";
+  const isPaid = row.status === "paid" || (isOutstandingInvoice && paymentStatus === "paid");
+  const isPartiallyPaid = isOutstandingInvoice && paymentStatus === "partially_paid";
   const isApprovedUnsettledCredit =
-    isCredit && (row.status === "approved" || row.status === "issued") && paymentStatus === "unpaid";
+    isOutstandingInvoice && (row.status === "approved" || row.status === "issued") && paymentStatus === "unpaid";
 
   if (isPaid) return { label: "Paid", variant: "success-dark" as const };
   if (isPartiallyPaid) return { label: "P. Paid", variant: "warning" as const };
@@ -155,7 +155,7 @@ function InvoiceTable({
             <TableCell>{formatCurrencyLKR(invoice.total_amount)}</TableCell>
             <TableCell>{formatCurrencyLKR(invoice.collected_total)}</TableCell>
             {showRemaining ? <TableCell>{formatCurrencyLKR(invoice.remaining_amount)}</TableCell> : null}
-            <TableCell className="capitalize">{invoice.payment_method || "-"}</TableCell>
+            <TableCell className="capitalize">{invoice.payment_method === "on_account" ? "On Account" : invoice.payment_method || "-"}</TableCell>
             <TableCell>
               {(() => {
                 const badge = getInvoiceStatusBadge(invoice);

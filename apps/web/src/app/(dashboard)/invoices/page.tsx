@@ -68,12 +68,12 @@ export default function InvoicesPage() {
   };
 
   const getInvoiceStatusBadge = (row: (typeof rows)[number]) => {
-    const isCredit = row.payment_method === "credit";
+    const isOutstandingInvoice = row.payment_method === "credit" || row.payment_method === "on_account";
     const paymentStatus = row.payment_status ?? (row.status === "paid" ? "paid" : "unpaid");
-    const isPaid = row.status === "paid" || (isCredit && paymentStatus === "paid");
-    const isPartiallyPaid = isCredit && paymentStatus === "partially_paid";
+    const isPaid = row.status === "paid" || (isOutstandingInvoice && paymentStatus === "paid");
+    const isPartiallyPaid = isOutstandingInvoice && paymentStatus === "partially_paid";
     const isApprovedUnsettledCredit =
-      isCredit && (row.status === "approved" || row.status === "issued") && paymentStatus === "unpaid";
+      isOutstandingInvoice && (row.status === "approved" || row.status === "issued") && paymentStatus === "unpaid";
 
     if (isPaid) return { label: "Paid", variant: "success-dark" } as const;
     if (isPartiallyPaid) return { label: "P. Paid", variant: "warning" } as const;
@@ -378,7 +378,7 @@ export default function InvoicesPage() {
                 </TableCell>
                 <TableCell>{formatDate(row.created_at)}</TableCell>
                 <TableCell>{row.customer_name}</TableCell>
-                <TableCell className="capitalize">{row.payment_method}</TableCell>
+                <TableCell className="capitalize">{row.payment_method === "on_account" ? "On Account" : row.payment_method}</TableCell>
                 <TableCell>LKR {row.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
                 <TableCell>
                   {(() => {

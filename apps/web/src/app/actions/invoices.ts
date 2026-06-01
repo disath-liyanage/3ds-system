@@ -34,6 +34,16 @@ type ProfilePermissionRow = {
   custom_role: CustomRolePermissionSummary | CustomRolePermissionSummary[] | null;
 };
 
+type InvoicePaymentMethod = "cash" | "credit" | "on_account";
+
+function isValidInvoicePaymentMethod(value: string): value is InvoicePaymentMethod {
+  return value === "cash" || value === "credit" || value === "on_account";
+}
+
+function isOutstandingInvoicePaymentMethod(value: string | null | undefined): boolean {
+  return value === "credit" || value === "on_account";
+}
+
 export type InvoiceListRow = {
   id: string;
   invoice_number: number;
@@ -91,7 +101,7 @@ export type ReturnableInvoiceRow = {
   invoice_number: number;
   customer_id: string;
   customer_name: string;
-  payment_method: "cash" | "credit";
+  payment_method: InvoicePaymentMethod;
   created_at: string;
   items: Array<{
     invoice_item_id: string;
@@ -594,7 +604,7 @@ export async function getInvoiceDetail(
     .select("id, invoice_number, created_at, total_amount, payment_method, status")
     .eq("customer_id", invoiceData.customer_id)
     .eq("invoice_kind", "invoice")
-    .eq("payment_method", "credit")
+    .in("payment_method", ["credit", "on_account"])
     .in("status", ["approved", "issued", "paid"])
     .order("created_at", { ascending: false });
 
@@ -623,7 +633,7 @@ export async function getInvoiceDetail(
         invoice_number: Number(row.invoice_number) || 0,
         created_at: String(row.created_at),
         net_amount: netAmount,
-        credit_amount: row.payment_method === "credit" ? netAmount : 0,
+        credit_amount: isOutstandingInvoicePaymentMethod(row.payment_method) ? netAmount : 0,
         settled_amount: settledAmount,
         due_amount: dueAmount
       };
@@ -685,8 +695,8 @@ export async function createInvoice(input: InvoiceInput): Promise<CreateInvoiceA
     return { success: false, error: "Customer is required" };
   }
 
-  if (payment_method !== "cash" && payment_method !== "credit") {
-    return { success: false, error: "Valid payment method is required (cash or credit)" };
+  if (!isValidInvoicePaymentMethod(payment_method)) {
+    return { success: false, error: "Valid payment method is required (cash, credit, or on account)" };
   }
 
   if (!items || items.length === 0) {
@@ -841,8 +851,8 @@ export async function createInvoice(input: InvoiceInput): Promise<CreateInvoiceA
       console.error("Failed to update stock after invoice creation", err);
     }
 
-    // If credit, we might want to update customer balance
-    if (payment_method === "credit") {
+    // Outstanding invoices increase the customer's collection balance.
+    if (isOutstandingInvoicePaymentMethod(payment_method)) {
       try {
         const { data: customer, error: customerError } = await adminClient
           .from("customers")
@@ -891,8 +901,8 @@ export async function updateDraftInvoice(input: UpdateDraftInvoiceInput): Promis
     return { success: false, error: "Invoice id is required" };
   }
 
-  if (payment_method !== "cash" && payment_method !== "credit") {
-    return { success: false, error: "Valid payment method is required (cash or credit)" };
+  if (!isValidInvoicePaymentMethod(payment_method)) {
+    return { success: false, error: "Valid payment method is required (cash, credit, or on account)" };
   }
 
   if (!items || items.length === 0) {
@@ -1036,7 +1046,7 @@ export async function updateDraftInvoice(input: UpdateDraftInvoiceInput): Promis
       console.error("Failed to update stock after draft finalize", err);
     }
 
-    if (payment_method === "credit") {
+    if (isOutstandingInvoicePaymentMethod(payment_method)) {
       try {
         const { data: customer, error: customerError } = await adminClient
           .from("customers")
@@ -1084,8 +1094,8 @@ export async function updateInvoice(input: UpdateInvoiceInput): Promise<ActionRe
     return { success: false, error: "Invoice id is required" };
   }
 
-  if (payment_method !== "cash" && payment_method !== "credit") {
-    return { success: false, error: "Valid payment method is required (cash or credit)" };
+  if (!isValidInvoicePaymentMethod(payment_method)) {
+    return { success: false, error: "Valid payment method is required (cash, credit, or on account)" };
   }
 
   if (!items || items.length === 0) {
@@ -1198,8 +1208,8 @@ export async function updateInvoice(input: UpdateInvoiceInput): Promise<ActionRe
       console.error("Failed to update stock after invoice edit", err);
     }
 
-    const oldContribution = invoice.payment_method === "credit" ? Number(invoice.total_amount) : 0;
-    const newContribution = payment_method === "credit" ? total_amount : 0;
+    const oldContribution = isOutstandingInvoicePaymentMethod(invoice.payment_method) ? Number(invoice.total_amount) : 0;
+    const newContribution = isOutstandingInvoicePaymentMethod(payment_method) ? total_amount : 0;
     const balanceDelta = newContribution - oldContribution;
 
     if (balanceDelta !== 0) {
@@ -1419,7 +1429,7 @@ export async function approveInvoice(invoiceId: string, notificationId?: string)
     console.error("Failed to update stock after invoice approval", err);
   }
 
-  if (invoice.payment_method === "credit") {
+  if (isOutstandingInvoicePaymentMethod(invoice.payment_method)) {
     try {
       const { data: customer, error: customerError } = await adminClient
         .from("customers")
@@ -1616,8 +1626,8 @@ export async function deleteInvoice(invoiceId: string): Promise<ActionResult> {
       console.error("Failed to restore stock after invoice deletion", err);
     }
 
-    // Restore customer balance if credit
-    if (invoice.payment_method === "credit") {
+    // Restore customer balance for invoices tracked through collections.
+    if (isOutstandingInvoicePaymentMethod(invoice.payment_method)) {
       try {
         const { data: customer, error: customerError } = await adminClient
           .from("customers")
@@ -1712,7 +1722,7 @@ export async function listReturnableInvoices(): Promise<{ success: boolean; data
         invoice_number: Number(invoice.invoice_number),
         customer_id: invoice.customer_id,
         customer_name: customer?.name ?? "Unknown Customer",
-        payment_method: (invoice.payment_method === "cash" ? "cash" : "credit") as "cash" | "credit",
+        payment_method: isValidInvoicePaymentMethod(invoice.payment_method) ? invoice.payment_method : "credit",
         created_at: invoice.created_at,
         items
       };
@@ -1853,7 +1863,7 @@ export async function createReturnInvoice(input: CreateReturnInvoiceInput): Prom
       await adminClient.from("products").update({ stock_qty: newStock }).eq("id", item.product_id);
     }
 
-    if (sourceInvoice.payment_method === "credit") {
+    if (isOutstandingInvoicePaymentMethod(sourceInvoice.payment_method)) {
       const { data: customer, error: customerError } = await adminClient
         .from("customers")
         .select("balance")

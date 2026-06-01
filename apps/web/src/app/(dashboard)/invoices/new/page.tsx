@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 
 type InvoiceForm = {
   customer_id: string;
-  payment_method: "cash" | "credit";
+  payment_method: "cash" | "credit" | "on_account";
   notes?: string;
   draft: {
     product_id: string;
@@ -870,6 +870,13 @@ export default function NewInvoicePage() {
                   onClick={() => setValue("payment_method", "cash", { shouldDirty: true })}
                 >
                   Cash
+                </Button>
+                <Button
+                  type="button"
+                  variant={watchedPaymentMethod === "on_account" ? "default" : "outline"}
+                  onClick={() => setValue("payment_method", "on_account", { shouldDirty: true })}
+                >
+                  On Account
                 </Button>
                 {!editId && !draftId ? (
                   <Button

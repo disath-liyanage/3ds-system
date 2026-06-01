@@ -286,6 +286,10 @@ function getColomboHour(value: Date): number {
   );
 }
 
+function isOutstandingInvoicePaymentMethod(value: string | null | undefined): boolean {
+  return value === "credit" || value === "on_account";
+}
+
 export async function createDueChequeDepositReminders(): Promise<{ success: boolean; error?: string }> {
   const access = await getCurrentUserProfile();
   if ("error" in access) return { success: false, error: access.error };
@@ -406,6 +410,7 @@ export async function listCollectionInvoices(): Promise<{ success: boolean; data
     .select(
       "id, invoice_number, customer_id, total_amount, status, created_at, is_settled, settled_at, customer:customers(name, sales_rep_id)"
     )
+    .in("payment_method", ["credit", "on_account"])
     .in("status", ["approved", "issued", "paid"])
     .order("created_at", { ascending: false })
     .returns<InvoiceCollectionRow[]>();
@@ -764,7 +769,7 @@ export async function recordCollection(input: RecordCollectionInput): Promise<Ac
   const { data: invoice, error: invoiceError } = await adminClient
     .from("invoices")
     .select(
-      "id, invoice_number, customer_id, total_amount, status, is_settled, customer:customers(name, balance, sales_rep_id), invoice_items(id, product_id, qty, unit_price, discount_type, discount_value)"
+      "id, invoice_number, customer_id, total_amount, payment_method, status, is_settled, customer:customers(name, balance, sales_rep_id), invoice_items(id, product_id, qty, unit_price, discount_type, discount_value)"
     )
     .eq("id", input.invoice_id)
     .maybeSingle();
@@ -775,6 +780,10 @@ export async function recordCollection(input: RecordCollectionInput): Promise<Ac
 
   if (invoice.is_settled) {
     return { success: false, error: "Invoice is already settled" };
+  }
+
+  if (!isOutstandingInvoicePaymentMethod(invoice.payment_method)) {
+    return { success: false, error: "Only credit or on account invoices can be settled through collections" };
   }
 
   if (!["approved", "issued", "paid"].includes(invoice.status)) {
