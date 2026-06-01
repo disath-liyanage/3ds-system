@@ -73,6 +73,10 @@ export type CustomerDetailData = {
   current_month_invoices: CustomerInvoiceRow[];
 };
 
+function isOutstandingInvoicePaymentMethod(value: string | null | undefined): boolean {
+  return value === "credit" || value === "on_account";
+}
+
 async function getCurrentUserProfile() {
   const supabase = createClient();
 
@@ -227,7 +231,7 @@ export async function getCustomerDetail(customerId: string): Promise<{
 
   const outstandingInvoices = invoices.filter(
     (invoice) =>
-      invoice.payment_method === "credit" &&
+      isOutstandingInvoicePaymentMethod(invoice.payment_method) &&
       ["approved", "issued", "paid"].includes(invoice.status) &&
       invoice.remaining_amount > 0
   );
