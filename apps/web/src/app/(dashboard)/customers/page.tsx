@@ -300,7 +300,7 @@ export default function CustomersPage() {
           {filtered.map((customer) => (
             <TableRow
               key={customer.id}
-              className={`cursor-pointer ${customer.status === "pending_approval" ? "bg-brand-light/70 hover:bg-brand-light" : ""}`}
+              className={`cursor-pointer transition-colors hover:bg-muted/50 ${customer.status === "pending_approval" ? "bg-brand-light/70 hover:bg-brand-light" : ""}`}
               onClick={() => openCustomerDialog(customer)}
             >
               <TableCell>{customer.name}</TableCell>
