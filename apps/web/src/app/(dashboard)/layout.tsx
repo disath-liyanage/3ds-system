@@ -42,7 +42,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
   const worker = Array.isArray(resolvedProfile?.worker) ? resolvedProfile.worker[0] : resolvedProfile?.worker;
 
   return (
-    <div className="min-h-screen lg:flex">
+    <div className="min-h-screen bg-transparent lg:flex">
       <DashboardSidebar
         isAdmin={isAdmin}
         isManager={isManager}
@@ -54,7 +54,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
           identityCardNo: worker?.identity_card_no ?? null
         }}
       />
-      <main className="flex-1 p-4 lg:p-8">{children}</main>
+      <main className="flex-1 bg-transparent p-4 lg:p-8">{children}</main>
     </div>
   );
 }

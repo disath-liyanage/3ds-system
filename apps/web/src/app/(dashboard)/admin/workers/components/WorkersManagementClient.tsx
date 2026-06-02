@@ -163,7 +163,7 @@ export function WorkersManagementClient({ workers, currentUser }: WorkersManagem
 
   if (!permissions.canViewUsers) {
     return (
-      <div className="rounded-lg border border-border bg-white p-4 text-sm text-muted-foreground">
+      <div className="glass-panel p-4 text-sm text-muted-foreground">
         You do not have permission to manage workers.
       </div>
     );

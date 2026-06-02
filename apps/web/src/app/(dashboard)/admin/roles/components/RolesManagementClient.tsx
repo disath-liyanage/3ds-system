@@ -64,7 +64,7 @@ export function RolesManagementClient({ roles, currentUser }: RolesManagementCli
 
   if (!permissions.canManageUsers) {
     return (
-      <div className="rounded-lg border border-border bg-white p-4 text-sm text-muted-foreground">
+      <div className="glass-panel p-4 text-sm text-muted-foreground">
         You do not have permission to manage custom roles.
       </div>
     );
@@ -88,7 +88,7 @@ export function RolesManagementClient({ roles, currentUser }: RolesManagementCli
       />
 
       {sortedRoles.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-border bg-white p-8 text-center text-sm text-muted-foreground">
+        <div className="glass-panel border-dashed p-8 text-center text-sm text-muted-foreground">
           No custom roles yet. Create one to assign granular permissions.
         </div>
       ) : (

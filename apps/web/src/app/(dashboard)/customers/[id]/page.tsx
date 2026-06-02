@@ -350,11 +350,11 @@ export default function CustomerDetailPage() {
       />
 
       {detailQuery.isLoading || isPermissionsLoading ? (
-        <div className="rounded-md border border-border bg-white p-4 text-sm text-muted-foreground">
+        <div className="glass-panel p-4 text-sm text-muted-foreground">
           Loading customer...
         </div>
       ) : detailQuery.isError ? (
-        <div className="rounded-md border border-border bg-white p-4 text-sm text-red-600">
+        <div className="glass-panel p-4 text-sm text-red-300">
           Failed to load customer.
         </div>
       ) : customer ? (
@@ -401,7 +401,7 @@ export default function CustomerDetailPage() {
           </Card>
         </>
       ) : (
-        <div className="rounded-md border border-border bg-white p-4 text-sm text-muted-foreground">
+        <div className="glass-panel p-4 text-sm text-muted-foreground">
           Customer not found.
         </div>
       )}

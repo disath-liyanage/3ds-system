@@ -132,7 +132,7 @@ export function UsersTableClient({ users, customRoles, workers, currentUser }: U
 
   if (!permissions.canViewUsers) {
     return (
-      <div className="rounded-lg border border-border bg-white p-4 text-sm text-muted-foreground">
+      <div className="glass-panel p-4 text-sm text-muted-foreground">
         You do not have permission to view users.
       </div>
     );

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useMemo, useState } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
 import Link from "next/link";
 import { REPORT_SECTIONS } from "./reports-data";
 
@@ -58,12 +58,16 @@ export default function ReportsPage() {
           <CardTitle>Universal Search</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search reports by name..."
-            aria-label="Search reports"
-          />
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search reports by name..."
+              aria-label="Search reports"
+              className="glass-search"
+            />
+          </div>
           <p className="text-xs text-muted-foreground">
             {totalVisibleReports} report{totalVisibleReports === 1 ? "" : "s"} found
           </p>

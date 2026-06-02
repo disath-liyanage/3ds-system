@@ -4,7 +4,7 @@ import type { FormEvent } from "react";
 import type { Product } from "@paintdist/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -365,7 +365,7 @@ function SearchableSelect({ id, value, options, placeholder, onChange }: Searcha
         onKeyDown={handleKeyDown}
       />
       {isOpen ? (
-        <div className="absolute z-20 mt-2 w-full rounded-md border border-border bg-white shadow-lg">
+        <div className="light-surface absolute z-20 mt-2 w-full rounded-md border border-border bg-white shadow-lg">
           {filteredOptions.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">No matches found.</div>
           ) : (
@@ -1881,18 +1881,21 @@ export default function ProductsPage() {
       {error ? <p className="text-sm text-red-600">Failed to load products: {error.message}</p> : null}
 
       {isLoading ? (
-        <div className="rounded-md border border-border bg-white p-4 text-sm text-muted-foreground">Loading products...</div>
+        <div className="glass-panel p-4 text-sm text-muted-foreground">Loading products...</div>
       ) : (
         <div className="space-y-3">
-          <div className="flex flex-col gap-3 rounded-md border border-border bg-white p-4">
+          <div className="glass-panel flex flex-col gap-3 p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-1 items-center gap-3">
+                <div className="relative flex-1 lg:max-w-md">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder="Search products..."
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  className="lg:max-w-md"
+                  className="glass-search"
                 />
+                </div>
                 {hasFilters ? <span className="text-xs text-muted-foreground">Filters active</span> : null}
               </div>
               <div className="flex items-center gap-2">
@@ -1915,14 +1918,14 @@ export default function ProductsPage() {
             </div>
 
             {filtersOpen ? (
-              <div className="flex flex-wrap items-end gap-3 rounded-md border border-border bg-muted/30 p-4">
+              <div className="glass-panel flex flex-wrap items-end gap-3 p-4">
                 <div className="w-full space-y-1 sm:w-[170px]">
                   <label className="text-xs font-semibold text-muted-foreground">Status</label>
                   <div ref={statusDropdownRef} className="relative">
                     <Button
                       type="button"
                       variant="outline"
-                      className="flex h-10 w-full items-center justify-between px-3"
+                    className="flex h-10 w-full items-center justify-between px-3"
                       onClick={() => setIsStatusDropdownOpen((prev) => !prev)}
                     >
                       <Badge variant={selectedStatusOption.variant}>{selectedStatusOption.label}</Badge>
@@ -1935,7 +1938,7 @@ export default function ProductsPage() {
                       />
                     </Button>
                     {isStatusDropdownOpen ? (
-                      <div className="absolute z-20 mt-2 w-full rounded-md border border-border bg-white py-1 shadow-lg">
+                      <div className="light-surface absolute z-20 mt-2 w-full rounded-md border border-border bg-white py-1 shadow-lg">
                         {statusOptions.map((option) => (
                           <Button
                             key={option.value}
@@ -1958,7 +1961,7 @@ export default function ProductsPage() {
                 <div className="w-full space-y-1 sm:w-[240px]">
                   <label className="text-xs font-semibold text-muted-foreground">Department</label>
                   <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="glass-field flex h-10 w-full px-3 py-2 text-sm"
                     value={departmentFilter}
                     onChange={(event) => setDepartmentFilter(event.target.value)}
                   >
@@ -1973,7 +1976,7 @@ export default function ProductsPage() {
                 <div className="w-full space-y-1 sm:w-[240px]">
                   <label className="text-xs font-semibold text-muted-foreground">Category</label>
                   <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="glass-field flex h-10 w-full px-3 py-2 text-sm"
                     value={categoryFilter}
                     onChange={(event) => setCategoryFilter(event.target.value)}
                   >
