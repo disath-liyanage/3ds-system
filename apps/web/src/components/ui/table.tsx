@@ -9,7 +9,7 @@ type TableProps = React.TableHTMLAttributes<HTMLTableElement> & {
 export const Table = React.forwardRef<HTMLTableElement, TableProps>(
   ({ className, containerClassName, ...props }, ref) => (
     <div
-      className={cn("w-full overflow-auto rounded-md border border-border bg-white", containerClassName)}
+      className={cn("glass-panel w-full overflow-auto", containerClassName)}
     >
       <table ref={ref} className={cn("w-full text-sm", className)} {...props} />
     </div>

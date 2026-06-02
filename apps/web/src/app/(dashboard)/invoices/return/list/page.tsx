@@ -40,7 +40,7 @@ export default function ReturnInvoiceListPage() {
         description="All created return invoices."
       />
 
-      <div className="rounded-md border border-border bg-white">
+      <div className="glass-panel">
         <Table>
           <TableHeader>
             <TableRow>

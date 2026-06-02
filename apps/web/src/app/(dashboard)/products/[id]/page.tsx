@@ -157,7 +157,7 @@ export default function ProductStockDetailPage() {
       />
 
       {isLoading ? (
-        <div className="rounded-md border border-border bg-white p-4 text-sm text-muted-foreground">
+        <div className="glass-panel p-4 text-sm text-muted-foreground">
           Loading product...
         </div>
       ) : product ? (
@@ -200,7 +200,7 @@ export default function ProductStockDetailPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="rounded-md border border-border bg-white p-4 text-sm text-muted-foreground">
+        <div className="glass-panel p-4 text-sm text-muted-foreground">
           Product not found.
         </div>
       )}

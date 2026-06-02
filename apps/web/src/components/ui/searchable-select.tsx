@@ -160,7 +160,7 @@ export function SearchableSelect({
         onKeyDown={handleKeyDown}
       />
       {isOpen && !disabled ? (
-        <div className="absolute z-20 mt-2 w-full rounded-md border border-border bg-white shadow-lg">
+        <div className="light-surface absolute z-20 mt-2 w-full rounded-md border border-border bg-white text-foreground shadow-lg">
           {filteredOptions.length === 0 ? (
             <div className="px-3 py-2 text-sm text-muted-foreground">No matches found.</div>
           ) : (

@@ -41,7 +41,7 @@ export function Dialog({
   return (
     <dialog
       ref={dialogRef}
-      className={`w-full ${maxWidthClassName} rounded-xl border border-border bg-white p-0 shadow-xl backdrop:bg-black/35`}
+      className={`light-surface w-full ${maxWidthClassName} rounded-xl border border-border bg-white p-0 text-foreground shadow-xl backdrop:bg-black/35`}
       onClose={() => onOpenChange(false)}
     >
       <div className={`relative ${stickyHeader ? "max-h-[85vh] overflow-hidden" : ""}`}>

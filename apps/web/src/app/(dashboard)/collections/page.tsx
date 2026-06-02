@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { DayPicker, type DateRange } from "react-day-picker";
 
 import "react-day-picker/dist/style.css";
@@ -289,15 +289,18 @@ export default function CollectionsPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-md border border-border bg-white p-4">
+      <div className="glass-panel flex flex-col gap-3 p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-1 items-center gap-3">
+            <div className="relative flex-1 lg:max-w-md">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search customer or invoice #..."
               value={customerSearch}
               onChange={(event) => setCustomerSearch(event.target.value)}
-              className="lg:max-w-md"
+              className="glass-search"
             />
+            </div>
             {hasFilters ? <span className="text-xs text-muted-foreground">Filters active</span> : null}
           </div>
           <div className="flex items-center gap-2">
@@ -325,7 +328,7 @@ export default function CollectionsPage() {
         </div>
 
         {filtersOpen ? (
-          <div className="grid grid-cols-1 gap-4 rounded-md border border-border bg-muted/30 p-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="glass-panel grid grid-cols-1 gap-4 p-4 md:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-muted-foreground">Status</label>
               <Select
