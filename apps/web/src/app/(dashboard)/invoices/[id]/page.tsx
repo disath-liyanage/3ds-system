@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Mail, MapPin, Phone } from "lucide-react";
 
 import { approveInvoice, deleteInvoice, rejectInvoice } from "@/app/actions/invoices";
@@ -16,12 +16,23 @@ import { PageHeader } from "@/components/page-header";
 export default function InvoiceDetailsPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
+  const shouldPrint = searchParams.get("print") === "true";
   const invoiceId = Array.isArray(params.id) ? params.id[0] : params.id;
 
   const { permissions, user, isLoading: isPermissionsLoading } = useCurrentUserPermissions();
   const { data: invoice, isLoading: isInvoiceLoading, isError } = useInvoice(invoiceId);
 
   const [isReviewing, setIsReviewing] = useState(false);
+
+  useEffect(() => {
+    if (shouldPrint && invoice && !isInvoiceLoading && !isError) {
+      const timer = setTimeout(() => {
+        window.print();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldPrint, invoice, isInvoiceLoading, isError]);
 
   const isAdminOrManager = user?.role === "admin" || user?.role === "manager";
 

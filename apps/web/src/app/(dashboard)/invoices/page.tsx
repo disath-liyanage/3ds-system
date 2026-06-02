@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Printer, Search } from "lucide-react";
 import { DayPicker, type DateRange } from "react-day-picker";
 
 import "react-day-picker/dist/style.css";
@@ -393,10 +393,11 @@ export default function InvoicesPage() {
                 <TableCell>
                   <Button asChild size="sm" variant="outline">
                     <Link
-                      href={row.status === "draft" ? `/invoices/new?draftId=${row.id}` : `/invoices/${row.id}`}
+                      href={row.status === "draft" ? `/invoices/new?draftId=${row.id}` : `/invoices/${row.id}?print=true`}
                       onClick={(event) => event.stopPropagation()}
                     >
-                      View
+                      <Printer className="mr-2 h-4 w-4" />
+                      Print
                     </Link>
                   </Button>
                 </TableCell>
