@@ -347,8 +347,8 @@ export default function InvoicesPage() {
             <TableHead>Customer</TableHead>
             <TableHead>Payment</TableHead>
             <TableHead>Total</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Action</TableHead>
+            <TableHead className="text-center">Status</TableHead>
+            <TableHead className="text-center">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -384,13 +384,13 @@ export default function InvoicesPage() {
                 <TableCell>{row.customer_name}</TableCell>
                 <TableCell className="capitalize">{row.payment_method === "on_account" ? "On Account" : row.payment_method}</TableCell>
                 <TableCell>LKR {row.total_amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
-                <TableCell>
+                <TableCell className="text-center">
                   {(() => {
                     const badge = getInvoiceStatusBadge(row);
                     return <Badge variant={badge.variant}>{badge.label}</Badge>;
                   })()}
                 </TableCell>
-                <TableCell>
+                <TableCell className="text-center">
                   <Button asChild size="sm" variant="outline">
                     <Link
                       href={row.status === "draft" ? `/invoices/new?draftId=${row.id}` : `/invoices/${row.id}?print=true`}
