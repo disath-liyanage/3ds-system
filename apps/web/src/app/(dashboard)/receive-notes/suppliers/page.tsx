@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useMemo, useState } from "react";
 
 import { createSupplier, deleteSupplier, updateSupplier } from "@/app/actions/suppliers";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -139,18 +140,13 @@ export default function SuppliersPage() {
 
   return (
     <section className="space-y-4">
-      <header className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Suppliers</h1>
-          <p className="text-sm text-muted-foreground">Manage suppliers for GRN entries.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="outline">
-            <Link href="/receive-notes">Back</Link>
-          </Button>
-          {canManageReceiveNotes ? <Button onClick={() => setIsAddOpen(true)}>Add Supplier</Button> : null}
-        </div>
-      </header>
+      <PageHeader
+        title="Suppliers"
+        description="Manage suppliers for GRN entries."
+        actions={
+          canManageReceiveNotes ? <Button onClick={() => setIsAddOpen(true)}>Add Supplier</Button> : null
+        }
+      />
 
       <Table>
         <TableHeader>

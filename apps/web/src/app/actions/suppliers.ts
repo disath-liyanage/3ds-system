@@ -92,7 +92,7 @@ export async function createSupplier(input: CreateSupplierInput): Promise<Action
     return { success: false, error: supplierError.message };
   }
 
-  revalidatePath("/suppliers");
+  revalidatePath("/receive-notes/suppliers");
 
   return { success: true, message: "Supplier added successfully." };
 }
@@ -126,7 +126,7 @@ export async function updateSupplier(supplierId: string, input: UpdateSupplierIn
     return { success: false, error: updateError.message };
   }
 
-  revalidatePath("/suppliers");
+  revalidatePath("/receive-notes/suppliers");
 
   return { success: true, message: "Supplier updated successfully." };
 }
@@ -149,7 +149,7 @@ export async function deleteSupplier(supplierId: string): Promise<ActionResult> 
     return { success: false, error: deleteError.message };
   }
 
-  revalidatePath("/suppliers");
+  revalidatePath("/receive-notes/suppliers");
 
   return { success: true, message: "Supplier deleted successfully." };
 }
