@@ -1058,20 +1058,21 @@ export default function NewInvoicePage() {
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {stockByPriceWithAvailability.map((bucket) => (
-                          <button
+                          <Button
                             key={bucket.selling_price}
                             type="button"
+                            variant="outline"
                             onClick={() => {
                               setValue("draft.unit_price", bucket.selling_price, { shouldValidate: true, shouldDirty: true });
                               setValue("draft.unit_cost", bucket.unit_cost);
                               setIsPriceModalOpen(false);
                               focusQtyField();
                             }}
-                            className="flex flex-col items-start px-4 py-3 border rounded-lg bg-muted/20 hover:bg-muted/60 transition text-left"
+                            className="h-auto flex-col items-start bg-muted/20 px-4 py-3 text-left hover:bg-brand-light/60"
                           >
                             <span className="font-semibold text-primary text-base">LKR {bucket.selling_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             <span className="text-xs text-muted-foreground mt-1">Stock Available: {bucket.total_qty}</span>
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     )}

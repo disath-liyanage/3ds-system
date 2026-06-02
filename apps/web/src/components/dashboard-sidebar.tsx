@@ -21,6 +21,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { createDueChequeDepositReminders } from "@/app/actions/collections";
 import { Sidebar, type SidebarItem } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -242,27 +243,30 @@ export function DashboardSidebar({ isAdmin, isManager, user }: DashboardSidebarP
             <p className="mt-2 truncate text-xs text-muted-foreground">Role: {user.role}</p>
             <p className="mt-1 truncate text-xs text-muted-foreground">ID No: {identityCardLabel}</p>
             <p className="mt-1 truncate text-xs text-muted-foreground">Created: {createdDateLabel}</p>
-            <button
+            <Button
               type="button"
+              variant="danger"
+              size="sm"
               onClick={(event) => {
                 event.stopPropagation();
                 void handleSignOut();
               }}
               disabled={isSigningOut}
               className={cn(
-                "pointer-events-auto mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md bg-red-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-red-700",
+                "pointer-events-auto mt-3 w-full gap-2 text-xs",
                 isSigningOut ? "cursor-not-allowed opacity-70" : ""
               )}
             >
               <LogOut className="h-4 w-4" />
               {isSigningOut ? "Signing out..." : "Logout"}
-            </button>
+            </Button>
           </div>
 
-          <button
+          <Button
             type="button"
+            variant="ghost"
             onClick={() => setIsProfileExpanded((prev) => !prev)}
-            className="w-full rounded-md bg-background text-left transition hover:bg-muted/40 focus:outline-none"
+            className="h-auto w-full justify-start bg-background p-0 text-left hover:bg-brand-light/60 focus:outline-none"
             aria-expanded={isProfileExpanded}
             aria-label="Toggle user profile"
           >
@@ -290,7 +294,7 @@ export function DashboardSidebar({ isAdmin, isManager, user }: DashboardSidebarP
                 <p className="truncate text-xs text-muted-foreground">{user.email}</p>
               </div>
             </div>
-          </button>
+          </Button>
         </div>
       }
     />

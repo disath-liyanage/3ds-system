@@ -45,16 +45,18 @@ export function Dialog({
       onClose={() => onOpenChange(false)}
     >
       <div className={`relative ${stickyHeader ? "max-h-[85vh] overflow-hidden" : ""}`}>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           aria-label="Close dialog"
           onClick={() => onOpenChange(false)}
-          className={`absolute right-4 z-20 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/80 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm transition hover:text-foreground ${
+          className={`absolute right-4 z-20 h-9 w-9 p-0 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:text-brand ${
             stickyHeader ? "top-4" : "top-6"
           }`}
         >
           <X className="h-4 w-4" />
-        </button>
+        </Button>
         <div className={`space-y-4 p-6 ${stickyHeader ? "sticky top-0 z-10 border-b border-border bg-white/95 pr-16 backdrop-blur-sm" : "pr-16"}`}>
           <div className="space-y-1">
             <h2 className="text-lg font-semibold">{title}</h2>

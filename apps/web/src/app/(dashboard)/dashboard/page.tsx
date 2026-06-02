@@ -10,7 +10,7 @@ function getProgressBarColorClass(percentage: number) {
   if (percentage >= 100) return "bg-emerald-600";
   if (percentage > 75) return "bg-lime-500";
   if (percentage > 50) return "bg-yellow-400";
-  if (percentage > 25) return "bg-orange-500";
+  if (percentage > 25) return "bg-brand";
   return "bg-red-500";
 }
 

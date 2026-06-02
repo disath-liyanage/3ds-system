@@ -1937,17 +1937,18 @@ export default function ProductsPage() {
                     {isStatusDropdownOpen ? (
                       <div className="absolute z-20 mt-2 w-full rounded-md border border-border bg-white py-1 shadow-lg">
                         {statusOptions.map((option) => (
-                          <button
+                          <Button
                             key={option.value}
                             type="button"
-                            className="flex w-full items-center px-3 py-2 text-left hover:bg-muted"
+                            variant="ghost"
+                            className="h-auto w-full justify-start px-3 py-2 text-left"
                             onClick={() => {
                               setStatusFilter(option.value);
                               setIsStatusDropdownOpen(false);
                             }}
                           >
                             <Badge variant={option.variant}>{option.label}</Badge>
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     ) : null}
@@ -2023,30 +2024,30 @@ export default function ProductsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>
-                  <button type="button" className="font-semibold" onClick={() => handleSort("name")}>
+                  <Button type="button" variant="ghost" size="sm" className="h-auto p-0 font-semibold hover:bg-transparent" onClick={() => handleSort("name")}>
                     Name{getSortLabel("name")}
-                  </button>
+                  </Button>
                 </TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>
-                  <button type="button" className="font-semibold" onClick={() => handleSort("unit")}>
+                  <Button type="button" variant="ghost" size="sm" className="h-auto p-0 font-semibold hover:bg-transparent" onClick={() => handleSort("unit")}>
                     Unit{getSortLabel("unit")}
-                  </button>
+                  </Button>
                 </TableHead>
                 <TableHead>
-                  <button type="button" className="font-semibold" onClick={() => handleSort("price")}>
+                  <Button type="button" variant="ghost" size="sm" className="h-auto p-0 font-semibold hover:bg-transparent" onClick={() => handleSort("price")}>
                     Price (LKR){getSortLabel("price")}
-                  </button>
+                  </Button>
                 </TableHead>
                 <TableHead>
-                  <button type="button" className="font-semibold" onClick={() => handleSort("stock")}>
+                  <Button type="button" variant="ghost" size="sm" className="h-auto p-0 font-semibold hover:bg-transparent" onClick={() => handleSort("stock")}>
                     Stock Qty{getSortLabel("stock")}
-                  </button>
+                  </Button>
                 </TableHead>
                 <TableHead>
-                  <button type="button" className="font-semibold" onClick={() => handleSort("status")}>
+                  <Button type="button" variant="ghost" size="sm" className="h-auto p-0 font-semibold hover:bg-transparent" onClick={() => handleSort("status")}>
                     Status{getSortLabel("status")}
-                  </button>
+                  </Button>
                 </TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -2109,25 +2110,29 @@ export default function ProductsPage() {
             </TableBody>
           </Table>
           <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => setPage((prev) => prev - 1)}
               aria-label="Previous page"
               disabled={page <= 1 || pagedProductsQuery.isLoading}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm transition hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+              className="h-9 w-9 p-0 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:border-brand hover:text-brand"
             >
               <ChevronLeft className="h-4 w-4" />
-            </button>
+            </Button>
             <span>{`Rows ${startRow} - ${endRow} of ${totalProducts}`}</span>
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => setPage((prev) => prev + 1)}
               aria-label="Next page"
               disabled={page >= totalPages || pagedProductsQuery.isLoading}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm transition hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+              className="h-9 w-9 p-0 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:border-brand hover:text-brand"
             >
               <ChevronRight className="h-4 w-4" />
-            </button>
+            </Button>
           </div>
         </div>
       )}

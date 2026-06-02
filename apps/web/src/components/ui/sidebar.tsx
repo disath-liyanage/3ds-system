@@ -36,14 +36,15 @@ export function Sidebar({ title, logoSrc, items, adminItems = [], adminTitle = "
         key={item.href}
         href={item.href}
         className={cn(
-          "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition hover:bg-muted",
-          active ? "bg-muted font-semibold" : "text-muted-foreground"
+          "relative flex items-center gap-2 overflow-hidden rounded-xl px-3 py-2 text-sm transition hover:bg-brand-light/60",
+          active ? "font-medium text-brand" : "text-gray-500 hover:text-brand"
         )}
       >
-        {Icon ? <Icon className="h-4 w-4" /> : null}
-        <span>{item.label}</span>
+        {active ? <span className="absolute inset-0 rounded-xl bg-brand-light" /> : null}
+        {Icon ? <Icon className="relative h-4 w-4" /> : null}
+        <span className="relative">{item.label}</span>
         {typeof item.badgeCount === "number" && item.badgeCount > 0 ? (
-          <span className="ml-auto rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
+          <span className="relative ml-auto rounded-full bg-brand px-2 py-0.5 text-xs font-semibold text-white">
             {item.badgeCount}
           </span>
         ) : null}
@@ -52,7 +53,7 @@ export function Sidebar({ title, logoSrc, items, adminItems = [], adminTitle = "
   };
 
   return (
-    <aside className="flex w-full flex-col border-b border-border bg-white p-4 lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:border-b-0 lg:border-r lg:overflow-y-auto">
+    <aside className="flex w-full flex-col border-b border-brand-muted bg-brand-light/35 p-4 lg:sticky lg:top-0 lg:h-screen lg:w-72 lg:border-b-0 lg:border-r lg:overflow-y-auto">
       <div className="mb-6 flex justify-center">
         {logoSrc ? (
           <Image src={logoSrc} alt={title} width={220} height={124} priority className="h-auto w-full max-w-[220px]" />

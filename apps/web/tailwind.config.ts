@@ -6,6 +6,12 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        brand: {
+          DEFAULT: "#4C5C8A",
+          dark: "#3a4a78",
+          light: "#e8ebf4",
+          muted: "#c5cce0"
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: "hsl(var(--card))",
@@ -19,6 +25,9 @@ const config: Config = {
         border: "hsl(var(--border))",
         accent: "hsl(var(--accent))",
         "accent-foreground": "hsl(var(--accent-foreground))"
+      },
+      borderRadius: {
+        btn: "10px"
       }
     }
   },

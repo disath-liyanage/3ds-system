@@ -267,16 +267,17 @@ export default function QuotationsPage() {
 
             <div className="space-y-1" ref={datePickerRef}>
               <label className="text-xs font-semibold text-muted-foreground">Date Range</label>
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 onClick={() => setIsDatePickerOpen((prev) => !prev)}
-                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 text-sm text-foreground transition focus:outline-none focus:ring-2 focus:ring-primary/40"
+                className="h-10 w-full justify-between bg-background px-3 text-sm font-normal text-foreground"
               >
                 <span className={dateRange?.from ? "text-foreground" : "text-muted-foreground"}>
                   {dateRangeLabel}
                 </span>
                 <span className="text-xs text-muted-foreground">Pick</span>
-              </button>
+              </Button>
               {isDatePickerOpen ? (
                 <div className="relative">
                   <div className="absolute z-20 mt-2 rounded-md border border-border bg-white p-3 shadow-lg">
@@ -368,7 +369,7 @@ export default function QuotationsPage() {
                   row.status === "draft"
                     ? "bg-muted/30 cursor-pointer"
                     : row.status === "pending_approval"
-                      ? "bg-orange-50 hover:bg-orange-100 cursor-pointer"
+                      ? "bg-brand-light/70 hover:bg-brand-light cursor-pointer"
                       : "cursor-pointer"
                 }
               >

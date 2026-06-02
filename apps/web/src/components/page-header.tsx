@@ -3,6 +3,7 @@
 import { ChevronLeft } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type PageHeaderProps = {
@@ -23,14 +24,16 @@ export function PageHeader({ title, description, eyebrow, actions, className }: 
     <header className={cn("flex flex-wrap items-start justify-between gap-3", className)}>
       <div className="flex items-start gap-3">
         {showBack ? (
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             onClick={() => router.back()}
             aria-label="Go back"
-            className="inline-flex h-9 w-9 items-center justify-center self-center rounded-full border border-border/70 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm transition hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="h-9 w-9 self-center p-0 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:border-brand hover:text-brand"
           >
             <ChevronLeft className="h-4 w-4" />
-          </button>
+          </Button>
         ) : null}
         <div className="space-y-1">
           {eyebrow ? (
