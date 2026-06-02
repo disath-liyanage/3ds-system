@@ -35,9 +35,6 @@ export default function ReturnInvoiceReceiptPage() {
       <section className="space-y-4">
         <PageHeader title="Return Receipt" description="Could not load return receipt." />
         <p className="text-xs text-muted-foreground">{error instanceof Error ? error.message : "Unknown error"}</p>
-        <Button asChild variant="outline">
-          <Link href="/invoices/return">Back</Link>
-        </Button>
       </section>
     );
   }
@@ -52,9 +49,6 @@ export default function ReturnInvoiceReceiptPage() {
           <>
             <Button variant="default" onClick={() => window.print()}>
               Print Receipt
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/invoices/return">Back</Link>
             </Button>
           </>
         }
