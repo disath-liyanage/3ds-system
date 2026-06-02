@@ -149,7 +149,7 @@ export default function ReceiveNotesPage() {
               placeholder="Search GRNs..."
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              className="glass-search"
+              className="glass-search  pl-10"
             />
             </div>
             {hasFilters ? <span className="text-xs text-muted-foreground">Filters active</span> : null}

@@ -65,7 +65,7 @@ export default function ReportsPage() {
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search reports by name..."
               aria-label="Search reports"
-              className="glass-search"
+              className="glass-search  pl-10"
             />
           </div>
           <p className="text-xs text-muted-foreground">

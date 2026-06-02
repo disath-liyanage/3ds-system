@@ -298,7 +298,7 @@ export default function CollectionsPage() {
               placeholder="Search customer or invoice #..."
               value={customerSearch}
               onChange={(event) => setCustomerSearch(event.target.value)}
-              className="glass-search"
+              className="glass-search pl-10"
             />
             </div>
             {hasFilters ? <span className="text-xs text-muted-foreground">Filters active</span> : null}
