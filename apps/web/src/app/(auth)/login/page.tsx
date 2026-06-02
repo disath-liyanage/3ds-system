@@ -63,6 +63,8 @@ export default function LoginPage() {
               id="email"
               type="email"
               placeholder="Email"
+              aria-label="Email"
+              autoComplete="email"
               className="w-full rounded-full border border-white/20 bg-white/10 px-4 py-3 pr-10 text-white outline-none transition placeholder:text-white/50 focus:border-white/50"
               {...register("email")}
             />
@@ -75,6 +77,8 @@ export default function LoginPage() {
               id="password"
               type={showPassword ? "text" : "password"}
               placeholder="Password"
+              aria-label="Password"
+              autoComplete="current-password"
               className="w-full rounded-full border border-white/20 bg-white/10 px-4 py-3 pr-16 text-white outline-none transition placeholder:text-white/50 focus:border-white/50"
               {...register("password")}
             />
