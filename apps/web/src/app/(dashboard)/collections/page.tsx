@@ -657,6 +657,7 @@ export default function CollectionsPage() {
           if (!open) setEditingEntry(null);
         }}
         title={editingEntry ? `Edit Collection #${editingEntry.collection_number}` : "Edit Collection"}
+        showBottomClose={false}
       >
         <div className="space-y-3">
           <div className="space-y-1">

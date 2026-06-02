@@ -114,6 +114,7 @@ export function CreateRoleDialog({ open, onOpenChange, onSaved, initialRole }: C
       onOpenChange={onOpenChange}
       title={isEditMode ? "Edit custom role" : "Create custom role"}
       description="Define the role and select exactly which capabilities it should have."
+      showBottomClose={false}
     >
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-1">
