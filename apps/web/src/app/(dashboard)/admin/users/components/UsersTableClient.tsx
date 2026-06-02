@@ -43,7 +43,7 @@ function getRoleBadgeMeta(user: AdminUserRow) {
   }
 
   if (user.role === "driver") {
-    return { label: "Driver", className: "bg-amber-100 text-amber-700" };
+    return { label: "Driver", className: "bg-brand-light text-brand" };
   }
 
   return {

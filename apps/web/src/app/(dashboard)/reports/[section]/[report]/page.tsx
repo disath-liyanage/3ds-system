@@ -151,14 +151,16 @@ function MultiSearchableSelect({ value, options, placeholder, onChange }: MultiS
               className="inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-muted px-2 py-1 text-xs font-medium text-foreground"
             >
               <span className="truncate">{option.label}</span>
-              <button
+              <Button
                 type="button"
-                className="text-muted-foreground hover:text-foreground"
+                variant="ghost"
+                size="sm"
+                className="h-auto p-0 text-muted-foreground hover:bg-transparent hover:text-brand"
                 onClick={() => removeOption(option.value)}
                 aria-label={`Remove ${option.label}`}
               >
                 <X className="h-3 w-3" />
-              </button>
+              </Button>
             </span>
           ))}
         </div>
@@ -666,7 +668,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
     for (const row of activeResult.rows) {
       const grnNo = String(row["GRN No"] ?? "");
       if (!grnNo || out.has(grnNo)) continue;
-      out.set(grnNo, colorIndex % 2 === 0 ? "bg-slate-50" : "bg-amber-50");
+      out.set(grnNo, colorIndex % 2 === 0 ? "bg-slate-50" : "bg-brand-light/60");
       colorIndex += 1;
     }
     return out;
@@ -675,7 +677,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
   const expenseUserShadeMap = useMemo(() => {
     const out = new Map<string, string>();
     if (!isExpensesByUserReport || !activeResult) return out;
-    const shades = ["bg-slate-50", "bg-amber-50", "bg-emerald-50", "bg-sky-50"];
+    const shades = ["bg-slate-50", "bg-brand-light/60", "bg-emerald-50", "bg-sky-50"];
     let colorIndex = 0;
     for (const row of activeResult.rows) {
       const userName = String(row["User / Worker"] ?? "").trim();
@@ -919,14 +921,15 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                 />
               </div>
               <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => setIsDatePickerOpen((prev) => !prev)}
-                  className="flex h-10 min-w-[260px] items-center justify-between rounded-md border border-input bg-background px-3 text-sm text-foreground transition focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="h-10 min-w-[260px] justify-between bg-background px-3 text-sm font-normal text-foreground"
                 >
                   <span className={dateRange?.from ? "text-foreground" : "text-muted-foreground"}>{dateRangeLabel}</span>
                   <span className="text-xs text-muted-foreground">Pick</span>
-                </button>
+                </Button>
                 <div className="flex items-center gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={() => setDateRange(getMonthRange(0))}>
                     This Month
@@ -958,14 +961,15 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
             <div className="space-y-1" ref={datePickerRef}>
               <label className="text-sm font-medium">Date Range</label>
               <div className="flex flex-wrap items-center gap-2">
-                <button
+                <Button
                   type="button"
+                  variant="outline"
                   onClick={() => setIsDatePickerOpen((prev) => !prev)}
-                  className="flex h-10 min-w-[260px] flex-1 items-center justify-between rounded-md border border-input bg-background px-3 text-sm text-foreground transition focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="h-10 min-w-[260px] flex-1 justify-between bg-background px-3 text-sm font-normal text-foreground"
                 >
                   <span className={dateRange?.from ? "text-foreground" : "text-muted-foreground"}>{dateRangeLabel}</span>
                   <span className="text-xs text-muted-foreground">Pick</span>
-                </button>
+                </Button>
                 <Button type="button" variant="outline" size="sm" onClick={() => setDateRange(getMonthRange(0))}>
                   This Month
                 </Button>
@@ -1137,14 +1141,16 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                           key={column}
                           className={`py-2 font-semibold ${isCollectionNoColumn ? "pl-0 pr-3" : isGrnNoColumn ? "pl-1 pr-3" : "px-3"} ${headerAlignClass}`}
                         >
-                          <button
+                          <Button
                             type="button"
-                            className="inline-flex items-center gap-1 text-left"
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto justify-start gap-1 p-0 text-left font-semibold hover:bg-transparent"
                             onClick={() => onSortColumn(column)}
                           >
                             {column}
                             {sortColumn === column ? (sortDirection === "asc" ? "▲" : "▼") : ""}
-                          </button>
+                          </Button>
                         </th>
                       );
                     })}
@@ -1320,7 +1326,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                                 className={
                                   String(value ?? "").toLowerCase() === "approved"
                                     ? "inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700"
-                                    : "inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700"
+                                    : "inline-flex rounded-full bg-brand-light px-2 py-0.5 text-xs font-semibold text-brand"
                                 }
                               >
                                 {String(value ?? "")}

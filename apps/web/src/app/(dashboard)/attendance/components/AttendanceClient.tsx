@@ -292,27 +292,28 @@ export function AttendanceClient({
                   .join("\n");
 
                 return (
-                  <button
+                  <Button
                     key={dateKey}
                     type="button"
+                    variant="outline"
                     title={chequeTitle || undefined}
                     onClick={() => setSelectedDay(day)}
                     className={cn(
-                      "rounded-md border px-2 py-2 text-left text-xs transition",
-                      selectedDay === day ? "border-primary bg-primary/5" : "border-border hover:bg-muted",
+                      "h-auto justify-start px-2 py-2 text-left text-xs font-normal",
+                      selectedDay === day ? "border-brand bg-brand-light/70" : "border-border hover:bg-brand-light/60",
                       dateKey === todayDateKey ? "ring-2 ring-blue-400 ring-offset-1" : "",
                       isSunday ? "bg-rose-50" : "",
                       isSaturday ? "bg-sky-50" : "",
-                      shouldUseHolidayShade ? "bg-amber-100 border-amber-300" : ""
+                      shouldUseHolidayShade ? "border-brand-muted bg-brand-light" : ""
                     )}
                   >
                     <div className="font-semibold">{day}</div>
                     {dateKey === todayDateKey ? <div className="mt-1 text-[10px] text-blue-700">Today</div> : null}
                     {isSunday ? <div className="mt-1 text-[10px] text-rose-700">Sunday</div> : null}
                     {isSaturday ? <div className="mt-1 text-[10px] text-sky-700">Saturday</div> : null}
-                    {isHoliday ? <div className="mt-1 text-[10px] text-amber-700">Holiday</div> : null}
+                    {isHoliday ? <div className="mt-1 text-[10px] text-brand">Holiday</div> : null}
                     {!isHoliday && isFullyMarkedAsHoliday ? (
-                      <div className="mt-1 text-[10px] text-amber-700">All marked holiday</div>
+                      <div className="mt-1 text-[10px] text-brand">All marked holiday</div>
                     ) : null}
                     {chequeDepositsForDate.length ? (
                       <div className="mt-1 rounded bg-emerald-100 px-1 py-0.5 text-[10px] font-medium text-emerald-800">
@@ -320,7 +321,7 @@ export function AttendanceClient({
                       </div>
                     ) : null}
                     <div className="mt-1 text-[10px] text-slate-600">{markedCount}/{workers.length} marked</div>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -336,7 +337,7 @@ export function AttendanceClient({
           </CardHeader>
           <CardContent className="space-y-3">
             {selectedDateKey && holidayMap[selectedDateKey] ? (
-              <Badge className="bg-amber-100 text-amber-700">{holidayMap[selectedDateKey]}</Badge>
+              <Badge className="bg-brand-light text-brand">{holidayMap[selectedDateKey]}</Badge>
             ) : null}
             {selectedChequeDeposits.length ? (
               <div className="space-y-2 rounded-md border border-emerald-200 bg-emerald-50 p-3">
@@ -368,7 +369,7 @@ export function AttendanceClient({
               variant="outline"
               onClick={markAllAsHoliday}
               disabled={!selectedDateKey || isPending || workers.length === 0}
-              className="w-full border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+              className="w-full border-brand-muted bg-brand-light text-brand hover:bg-brand-light/80"
             >
               Mark Whole Day as Holiday (All Workers)
             </Button>
@@ -385,7 +386,7 @@ export function AttendanceClient({
                     <div key={worker.id} className="rounded-md border border-border p-3">
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <p className="text-sm font-medium">{worker.name}</p>
-                        <Badge className={status ? "bg-slate-200 text-slate-700" : "bg-orange-100 text-orange-700"}>
+                        <Badge className={status ? "bg-slate-200 text-slate-700" : "bg-brand-light text-brand"}>
                           {status ? status.replace("_", " ") : "not marked"}
                         </Badge>
                       </div>

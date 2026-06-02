@@ -297,7 +297,7 @@ export default function CustomersPage() {
           {filtered.map((customer) => (
             <TableRow
               key={customer.id}
-              className={`cursor-pointer ${customer.status === "pending_approval" ? "bg-orange-50 hover:bg-orange-100" : ""}`}
+              className={`cursor-pointer ${customer.status === "pending_approval" ? "bg-brand-light/70 hover:bg-brand-light" : ""}`}
               onClick={() => openCustomerDialog(customer)}
             >
               <TableCell>{customer.name}</TableCell>
@@ -315,25 +315,29 @@ export default function CustomersPage() {
         </TableBody>
       </Table>
       <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => setPage((prev) => prev - 1)}
           aria-label="Previous page"
           disabled={page <= 1 || customersQuery.isLoading}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm transition hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+          className="h-9 w-9 p-0 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:border-brand hover:text-brand"
         >
           <ChevronLeft className="h-4 w-4" />
-        </button>
+        </Button>
         <span>{`Rows ${startRow} - ${endRow} of ${total}`}</span>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           onClick={() => setPage((prev) => prev + 1)}
           aria-label="Next page"
           disabled={page >= totalPages || customersQuery.isLoading}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm transition hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+          className="h-9 w-9 p-0 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:border-brand hover:text-brand"
         >
           <ChevronRight className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
 
       <Dialog

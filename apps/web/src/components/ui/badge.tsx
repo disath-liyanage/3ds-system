@@ -6,7 +6,7 @@ const variantClasses: Record<BadgeVariant, string> = {
   default: "bg-primary/10 text-primary",
   success: "bg-green-100 text-green-700",
   "success-dark": "bg-green-200 text-green-900",
-  warning: "bg-amber-100 text-amber-700",
+  warning: "bg-brand-light text-brand",
   danger: "bg-red-100 text-red-700",
   muted: "bg-muted text-muted-foreground"
 };
