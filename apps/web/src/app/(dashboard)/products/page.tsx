@@ -2052,13 +2052,12 @@ export default function ProductsPage() {
                     Status{getSortLabel("status")}
                   </Button>
                 </TableHead>
-                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedProducts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
                     No products found.
                   </TableCell>
                 </TableRow>
@@ -2087,24 +2086,6 @@ export default function ProductsPage() {
                       <TableCell>{formatQuantity(product.stock_qty)}</TableCell>
                       <TableCell>
                         <Badge variant={stockStatus.variant}>{stockStatus.label}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {canManageProducts ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={updateProduct.isPending}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setEditingProduct(product);
-                              setIsEditDialogOpen(true);
-                            }}
-                          >
-                            Edit
-                          </Button>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
                       </TableCell>
                     </TableRow>
                   );
