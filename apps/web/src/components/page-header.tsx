@@ -30,7 +30,7 @@ export function PageHeader({ title, description, eyebrow, actions, className }: 
             size="sm"
             onClick={() => router.back()}
             aria-label="Go back"
-            className="h-9 w-9 self-center p-0 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:border-brand hover:text-brand"
+            className="h-9 w-9 self-center rounded-full p-0 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:border-brand hover:text-brand"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>

@@ -47,7 +47,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="relative min-h-screen w-full overflow-hidden bg-[linear-gradient(135deg,#1a2340_0%,#4C5C8A_50%,#2a3557_100%)]">
+    <main className="relative min-h-screen w-full overflow-hidden bg-[url('/images/background-image.jpg')] bg-cover bg-center bg-no-repeat">
       <div className="relative flex min-h-screen w-full items-center justify-center px-4 py-10">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.16),transparent_28%),radial-gradient(circle_at_78%_72%,rgba(255,255,255,0.12),transparent_30%)]" />
         <div className="absolute inset-0 bg-black/15" />
@@ -63,7 +63,7 @@ export default function LoginPage() {
               id="email"
               type="email"
               placeholder="Email"
-              className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 pr-10 text-white outline-none transition placeholder:text-white/50 focus:border-white/50"
+              className="w-full rounded-full border border-white/20 bg-white/10 px-4 py-3 pr-10 text-white outline-none transition placeholder:text-white/50 focus:border-white/50"
               {...register("email")}
             />
             <Mail className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" />
@@ -75,7 +75,7 @@ export default function LoginPage() {
               id="password"
               type={showPassword ? "text" : "password"}
               placeholder="Password"
-              className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 pr-16 text-white outline-none transition placeholder:text-white/50 focus:border-white/50"
+              className="w-full rounded-full border border-white/20 bg-white/10 px-4 py-3 pr-16 text-white outline-none transition placeholder:text-white/50 focus:border-white/50"
               {...register("password")}
             />
             <Lock className="pointer-events-none absolute right-10 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" />
@@ -90,17 +90,10 @@ export default function LoginPage() {
           </div>
           {errors.password ? <p className="-mt-2 mb-4 text-xs text-red-300">{errors.password.message}</p> : null}
 
-          <div className="mb-6 flex items-center text-sm">
-            <label className="flex cursor-pointer items-center gap-2 text-white/70">
-              <input type="checkbox" className="accent-[#4C5C8A]" />
-              Remember me
-            </label>
-          </div>
-
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full rounded-xl bg-[#4C5C8A] py-3 font-medium text-white transition hover:bg-[#3a4a78] disabled:opacity-60"
+            className="w-full rounded-full bg-[#4C5C8A] py-3 font-medium text-white transition hover:bg-[#3a4a78] disabled:opacity-60"
           >
             {isSubmitting ? "Signing in..." : "Login"}
           </button>

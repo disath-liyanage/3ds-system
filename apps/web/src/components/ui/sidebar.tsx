@@ -36,11 +36,12 @@ export function Sidebar({ title, logoSrc, items, adminItems = [], adminTitle = "
         key={item.href}
         href={item.href}
         className={cn(
-          "relative flex items-center gap-2 overflow-hidden rounded-xl px-3 py-2 text-sm transition hover:bg-brand-light/60",
-          active ? "font-medium text-brand" : "text-gray-500 hover:text-brand"
+          "relative flex items-center gap-2 overflow-hidden rounded-xl px-3 py-2 text-sm transition",
+          active
+            ? "font-bold text-white bg-brand hover:bg-brand/90"
+            : "text-gray-500 hover:bg-brand/10 hover:text-brand"
         )}
       >
-        {active ? <span className="absolute inset-0 rounded-xl bg-brand-light" /> : null}
         {Icon ? <Icon className="relative h-4 w-4" /> : null}
         <span className="relative">{item.label}</span>
         {typeof item.badgeCount === "number" && item.badgeCount > 0 ? (
