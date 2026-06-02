@@ -528,7 +528,7 @@ export default function CollectionsPage() {
           onClick={() => setPage((prev) => prev - 1)}
           aria-label="Previous page"
           disabled={page <= 1 || isInvoicesLoading}
-          className="h-9 w-9 p-0 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:border-brand hover:text-brand"
+          className="h-9 w-9 rounded-full p-0 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:border-brand hover:text-brand"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -540,7 +540,7 @@ export default function CollectionsPage() {
           onClick={() => setPage((prev) => prev + 1)}
           aria-label="Next page"
           disabled={page >= totalPages || isInvoicesLoading}
-          className="h-9 w-9 p-0 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:border-brand hover:text-brand"
+          className="h-9 w-9 rounded-full p-0 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:border-brand hover:text-brand"
         >
           <ChevronRight className="h-4 w-4" />
         </Button>

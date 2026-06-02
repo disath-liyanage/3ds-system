@@ -51,7 +51,7 @@ export function Dialog({
           size="sm"
           aria-label="Close dialog"
           onClick={() => onOpenChange(false)}
-          className={`absolute right-4 z-20 h-9 w-9 p-0 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:text-brand ${
+          className={`absolute right-4 z-20 h-9 w-9 rounded-full p-0 bg-white/80 text-muted-foreground shadow-sm backdrop-blur-sm hover:text-brand ${
             stickyHeader ? "top-4" : "top-6"
           }`}
         >
