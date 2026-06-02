@@ -71,6 +71,7 @@ export default function NewReceiveNotePage() {
   const [discountInputMode, setDiscountInputMode] = useState<"percent" | "amount">("percent");
   const [latestCostsByProduct, setLatestCostsByProduct] = useState<Record<string, number>>({});
   const [productSearchMode, setProductSearchMode] = useState<"all" | "name" | "price">("all");
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const { control, register, handleSubmit, setValue, trigger, getValues, resetField, formState } =
     useForm<ReceiveNoteForm>({
     defaultValues: {
@@ -160,7 +161,7 @@ export default function NewReceiveNotePage() {
     [suppliers]
   );
 
-  const { append, remove } = useFieldArray({
+  const { append, remove, update } = useFieldArray({
     control,
     name: "items"
   });
@@ -209,6 +210,14 @@ export default function NewReceiveNotePage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSaveDraft = () => {
+    toast({
+      title: "Feature coming soon",
+      description: "Saving GRN drafts requires backend support.",
+      variant: "info"
+    });
   };
 
   const normalizeNumber = (value: unknown) => {
@@ -349,7 +358,7 @@ export default function NewReceiveNotePage() {
           : 0
         : normalizeNumber(draft.item_discount_percent);
 
-    append({
+    const newItem = {
       product_id: draft.product_id,
       qty: normalizeNumber(draft.qty) || 0,
       free_qty: normalizeNumber(draft.free_qty) || 0,
@@ -358,7 +367,14 @@ export default function NewReceiveNotePage() {
       item_discount_percent: discountPercent || 0,
       rep_sales_discount: normalizeNumber(draft.rep_sales_discount) || 0,
       rep_collection: normalizeNumber(draft.rep_collection) || 0
-    });
+    };
+
+    if (editingIndex !== null) {
+      update(editingIndex, newItem);
+      setEditingIndex(null);
+    } else {
+      append(newItem);
+    }
 
     resetField("draft", {
       defaultValue: {
@@ -392,6 +408,48 @@ export default function NewReceiveNotePage() {
     });
     setDiscountInputMode("percent");
     setAddAttempted(false);
+  };
+
+  const handleEditItem = (index: number) => {
+    if (hasDraftData(getValues("draft"))) {
+      window.alert("Please add the item or reset the fields before editing an added item.");
+      return;
+    }
+
+    const item = watchedItems[index];
+    if (!item) return;
+
+    setValue("draft.product_id", item.product_id, { shouldDirty: true });
+    setValue("draft.qty", item.qty, { shouldDirty: true });
+    setValue("draft.free_qty", item.free_qty || 0, { shouldDirty: true });
+    setValue("draft.product_cost", item.product_cost, { shouldDirty: true });
+    setValue("draft.selling_price", item.selling_price, { shouldDirty: true });
+    setValue("draft.item_discount_percent", item.item_discount_percent || 0, { shouldDirty: true });
+    setValue("draft.rep_sales_discount", item.rep_sales_discount || 0, { shouldDirty: true });
+    setValue("draft.rep_collection", item.rep_collection || 0, { shouldDirty: true });
+
+    if (discountInputMode === "amount" && item.selling_price > 0 && item.item_discount_percent > 0) {
+      const discountAmount = Number(((item.selling_price * item.item_discount_percent) / 100).toFixed(2));
+      setValue("draft.item_discount_amount", discountAmount, { shouldDirty: true });
+    } else if (discountInputMode === "amount") {
+      setValue("draft.item_discount_amount", undefined, { shouldDirty: true });
+    }
+
+    setEditingIndex(index);
+  };
+
+  const handleCancelEdit = () => {
+    handleResetDraft();
+    setEditingIndex(null);
+  };
+
+  const handleRemoveItem = (index: number) => {
+    remove(index);
+    if (editingIndex === index) {
+      handleCancelEdit();
+    } else if (editingIndex !== null && index < editingIndex) {
+      setEditingIndex(editingIndex - 1);
+    }
   };
 
   const onSubmitInvalid = () => {
@@ -460,6 +518,14 @@ export default function NewReceiveNotePage() {
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="space-y-3">
               <div className="space-y-3 rounded-md border border-border p-4">
+                {editingIndex !== null && (
+                  <div className="flex items-center justify-between rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+                    <div className="text-xs font-semibold text-primary">Editing item #{editingIndex + 1}</div>
+                    <Button type="button" size="sm" variant="ghost" onClick={handleCancelEdit}>
+                      Cancel
+                    </Button>
+                  </div>
+                )}
                 <div>
                   <label className="text-xs font-semibold text-muted-foreground">{productSearchLabel}</label>
                   <SearchableSelect
@@ -657,7 +723,12 @@ export default function NewReceiveNotePage() {
             </div>
 
             <div className="space-y-3 rounded-md border border-border p-4">
-              <div className="text-sm font-semibold">Added products</div>
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold">Added products</div>
+                <div className="text-sm font-bold text-primary">
+                  Total: LKR {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </div>
+              </div>
               {itemSummaries.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No items added yet.</p>
               ) : (
@@ -668,17 +739,50 @@ export default function NewReceiveNotePage() {
                       "Unknown product";
 
                     return (
-                      <div key={`${item.productId}-${index}`} className="rounded-md border border-border p-3">
-                        <div className="text-sm font-semibold">{productLabel}</div>
-                        <div className="text-xs text-muted-foreground">
-                          Qty: {item.qty} + Free: {item.freeQty} = {item.totalQty}
+                      <div
+                        key={`${item.productId}-${index}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleEditItem(index)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            handleEditItem(index);
+                          }
+                        }}
+                        className={cn(
+                          "rounded-md border border-border p-3 flex flex-col gap-2 transition hover:bg-muted/40",
+                          editingIndex === index ? "border-primary/60 bg-primary/5" : "cursor-pointer"
+                        )}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <div className="text-sm font-semibold">{productLabel}</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Qty: {item.qty} + Free: {item.freeQty} = {item.totalQty}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              Selling: {item.sellingPrice} | Discount: {item.discountPercent}% | Cost: {item.cost}
+                            </div>
+                          </div>
+                          <div className="text-sm font-semibold">
+                            LKR {(item.qty * item.cost).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Selling: {item.sellingPrice} | Discount: {item.discountPercent}% | Cost: {item.cost}
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto p-0 text-red-500 hover:text-red-600 hover:bg-transparent"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleRemoveItem(index);
+                            }}
+                          >
+                            Remove
+                          </Button>
                         </div>
-                        <Button type="button" variant="ghost" onClick={() => remove(index)}>
-                          Remove
-                        </Button>
                       </div>
                     );
                   })}
@@ -688,13 +792,15 @@ export default function NewReceiveNotePage() {
           </CardContent>
         </Card>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Saving..." : "Add GRN"}
-          </Button>
-          <div className="text-right text-base font-semibold">
-            Total Amount: {formatCurrency(grandTotal)}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : "Add GRN"}
+            </Button>
           </div>
+          <Button type="button" variant="outline" onClick={handleSaveDraft} disabled={isSubmitting}>
+            Save Draft
+          </Button>
         </div>
       </form>
     </section>
