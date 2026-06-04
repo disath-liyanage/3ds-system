@@ -251,6 +251,15 @@ function dayKeyFromDate(date: Date) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
 }
 
+function calculateAttendanceIncentive(attendancePenaltyDays: number) {
+  if (attendancePenaltyDays <= 0) return 7500;
+  if (attendancePenaltyDays === 1) return 6500;
+  if (attendancePenaltyDays === 2) return 5500;
+  if (attendancePenaltyDays === 3) return 4500;
+  if (attendancePenaltyDays === 4) return 3500;
+  return 0;
+}
+
 async function calculateSalaryCostForRange(fromIso: string, toIso: string) {
   const { data: workers, error: workersError } = await adminClient.from("workers").select("id, name, salary_type, salary_amount");
   if (workersError) return { error: workersError };
@@ -1146,22 +1155,22 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         attendanceMap.set(String((row as any).attendance_date || ""), String((row as any).status || ""));
       }
 
-      let presentEquivalent = 0;
+      let attendedDayCount = 0;
+      let attendancePenaltyDays = 0;
       for (let day = 1; day <= totalDaysInMonth; day += 1) {
         const dateKey = `${year}-${String(monthStart.getUTCMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
         if (holidayDates.has(dateKey)) continue;
         const status = attendanceMap.get(dateKey) || "absent";
-        if (status === "present" || status === "holiday") presentEquivalent += 1;
-        else if (status === "half_day") presentEquivalent += 0.5;
+        if (status === "present" || status === "holiday") {
+          attendedDayCount += 1;
+        } else if (status === "absent" || status === "half_day" || status === "leave") {
+          attendancePenaltyDays += 1;
+        } else {
+          attendancePenaltyDays += 1;
+        }
       }
 
-      const missingDays = totalWorkingDays - presentEquivalent;
-      let attendanceIncentive = 0;
-      if (missingDays <= 0) attendanceIncentive = 7500;
-      else if (missingDays <= 1) attendanceIncentive = 6500;
-      else if (missingDays <= 2) attendanceIncentive = 5500;
-      else if (missingDays <= 3) attendanceIncentive = 4500;
-      else if (missingDays <= 4) attendanceIncentive = 3500;
+      const attendanceIncentive = calculateAttendanceIncentive(attendancePenaltyDays);
 
       const { data: deductions, error: deductionsError } = await adminClient
         .from("worker_deductions")
@@ -1250,7 +1259,8 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         { Item: "Employer EPF (12%)", Amount: employerEpf, __bucket: "stat" },
         { Item: "Employer ETF (3%)", Amount: employerEtf, __bucket: "stat" },
         { Item: "Total Work Days (Excluding Holidays)", Amount: totalWorkingDays, __bucket: "meta" },
-        { Item: "Attendance Count", Amount: presentEquivalent, __bucket: "meta" }
+        { Item: "Attendance Count", Amount: attendedDayCount, __bucket: "meta" },
+        { Item: "Absences / Half-days / Leaves", Amount: attendancePenaltyDays, __bucket: "meta" }
       );
 
       return {
