@@ -272,7 +272,8 @@ export function AttendanceClient({
                 const weekDay = new Date(year, month, day).getDay();
                 const isSunday = weekDay === 0;
                 const isSaturday = weekDay === 6;
-                const isHoliday = Boolean(holidayMap[dateKey]);
+                const holidayName = holidayMap[dateKey];
+                const isHoliday = Boolean(holidayName);
                 const markedCount = workers.reduce((count, worker) => {
                   const workerStatus = attendanceMap[`${worker.id}:${dateKey}`];
                   return workerStatus ? count + 1 : count;
@@ -299,7 +300,7 @@ export function AttendanceClient({
                     title={chequeTitle || undefined}
                     onClick={() => setSelectedDay(day)}
                     className={cn(
-                      "h-auto justify-start px-2 py-2 text-left text-xs font-normal",
+                      "h-28 flex-col items-stretch justify-between gap-2 px-2 py-3 text-center text-xs font-normal",
                       selectedDay === day ? "border-brand bg-brand-light/70" : "border-border hover:bg-brand-light/60",
                       dateKey === todayDateKey ? "ring-2 ring-blue-400 ring-offset-1" : "",
                       isSunday ? "bg-rose-50" : "",
@@ -307,20 +308,35 @@ export function AttendanceClient({
                       shouldUseHolidayShade ? "border-brand-muted bg-brand-light" : ""
                     )}
                   >
-                    <div className="font-semibold">{day}</div>
-                    {dateKey === todayDateKey ? <div className="mt-1 text-[10px] text-blue-700">Today</div> : null}
-                    {isSunday ? <div className="mt-1 text-[10px] text-rose-700">Sunday</div> : null}
-                    {isSaturday ? <div className="mt-1 text-[10px] text-sky-700">Saturday</div> : null}
-                    {isHoliday ? <div className="mt-1 text-[10px] text-brand">Holiday</div> : null}
-                    {!isHoliday && isFullyMarkedAsHoliday ? (
-                      <div className="mt-1 text-[10px] text-brand">All marked holiday</div>
-                    ) : null}
-                    {chequeDepositsForDate.length ? (
-                      <div className="mt-1 rounded bg-emerald-100 px-1 py-0.5 text-[10px] font-medium text-emerald-800">
-                        Cheque {chequeDepositsForDate.length}
-                      </div>
-                    ) : null}
-                    <div className="mt-1 text-[10px] text-slate-600">{markedCount}/{workers.length} marked</div>
+                    <div className="min-h-7">
+                      {isHoliday ? (
+                        <div className="line-clamp-2 text-[10px] font-semibold leading-tight text-brand">
+                          {holidayName}
+                        </div>
+                      ) : chequeDepositsForDate.length ? (
+                        <div className="rounded bg-emerald-100 px-1 py-0.5 text-[10px] font-medium text-emerald-800">
+                          Cheque {chequeDepositsForDate.length}
+                        </div>
+                      ) : null}
+                    </div>
+                    <div
+                      className={cn(
+                        "flex flex-1 items-center justify-center text-lg font-semibold",
+                        isSunday ? "text-rose-700" : "",
+                        isSaturday ? "text-sky-700" : "",
+                        !isSunday && !isSaturday ? "text-slate-900" : ""
+                      )}
+                    >
+                      {day}
+                    </div>
+                    <div
+                      className={cn(
+                        "min-h-4 text-[10px] font-medium leading-tight",
+                        isFullyMarkedAsHoliday ? "text-brand" : "text-slate-600"
+                      )}
+                    >
+                      {isFullyMarkedAsHoliday ? "All Marked as holiday" : `${markedCount}/${workers.length} marked`}
+                    </div>
                   </Button>
                 );
               })}
