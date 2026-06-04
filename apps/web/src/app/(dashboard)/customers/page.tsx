@@ -47,6 +47,13 @@ function getCustomerStatusBadge(status: CustomerRow["status"]) {
   return { label: "Approved", variant: "success" as const };
 }
 
+function toTitleCaseWords(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[A-Za-z][A-Za-z']*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1));
+}
+
 export default function CustomersPage() {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -180,10 +187,13 @@ export default function CustomersPage() {
     }
 
     setIsSubmitting(true);
+    const normalizedName = toTitleCaseWords(form.name);
+    const normalizedAddress = toTitleCaseWords(form.address);
+    setForm((prev) => ({ ...prev, name: normalizedName, address: normalizedAddress }));
     const result = await createCustomer({
-      name: form.name,
+      name: normalizedName,
       phone: form.phone,
-      address: form.address,
+      address: normalizedAddress,
       area: form.area,
       credit_limit: Number(form.credit_limit || 0),
       sales_rep_id: form.sales_rep_id || undefined
