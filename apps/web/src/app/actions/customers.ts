@@ -36,6 +36,13 @@ export type CreateCustomerInput = {
 
 export type UpdateCustomerInput = CreateCustomerInput;
 
+function toTitleCaseWords(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[A-Za-z][A-Za-z']*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1));
+}
+
 export type CustomerDetailRow = {
   id: string;
   name: string;
@@ -329,9 +336,9 @@ export async function createCustomer(input: CreateCustomerInput): Promise<Action
     return { success: false, error: "You do not have permission to add customers" };
   }
 
-  const name = input.name.trim();
+  const name = toTitleCaseWords(input.name);
   const phone = input.phone.trim();
-  const address = input.address.trim();
+  const address = toTitleCaseWords(input.address);
   const area = input.area?.trim() || null;
   const creditLimit = Number(input.credit_limit ?? 0);
 
