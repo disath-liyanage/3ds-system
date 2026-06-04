@@ -29,7 +29,7 @@ type CustomerRow = {
   phone: string;
   address: string;
   area: string | null;
-  credit_limit: number;
+  credit_limit: number | null;
   balance: number;
   status: "pending_approval" | "active" | "rejected";
   created_by: string | null;
@@ -71,7 +71,7 @@ export default function CustomersPage() {
     phone: "",
     address: "",
     area: "",
-    credit_limit: "0",
+    credit_limit: "",
     sales_rep_id: ""
   });
 
@@ -190,12 +190,19 @@ export default function CustomersPage() {
     const normalizedName = toTitleCaseWords(form.name);
     const normalizedAddress = toTitleCaseWords(form.address);
     setForm((prev) => ({ ...prev, name: normalizedName, address: normalizedAddress }));
+    const creditLimit = form.credit_limit.trim() === "" ? null : Number(form.credit_limit);
+    if (creditLimit !== null && (!Number.isFinite(creditLimit) || creditLimit < 0)) {
+      toast({ title: "Validation error", description: "Credit limit must be a valid non-negative number.", variant: "error" });
+      setIsSubmitting(false);
+      return;
+    }
+
     const result = await createCustomer({
       name: normalizedName,
       phone: form.phone,
       address: normalizedAddress,
       area: form.area,
-      credit_limit: Number(form.credit_limit || 0),
+      credit_limit: creditLimit,
       sales_rep_id: form.sales_rep_id || undefined
     });
     setIsSubmitting(false);
@@ -206,7 +213,7 @@ export default function CustomersPage() {
     }
 
     toast({ title: "Customer submitted", description: result.message, variant: "success" });
-    setForm({ name: "", phone: "", address: "", area: "", credit_limit: "0", sales_rep_id: "" });
+    setForm({ name: "", phone: "", address: "", area: "", credit_limit: "", sales_rep_id: "" });
     setIsAddOpen(false);
     await customersQuery.refetch();
   };
@@ -389,7 +396,7 @@ export default function CustomersPage() {
             type="number"
             min={0}
             step="0.01"
-            placeholder="Credit limit"
+            placeholder="Credit limit (blank for unlimited)"
             value={form.credit_limit}
             onChange={(event) => setForm((prev) => ({ ...prev, credit_limit: event.target.value }))}
           />

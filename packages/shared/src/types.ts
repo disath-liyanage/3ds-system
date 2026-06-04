@@ -52,7 +52,7 @@ export interface Customer {
   phone: string;
   address: string;
   area: string;
-  credit_limit: number;
+  credit_limit: number | null;
   balance: number;
   status?: "pending_approval" | "active" | "rejected";
   created_by?: string;

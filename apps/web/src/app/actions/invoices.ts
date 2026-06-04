@@ -44,6 +44,47 @@ function isOutstandingInvoicePaymentMethod(value: string | null | undefined): bo
   return value === "credit" || value === "on_account";
 }
 
+function formatCurrencyLKR(value: number) {
+  return `LKR ${value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })}`;
+}
+
+async function validateCustomerCreditLimit(
+  customerId: string,
+  invoiceTotal: number,
+  currentInvoiceCreditContribution = 0
+): Promise<ActionResult> {
+  const { data: customer, error: customerError } = await adminClient
+    .from("customers")
+    .select("credit_limit, balance")
+    .eq("id", customerId)
+    .single();
+
+  if (customerError || !customer) {
+    return { success: false, error: customerError?.message || "Customer not found" };
+  }
+
+  if (customer.credit_limit == null) {
+    return { success: true };
+  }
+
+  const creditLimit = Number(customer.credit_limit);
+  const currentBalance = Number(customer.balance) || 0;
+  const existingContribution = Number(currentInvoiceCreditContribution) || 0;
+  const availableCredit = Math.max(0, creditLimit - Math.max(0, currentBalance - existingContribution));
+
+  if (invoiceTotal > availableCredit) {
+    return {
+      success: false,
+      error: `Credit limit exceeded. Available credit: ${formatCurrencyLKR(availableCredit)}. Invoice total: ${formatCurrencyLKR(invoiceTotal)}.`
+    };
+  }
+
+  return { success: true };
+}
+
 export type InvoiceListRow = {
   id: string;
   invoice_number: number;
@@ -751,6 +792,11 @@ export async function createInvoice(input: InvoiceInput): Promise<CreateInvoiceA
         ? "paid"
         : "approved";
 
+  if (invoiceKind === "invoice" && status !== "draft" && isOutstandingInvoicePaymentMethod(payment_method)) {
+    const creditValidation = await validateCustomerCreditLimit(customer_id, total_amount);
+    if (!creditValidation.success) return creditValidation;
+  }
+
   const isQuotationNumberConflict = (error: { code?: string; message?: string } | null | undefined) => {
     if (!error) return false;
     if (error.code === "23505") return true;
@@ -975,6 +1021,16 @@ export async function updateDraftInvoice(input: UpdateDraftInvoiceInput): Promis
         : "approved"
     : "draft";
 
+  if (
+    invoice.invoice_kind === "invoice" &&
+    finalize &&
+    status !== "draft" &&
+    isOutstandingInvoicePaymentMethod(payment_method)
+  ) {
+    const creditValidation = await validateCustomerCreditLimit(invoice.customer_id, total_amount);
+    if (!creditValidation.success) return creditValidation;
+  }
+
   const { error: updateError } = await adminClient
     .from("invoices")
     .update({
@@ -1162,6 +1218,12 @@ export async function updateInvoice(input: UpdateInvoiceInput): Promise<ActionRe
   const shouldUpdateStock = invoice.status === "approved" || invoice.status === "paid" || invoice.status === "issued";
 
   if (shouldUpdateStock) {
+    const oldContribution = isOutstandingInvoicePaymentMethod(invoice.payment_method) ? Number(invoice.total_amount) : 0;
+    if (invoice.invoice_kind === "invoice" && isOutstandingInvoicePaymentMethod(payment_method)) {
+      const creditValidation = await validateCustomerCreditLimit(invoice.customer_id, total_amount, oldContribution);
+      if (!creditValidation.success) return creditValidation;
+    }
+
     const { data: existingItems, error: existingItemsError } = await adminClient
       .from("invoice_items")
       .select("product_id, qty")
@@ -1208,7 +1270,6 @@ export async function updateInvoice(input: UpdateInvoiceInput): Promise<ActionRe
       console.error("Failed to update stock after invoice edit", err);
     }
 
-    const oldContribution = isOutstandingInvoicePaymentMethod(invoice.payment_method) ? Number(invoice.total_amount) : 0;
     const newContribution = isOutstandingInvoicePaymentMethod(payment_method) ? total_amount : 0;
     const balanceDelta = newContribution - oldContribution;
 
@@ -1289,7 +1350,7 @@ export async function approveInvoice(invoiceId: string, notificationId?: string)
 
   const { data: invoice, error: invoiceError } = await adminClient
     .from("invoices")
-    .select("id, invoice_number, issued_by, status, customer_id, payment_method, total_amount")
+    .select("id, invoice_number, invoice_kind, issued_by, status, customer_id, payment_method, total_amount")
     .eq("id", invoiceId)
     .single();
 
@@ -1402,6 +1463,11 @@ export async function approveInvoice(invoiceId: string, notificationId?: string)
       success: false,
       error: `Approval blocked. Reduce these item quantities to available stock before approving: ${stockErrors.join("; ")}.`
     };
+  }
+
+  if (invoice.invoice_kind === "invoice" && isOutstandingInvoicePaymentMethod(invoice.payment_method)) {
+    const creditValidation = await validateCustomerCreditLimit(invoice.customer_id, Number(invoice.total_amount));
+    if (!creditValidation.success) return creditValidation;
   }
 
   const { error: updateError } = await adminClient

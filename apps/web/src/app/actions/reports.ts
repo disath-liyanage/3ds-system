@@ -877,7 +877,7 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
             Phone: r.phone || "",
             Address: r.address || "",
             Route: r.area || "",
-            "Credit Limit": Number(r.credit_limit) || 0,
+            "Credit Limit": r.credit_limit == null ? "Unlimited" : Number(r.credit_limit) || 0,
             Balance: Number(r.balance) || 0,
             "Created Date": String(r.created_at).slice(0, 10)
           }))
