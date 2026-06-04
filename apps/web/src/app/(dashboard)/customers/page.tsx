@@ -401,7 +401,7 @@ export default function CustomersPage() {
               onChange={(value) => setForm((prev) => ({ ...prev, sales_rep_id: value }))}
             />
           ) : null}
-          <Button type="submit" disabled={isSubmitting}>
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? "Saving..." : "Submit"}
           </Button>
         </form>
