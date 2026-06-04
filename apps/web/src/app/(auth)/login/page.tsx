@@ -49,8 +49,7 @@ export default function LoginPage() {
   return (
     <main className="relative min-h-screen w-full overflow-hidden bg-[url('/images/background-image.jpg')] bg-cover bg-center bg-no-repeat">
       <div className="relative flex min-h-screen w-full items-center justify-center px-4 py-10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.16),transparent_28%),radial-gradient(circle_at_78%_72%,rgba(255,255,255,0.12),transparent_30%)]" />
-        <div className="absolute inset-0 bg-black/15" />
+          <div className="absolute inset-0 bg-black/15" />
 
         <form
           onSubmit={handleSubmit(onSubmit)}
