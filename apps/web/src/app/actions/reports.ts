@@ -1053,7 +1053,7 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
 
       const { data: worker, error: workerError } = await adminClient
         .from("workers")
-        .select("id, name, salary_amount")
+        .select("id, name, salary_amount, salary_type")
         .eq("id", input.workerId)
         .maybeSingle();
       if (workerError || !worker) return { success: false, error: workerError?.message || "Worker not found" };
@@ -1156,12 +1156,16 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
       }
 
       let attendedDayCount = 0;
+      let attendancePaidDays = 0;
       let attendancePenaltyDays = 0;
       for (let day = 1; day <= totalDaysInMonth; day += 1) {
         const dateKey = `${year}-${String(monthStart.getUTCMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
         if (holidayDates.has(dateKey)) continue;
         const status = attendanceMap.get(dateKey) || "absent";
-        if (status === "present" || status === "holiday") {
+        if (status === "present") {
+          attendedDayCount += 1;
+          attendancePaidDays += 1;
+        } else if (status === "holiday") {
           attendedDayCount += 1;
         } else if (status === "absent" || status === "half_day" || status === "leave") {
           attendancePenaltyDays += 1;
@@ -1170,7 +1174,8 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         }
       }
 
-      const attendanceIncentive = calculateAttendanceIncentive(attendancePenaltyDays);
+      const attendanceIncentive =
+        String((worker as any).salary_type || "monthly_basic") === "daily" ? 0 : calculateAttendanceIncentive(attendancePenaltyDays);
 
       const { data: deductions, error: deductionsError } = await adminClient
         .from("worker_deductions")
@@ -1199,7 +1204,9 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         }
       }
 
-      const basicSalary = Number((worker as any).salary_amount) || 0;
+      const salaryAmount = Number((worker as any).salary_amount) || 0;
+      const salaryType = String((worker as any).salary_type || "monthly_basic");
+      const basicSalary = salaryType === "daily" ? salaryAmount * attendancePaidDays : salaryAmount;
       let targetAchievementIncentive = 0;
       if (workerUserId) {
         const { data: targetRow, error: targetError } = await adminClient
@@ -1226,9 +1233,9 @@ export async function getReportData(input: ReportQueryInput): Promise<ReportResp
         }
       }
 
-      const employeeEpf = basicSalary * 0.08;
-      const employerEpf = basicSalary * 0.12;
-      const employerEtf = basicSalary * 0.03;
+      const employeeEpf = salaryType === "daily" ? 0 : basicSalary * 0.08;
+      const employerEpf = salaryType === "daily" ? 0 : basicSalary * 0.12;
+      const employerEtf = salaryType === "daily" ? 0 : basicSalary * 0.03;
       const grossSalary = basicSalary + salesCommission + collectionCommission + attendanceIncentive + targetAchievementIncentive;
       const totalDeductions = advanceDeduction + loanDeduction;
       const netSalary = grossSalary - totalDeductions - employeeEpf;
