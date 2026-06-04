@@ -30,7 +30,7 @@ export type CreateCustomerInput = {
   phone: string;
   address: string;
   area?: string | null;
-  credit_limit?: number;
+  credit_limit?: number | null;
   sales_rep_id?: string;
 };
 
@@ -49,7 +49,7 @@ export type CustomerDetailRow = {
   phone: string;
   address: string;
   area: string | null;
-  credit_limit: number;
+  credit_limit: number | null;
   balance: number;
   status: "pending_approval" | "active" | "rejected";
   created_by: string | null;
@@ -257,7 +257,7 @@ export async function getCustomerDetail(customerId: string): Promise<{
         phone: String(customerRow.phone || ""),
         address: String(customerRow.address || ""),
         area: customerRow.area ?? null,
-        credit_limit: Number(customerRow.credit_limit) || 0,
+        credit_limit: customerRow.credit_limit == null ? null : Number(customerRow.credit_limit),
         balance: Number(customerRow.balance) || 0,
         status: customerRow.status,
         created_by: customerRow.created_by ?? null,
@@ -340,13 +340,13 @@ export async function createCustomer(input: CreateCustomerInput): Promise<Action
   const phone = input.phone.trim();
   const address = toTitleCaseWords(input.address);
   const area = input.area?.trim() || null;
-  const creditLimit = Number(input.credit_limit ?? 0);
+  const creditLimit = input.credit_limit == null ? null : Number(input.credit_limit);
 
   if (!name || !phone || !address) {
     return { success: false, error: "Name, phone, and address are required" };
   }
 
-  if (!Number.isFinite(creditLimit) || creditLimit < 0) {
+  if (creditLimit !== null && (!Number.isFinite(creditLimit) || creditLimit < 0)) {
     return { success: false, error: "Credit limit must be a valid non-negative number" };
   }
 
@@ -571,13 +571,13 @@ export async function updateCustomer(customerId: string, input: UpdateCustomerIn
   const phone = input.phone.trim();
   const address = input.address.trim();
   const area = input.area?.trim() || null;
-  const creditLimit = Number(input.credit_limit ?? 0);
+  const creditLimit = input.credit_limit == null ? null : Number(input.credit_limit);
 
   if (!name || !phone || !address) {
     return { success: false, error: "Name, phone, and address are required" };
   }
 
-  if (!Number.isFinite(creditLimit) || creditLimit < 0) {
+  if (creditLimit !== null && (!Number.isFinite(creditLimit) || creditLimit < 0)) {
     return { success: false, error: "Credit limit must be a valid non-negative number" };
   }
 

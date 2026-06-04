@@ -54,7 +54,7 @@ export const customerSchema = z.object({
   phone: z.string().min(1),
   address: z.string().min(1),
   area: z.string().min(1),
-  credit_limit: z.number(),
+  credit_limit: z.number().nullable(),
   balance: z.number(),
   status: z.enum(["pending_approval", "active", "rejected"]).optional(),
   created_by: z.string().uuid().optional(),

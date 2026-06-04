@@ -42,7 +42,7 @@ const emptyForm: CustomerFormState = {
   phone: "",
   address: "",
   area: "",
-  credit_limit: "0",
+  credit_limit: "",
   sales_rep_id: ""
 };
 
@@ -52,6 +52,10 @@ function formatCurrencyLKR(value: number | string | null | undefined) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }) : "0.00"}`;
+}
+
+function formatCreditLimit(value: number | string | null | undefined) {
+  return value == null || value === "" ? "Unlimited" : formatCurrencyLKR(value);
 }
 
 function formatStatusLabel(status: string) {
@@ -112,7 +116,7 @@ function toFormState(customer: CustomerDetailRow): CustomerFormState {
     phone: customer.phone,
     address: customer.address,
     area: customer.area || "",
-    credit_limit: String(customer.credit_limit ?? 0),
+    credit_limit: customer.credit_limit == null ? "" : String(customer.credit_limit),
     sales_rep_id: customer.sales_rep_id || ""
   };
 }
@@ -226,7 +230,7 @@ export default function CustomerDetailPage() {
       ["Balance", formatCurrencyLKR(customer.balance)],
       ["Sales Rep", customer.sales_rep_name || "-"],
       ["Phone", customer.phone],
-      ["Credit Limit", formatCurrencyLKR(customer.credit_limit)],
+      ["Credit Limit", formatCreditLimit(customer.credit_limit)],
       ["Created By", customer.created_by_name || customer.created_by || "-"],
       ["Address", customer.address],
       ["Area", customer.area || "-"],
@@ -251,12 +255,12 @@ export default function CustomerDetailPage() {
     event.preventDefault();
     if (!customer || isSubmitting) return;
 
-    const creditLimit = Number(form.credit_limit || 0);
+    const creditLimit = form.credit_limit.trim() === "" ? null : Number(form.credit_limit);
     if (!form.name.trim() || !form.phone.trim() || !form.address.trim()) {
       setSubmitError("Name, phone, and address are required");
       return;
     }
-    if (!Number.isFinite(creditLimit) || creditLimit < 0) {
+    if (creditLimit !== null && (!Number.isFinite(creditLimit) || creditLimit < 0)) {
       setSubmitError("Credit limit must be a valid non-negative number");
       return;
     }
@@ -461,6 +465,7 @@ export default function CustomerDetailPage() {
                 type="number"
                 min={0}
                 step="0.01"
+                placeholder="Blank for unlimited"
                 value={form.credit_limit}
                 onChange={(event) => setForm((prev) => ({ ...prev, credit_limit: event.target.value }))}
               />

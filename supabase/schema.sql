@@ -26,7 +26,7 @@ create table if not exists public.customers (
   phone text not null,
   address text not null,
   area text not null,
-  credit_limit numeric(12, 2) not null default 0,
+  credit_limit numeric(12, 2),
   balance numeric(12, 2) not null default 0,
   created_at timestamptz not null default now()
 );
@@ -854,6 +854,10 @@ alter table public.customers
   add column if not exists approved_by uuid references public.users_profile (id),
   add column if not exists approved_at timestamptz,
   add column if not exists sales_rep_id uuid references public.users_profile (id);
+
+alter table public.customers
+  alter column credit_limit drop default,
+  alter column credit_limit drop not null;
 
 alter table public.invoices
   add column if not exists approved_by uuid references public.users_profile (id),

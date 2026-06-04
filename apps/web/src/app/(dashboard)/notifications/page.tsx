@@ -28,7 +28,7 @@ type NotificationRow = {
     phone: string;
     address: string;
     area: string;
-    credit_limit: number;
+    credit_limit: number | null;
     status: "pending_approval" | "active" | "rejected";
   } | null;
   invoice: {
@@ -285,7 +285,10 @@ export default function NotificationsPage() {
               <strong>Address:</strong> {selectedNotification.customer.address}
             </p>
             <p>
-              <strong>Credit Limit:</strong> LKR {Number(selectedNotification.customer.credit_limit).toLocaleString()}
+              <strong>Credit Limit:</strong>{" "}
+              {selectedNotification.customer.credit_limit == null
+                ? "Unlimited"
+                : `LKR ${Number(selectedNotification.customer.credit_limit).toLocaleString()}`}
             </p>
             <div className="flex gap-2">
               {!selectedNotification.is_read ? (

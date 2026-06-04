@@ -9,7 +9,7 @@ export type CustomerRow = {
   phone: string;
   address: string;
   area: string;
-  credit_limit: number;
+  credit_limit: number | null;
   balance: number;
   status: string;
 };
@@ -33,7 +33,7 @@ export function useCustomers() {
         phone: row.phone,
         address: row.address,
         area: row.area,
-        credit_limit: Number(row.credit_limit),
+        credit_limit: row.credit_limit == null ? null : Number(row.credit_limit),
         balance: Number(row.balance),
         status: row.status
       }));
