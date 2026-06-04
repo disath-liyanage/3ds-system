@@ -101,9 +101,12 @@ export default function CollectionApprovalsPage() {
             />
           </div>
           {selectedSummary ? (
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-4">
               <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
-                Collected: {formatCurrency(selectedSummary.pending_collections_total)}
+                Cash Collected: {formatCurrency(selectedSummary.pending_cash_total)}
+              </div>
+              <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+                Cheques Collected: {formatCurrency(selectedSummary.pending_cheque_total)}
               </div>
               <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
                 Expenses: {formatCurrency(selectedSummary.pending_expenses_total)}

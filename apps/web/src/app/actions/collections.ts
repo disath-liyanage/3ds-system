@@ -71,6 +71,8 @@ export type CollectionExpenseRow = {
 export type CollectionApprovalSummary = {
   sales_rep_id: string;
   sales_rep_name: string;
+  pending_cash_total: number;
+  pending_cheque_total: number;
   pending_collections_total: number;
   pending_expenses_total: number;
   cash_in_hand: number;
@@ -81,6 +83,7 @@ export type PendingCollectionRow = {
   invoice_number: number | null;
   customer_name: string;
   amount: number;
+  payment_type: "cash" | "cheque";
   notes: string | null;
   created_at: string;
 };
@@ -167,6 +170,7 @@ type CollectionApprovalSalesRepRow = {
 type PendingCollectionQueryRow = {
   id: string;
   amount: number;
+  payment_type: "cash" | "cheque" | null;
   notes: string | null;
   created_at: string;
   invoice: { invoice_number: number | null } | null;
@@ -975,7 +979,7 @@ export async function recordCollection(input: RecordCollectionInput): Promise<Ac
 async function fetchPendingCollections(salesRepId: string): Promise<PendingCollectionRow[]> {
   const { data, error } = await adminClient
     .from("collections")
-    .select("id, amount, notes, created_at, invoice:invoices(invoice_number), customer:customers(name)")
+    .select("id, amount, payment_type, notes, created_at, invoice:invoices(invoice_number), customer:customers(name)")
     .eq("collected_by", salesRepId)
     .eq("status", "pending")
     .order("created_at", { ascending: true })
@@ -988,6 +992,7 @@ async function fetchPendingCollections(salesRepId: string): Promise<PendingColle
     invoice_number: row.invoice?.invoice_number ?? null,
     customer_name: row.customer?.name ?? "Unknown",
     amount: Number(row.amount),
+    payment_type: row.payment_type === "cheque" ? "cheque" : "cash",
     notes: row.notes ?? null,
     created_at: row.created_at
   }));
@@ -1187,7 +1192,7 @@ export async function listCollectionApprovalSummaries(): Promise<{
 
   const { data: collectionRows, error: collectionsError } = await adminClient
     .from("collections")
-    .select("collected_by, amount")
+    .select("collected_by, amount, payment_type")
     .in("collected_by", repIds)
     .eq("status", "pending");
 
@@ -1202,11 +1207,17 @@ export async function listCollectionApprovalSummaries(): Promise<{
 
   if (expenseError) return { success: false, error: expenseError.message };
 
-  const collectionTotals = new Map<string, number>();
+  const cashTotals = new Map<string, number>();
+  const chequeTotals = new Map<string, number>();
   for (const row of collectionRows ?? []) {
     const repId = (row as { collected_by: string }).collected_by;
     const amount = Number((row as { amount: number }).amount);
-    collectionTotals.set(repId, (collectionTotals.get(repId) ?? 0) + amount);
+    const paymentType = (row as { payment_type: "cash" | "cheque" | null }).payment_type;
+    if (paymentType === "cheque") {
+      chequeTotals.set(repId, (chequeTotals.get(repId) ?? 0) + amount);
+    } else {
+      cashTotals.set(repId, (cashTotals.get(repId) ?? 0) + amount);
+    }
   }
 
   const expenseTotals = new Map<string, number>();
@@ -1215,14 +1226,18 @@ export async function listCollectionApprovalSummaries(): Promise<{
   }
 
   const summaries = repRows.map((rep) => {
-    const collectionsTotal = collectionTotals.get(rep.id) ?? 0;
+    const cashTotal = cashTotals.get(rep.id) ?? 0;
+    const chequeTotal = chequeTotals.get(rep.id) ?? 0;
+    const collectionsTotal = cashTotal + chequeTotal;
     const expensesTotal = expenseTotals.get(rep.id) ?? 0;
     return {
       sales_rep_id: rep.id,
       sales_rep_name: rep.full_name,
+      pending_cash_total: cashTotal,
+      pending_cheque_total: chequeTotal,
       pending_collections_total: collectionsTotal,
       pending_expenses_total: expensesTotal,
-      cash_in_hand: collectionsTotal - expensesTotal
+      cash_in_hand: cashTotal - expensesTotal
     };
   });
 
@@ -1255,6 +1270,9 @@ export async function getCollectionApprovalDetail(
   const expenses = await fetchPendingExpenses(salesRepId);
 
   const collectionsTotal = collections.reduce((sum, row) => sum + row.amount, 0);
+  const cashTotal = collections
+    .filter((row) => row.payment_type === "cash")
+    .reduce((sum, row) => sum + row.amount, 0);
   const expensesTotal = expenses.reduce((sum, row) => sum + row.amount, 0);
 
   return {
@@ -1267,7 +1285,7 @@ export async function getCollectionApprovalDetail(
       totals: {
         collections_total: collectionsTotal,
         expenses_total: expensesTotal,
-        cash_in_hand: collectionsTotal - expensesTotal
+        cash_in_hand: cashTotal - expensesTotal
       }
     }
   };
