@@ -37,6 +37,16 @@ export type RecordCollectionInput = {
   incentive_recipient_id?: string;
 };
 
+export type RecordCollectionBatchInput = {
+  collections: RecordCollectionInput[];
+  expenses?: {
+    category: string;
+    amount: number;
+    notes?: string;
+    sales_rep_id?: string;
+  }[];
+};
+
 type DueChequeReminderCandidate = {
   id: string;
   invoice_id: string | null;
@@ -1077,6 +1087,76 @@ export async function addCollectionExpense(input: {
   revalidatePath("/collections/approvals");
 
   return { success: true, message: "Expense added" };
+}
+
+export async function recordCollectionBatch(input: RecordCollectionBatchInput): Promise<ActionResult> {
+  const access = await getCurrentUserProfile();
+  if ("error" in access) return { success: false, error: access.error };
+
+  if (!canRecordCollections(access.profile)) {
+    return { success: false, error: "You do not have permission to record collections" };
+  }
+
+  const collectionEntries = input.collections ?? [];
+  const expenseEntries = input.expenses ?? [];
+
+  if (collectionEntries.length === 0) {
+    return { success: false, error: "Add at least one collection before submitting" };
+  }
+
+  for (const [index, entry] of collectionEntries.entries()) {
+    const result = await recordCollection(entry);
+    if (!result.success) {
+      return {
+        success: false,
+        error: `Collection ${index + 1}: ${result.error || "Failed to record collection"}`
+      };
+    }
+  }
+
+  const allowedCategories = ["Fuel", "Food", "Parking", "Other"] as const;
+  const isAutoValidated = access.profile.role === "manager" || access.profile.role === "admin";
+  const expenseStatus = isAutoValidated ? "approved" : "pending";
+
+  for (const [index, expense] of expenseEntries.entries()) {
+    if (!allowedCategories.includes(expense.category as (typeof allowedCategories)[number])) {
+      return { success: false, error: `Expense ${index + 1}: Category must be Fuel, Food, Parking, or Other` };
+    }
+
+    const amount = Number(expense.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return { success: false, error: `Expense ${index + 1}: Amount must be greater than 0` };
+    }
+
+    const expenseOwnerId = isAutoValidated ? expense.sales_rep_id || access.profile.id : access.profile.id;
+    const { error } = await adminClient.from("collection_expenses").insert({
+      sales_rep_id: expenseOwnerId,
+      title: expense.category,
+      category: expense.category,
+      amount,
+      notes: expense.notes?.trim() || null,
+      status: expenseStatus,
+      approved_by: isAutoValidated ? access.profile.id : null,
+      approved_at: isAutoValidated ? new Date().toISOString() : null
+    });
+
+    if (error) {
+      return { success: false, error: `Expense ${index + 1}: ${error.message}` };
+    }
+  }
+
+  revalidatePath("/collections");
+  revalidatePath("/collections/approvals");
+  revalidatePath("/collections/expenses");
+  revalidatePath("/expenses");
+  revalidatePath("/notifications");
+
+  return {
+    success: true,
+    message: `Recorded ${collectionEntries.length} collection${collectionEntries.length === 1 ? "" : "s"}${
+      expenseEntries.length > 0 ? ` and ${expenseEntries.length} expense${expenseEntries.length === 1 ? "" : "s"}` : ""
+    }.`
+  };
 }
 
 export async function listCollectionApprovalSummaries(): Promise<{
