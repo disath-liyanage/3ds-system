@@ -24,7 +24,7 @@ function UnifiedSizeEditor({
 }: { 
   item: ExistingSizeFormState; 
   priceIndex: number; 
-  handleExistingSizeChange: (id: string, field: "stock_qty" | "low_stock_threshold" | "unit", value: string) => void; 
+  handleExistingSizeChange: (id: string, field: keyof ProductSizeFormState, value: string) => void; 
   handleToggleRemoveSize: (id: string) => void; 
 }) {
   return (
@@ -36,6 +36,19 @@ function UnifiedSizeEditor({
          </Button>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1">
+          <label htmlFor={`existing-product-price-${item.id}`} className="text-xs font-medium">Price</label>
+          <Input
+            id={`existing-product-price-${item.id}`}
+            required
+            type="number"
+            min={0}
+            step="0.01"
+            disabled={item.isRemoved}
+            value={item.price}
+            onChange={(event) => handleExistingSizeChange(item.id, "price", event.target.value)}
+          />
+        </div>
         <div className="space-y-1">
           <label htmlFor={`existing-product-stock-${item.id}`} className="text-xs font-medium">Stock Qty</label>
           <Input id={`existing-product-stock-${item.id}`} required type="number" min={0} step="0.01" disabled={item.isRemoved} value={item.stock_qty} onChange={(event) => handleExistingSizeChange(item.id, "stock_qty", event.target.value)} />
@@ -58,6 +71,7 @@ type ProductFormState = {
 
 type ProductSizeFormState = {
   unit: string;
+  price: string;
   stock_qty: string;
   low_stock_threshold: string;
 };
@@ -88,6 +102,7 @@ type ProductFormPayload = {
   name: string;
   category: string;
   unit: string;
+  price?: number;
   discount_type: "percent" | "amount";
   discount_value: number;
   stock_qty: number;
@@ -139,6 +154,7 @@ const initialProductFormState: ProductFormState = {
 
 const initialProductSizeState: ProductSizeFormState = {
   unit: "",
+  price: "0",
   stock_qty: "0",
   low_stock_threshold: "10"
 };
@@ -448,6 +464,7 @@ function ProductFormDialog({
       relatedProducts.map((item) => ({
         id: item.id,
         unit: item.unit,
+        price: toNumber(item.price).toString(),
         stock_qty: toNumber(item.stock_qty).toString(),
         low_stock_threshold: toNumber(item.low_stock_threshold).toString(),
         isRemoved: false,
@@ -554,6 +571,7 @@ function ProductFormDialog({
         name,
         category: composedCategory,
         unit: fallbackSize?.unit ?? unit,
+        price: toNumber(fallbackSize?.price ?? product?.price),
         discount_type: form.discount_type,
         discount_value: discountValueResult.value,
         stock_qty: toNumber(fallbackSize?.stock_qty ?? form.stock_qty),
@@ -635,11 +653,15 @@ function ProductFormDialog({
         const extraStock = parseNonNegativeNumber(size.stock_qty, `Extra size ${index + 1}: Stock quantity`);
         if (!extraStock.ok) { setSubmitError(extraStock.error); return; }
 
+        const extraPrice = parseNonNegativeNumber(size.price, `Extra size ${index + 1}: Price`);
+        if (!extraPrice.ok) { setSubmitError(extraPrice.error); return; }
+
         const extraThreshold = parseNonNegativeNumber(size.low_stock_threshold, `Extra size ${index + 1}: Low stock`);
         if (!extraThreshold.ok) { setSubmitError(extraThreshold.error); return; }
 
         extraPayloads.push({
           name, category: composedCategory, unit: extraUnit,
+          price: extraPrice.value,
           discount_type: form.discount_type,
           discount_value: toNumber(form.discount_value),
           stock_qty: extraStock.value, low_stock_threshold: extraThreshold.value
@@ -659,12 +681,16 @@ function ProductFormDialog({
         const stockResult = parseNonNegativeNumber(size.stock_qty, "Stock quantity");
         if (!stockResult.ok) { setSubmitError(stockResult.error); return; }
 
+        const priceResult = parseNonNegativeNumber(size.price, "Price");
+        if (!priceResult.ok) { setSubmitError(priceResult.error); return; }
+
         const thresholdResult = parseNonNegativeNumber(size.low_stock_threshold, "Low stock threshold");
         if (!thresholdResult.ok) { setSubmitError(thresholdResult.error); return; }
 
         if (size.id.startsWith("new-")) {
           extraPayloads.push({
             name, category: composedCategory, unit: trimmedUnit,
+            price: priceResult.value,
             discount_type: form.discount_type,
             discount_value: toNumber(form.discount_value),
             stock_qty: stockResult.value, low_stock_threshold: thresholdResult.value
@@ -674,6 +700,7 @@ function ProductFormDialog({
             id: size.id,
             payload: {
               name, category: composedCategory, unit: trimmedUnit,
+              price: priceResult.value,
               discount_type: form.discount_type,
               discount_value: toNumber(form.discount_value),
               stock_qty: stockResult.value, low_stock_threshold: thresholdResult.value
@@ -766,20 +793,6 @@ function ProductFormDialog({
         return size;
       })
     );
-  };
-
-  const handleAddStockEntryToGroup = (groupKey: string, currentUnit: string) => {
-    setExistingSizes((prev) => [
-      ...prev,
-      {
-        id: `new-${Date.now()}-${Math.random()}`,
-        unit: currentUnit,
-        stock_qty: "0",
-        low_stock_threshold: "10",
-        isRemoved: false,
-        originalGroupKey: groupKey
-      }
-    ]);
   };
 
   const isEditMode = mode === "edit";
@@ -995,18 +1008,6 @@ function ProductFormDialog({
                             handleToggleRemoveSize={handleConfirmToggleRemoveSize} 
                           />
                         ))}
-                        
-                        <div className="flex justify-end pt-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={isAllRemoved}
-                            onClick={() => handleAddStockEntryToGroup(originalUnitKey, currentUnit)}
-                          >
-                            Add Stock Entry
-                          </Button>
-                        </div>
                       </div>
                     </div>
                   );

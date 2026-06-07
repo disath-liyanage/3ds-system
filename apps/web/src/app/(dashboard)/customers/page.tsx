@@ -365,49 +365,74 @@ export default function CustomersPage() {
         onOpenChange={setIsAddOpen}
         title="Add customer"
         description="Admins and managers create customers immediately. Sales reps submit a request for review."
+        maxWidthClassName="max-w-3xl"
+        stickyHeader
         showBottomClose={false}
       >
-        <form className="space-y-3" onSubmit={handleAddCustomer}>
-          <Input
-            placeholder="Name"
-            value={form.name}
-            onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-            required
-          />
-          <Input
-            placeholder="Phone"
-            value={form.phone}
-            onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
-            required
-          />
-          <Input
-            placeholder="Address"
-            value={form.address}
-            onChange={(event) => setForm((prev) => ({ ...prev, address: event.target.value }))}
-            required
-          />
-          <SearchableSelect
-            placeholder={areasQuery.isLoading ? "Loading areas..." : "Select Area"}
-            options={(areasQuery.data || []).map((area) => ({ value: area.name, label: area.name }))}
-            value={form.area || ""}
-            onChange={(value) => setForm((prev) => ({ ...prev, area: value }))}
-          />
-          <Input
-            type="number"
-            min={0}
-            step="0.01"
-            placeholder="Credit limit (blank for unlimited)"
-            value={form.credit_limit}
-            onChange={(event) => setForm((prev) => ({ ...prev, credit_limit: event.target.value }))}
-          />
-          {isAdminOrManager ? (
-            <SearchableSelect
-              placeholder="Select Sales Rep"
-              options={(salesRepsQuery.data || []).map((rep) => ({ value: rep.id, label: rep.full_name }))}
-              value={form.sales_rep_id}
-              onChange={(value) => setForm((prev) => ({ ...prev, sales_rep_id: value }))}
-            />
-          ) : null}
+        <form className="space-y-4" onSubmit={handleAddCustomer}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-1">
+              <label htmlFor="add-customer-name" className="text-sm font-medium">Name</label>
+              <Input
+                id="add-customer-name"
+                value={form.name}
+                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="add-customer-phone" className="text-sm font-medium">Phone</label>
+              <Input
+                id="add-customer-phone"
+                value={form.phone}
+                onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
+                required
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <label htmlFor="add-customer-address" className="text-sm font-medium">Address</label>
+              <Input
+                id="add-customer-address"
+                value={form.address}
+                onChange={(event) => setForm((prev) => ({ ...prev, address: event.target.value }))}
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="add-customer-area" className="text-sm font-medium">Area</label>
+              <SearchableSelect
+                id="add-customer-area"
+                placeholder={areasQuery.isLoading ? "Loading areas..." : "Select Area"}
+                options={(areasQuery.data || []).map((area) => ({ value: area.name, label: area.name }))}
+                value={form.area || ""}
+                onChange={(value) => setForm((prev) => ({ ...prev, area: value }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="add-customer-credit-limit" className="text-sm font-medium">Credit Limit</label>
+              <Input
+                id="add-customer-credit-limit"
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="Blank for unlimited"
+                value={form.credit_limit}
+                onChange={(event) => setForm((prev) => ({ ...prev, credit_limit: event.target.value }))}
+              />
+            </div>
+            {isAdminOrManager ? (
+              <div className="space-y-1 md:col-span-2">
+                <label htmlFor="add-customer-sales-rep" className="text-sm font-medium">Sales Rep</label>
+                <SearchableSelect
+                  id="add-customer-sales-rep"
+                  placeholder="Select Sales Rep"
+                  options={(salesRepsQuery.data || []).map((rep) => ({ value: rep.id, label: rep.full_name }))}
+                  value={form.sales_rep_id}
+                  onChange={(value) => setForm((prev) => ({ ...prev, sales_rep_id: value }))}
+                />
+              </div>
+            ) : null}
+          </div>
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             {isSubmitting ? "Saving..." : "Submit"}
           </Button>
