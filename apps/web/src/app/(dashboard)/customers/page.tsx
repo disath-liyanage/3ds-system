@@ -434,7 +434,7 @@ export default function CustomersPage() {
             ) : null}
           </div>
           <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? "Saving..." : "Submit"}
+            {isSubmitting ? "Saving changes..." : "Save changes"}
           </Button>
         </form>
       </Dialog>
