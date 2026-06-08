@@ -974,6 +974,7 @@ function ProductFormDialog({
                             disabled={isAllRemoved}
                             value={currentUnit}
                             onChange={(event) => handleGroupUnitChange(originalUnitKey, event.target.value)}
+                            autoFocus={sizes.some((s) => s.id === product?.id)}
                           />
                         </div>
                         <div className="space-y-1">
