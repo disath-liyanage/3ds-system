@@ -102,7 +102,7 @@ export default function CustomersPage() {
       let q = supabase
         .from("customers")
         .select("id, name, phone, address, area, credit_limit, balance, status, created_by, sales_rep_id", { count: "exact" })
-        .order("created_at", { ascending: false });
+        .order("name", { ascending: true });
       if (query.trim()) {
         const search = query.trim().replace(/[%_]/g, "\\$&");
         q = q.or(`name.ilike.%${search}%,phone.ilike.%${search}%,area.ilike.%${search}%`);

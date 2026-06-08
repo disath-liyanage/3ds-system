@@ -13,7 +13,7 @@ async function listSuppliers(supabase: ReturnType<typeof createClient>): Promise
   const { data, error } = await supabase
     .from("suppliers")
     .select("id, name, phone, address, created_at")
-    .order("created_at", { ascending: false });
+    .order("name", { ascending: true });
 
   if (error) throw error;
   return (data ?? []) as Supplier[];

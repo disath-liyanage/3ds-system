@@ -43,7 +43,7 @@ export default function SuppliersPage() {
       const { data, error } = await supabase
         .from("suppliers")
         .select("id, name, phone, address, created_at")
-        .order("created_at", { ascending: false });
+        .order("name", { ascending: true });
 
       if (error) throw new Error(error.message);
       return (data || []) as SupplierRow[];
