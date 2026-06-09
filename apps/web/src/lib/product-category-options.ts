@@ -6,9 +6,9 @@ export const categoryOptions: Array<{ value: string; label: string }> = [
   { value: "Different Types of Glue", label: "Different Types of Glue" },
   { value: "Different Types of Nets", label: "Different Types of Nets" },
   { value: "E+ Cutting, Diamond Bar Cutter, Grinding Wheel", label: "E+ Cutting, Diamond Bar Cutter, Grinding Wheel" },
-  { value: "Electric Bathware", label: "Electric Bathware" },
+  { value: "Electric", label: "Electric" },
   { value: "Fast Moving", label: "Fast Moving" },
-  { value: "Gloves, Masking Tapes & Pads", label: "Gloves, Masking Tapes & Pads" },
+  { value: "Gloves & Masking Tapes", label: "Gloves & Masking Tapes"},
   { value: "Grass Related Items", label: "Grass Related Items" },
   { value: "Hardware", label: "Hardware" },
   { value: "Nail Varieties", label: "Nail Varieties" },
@@ -18,6 +18,6 @@ export const categoryOptions: Array<{ value: string; label: string }> = [
   { value: "Pantry Cupboard Related Items", label: "Pantry Cupboard Related Items" },
   { value: "Pliers & Hammers", label: "Pliers & Hammers" },
   { value: "Spray Gun", label: "Spray Gun" },
-  { value: "Stationery Steel Tape", label: "Stationery Steel Tape" },
-  { value: "Water Tec Range", label: "Water Tec Range" }
+  { value: "Stationery", label: "Stationery" },
+  { value: "Steel Tape", label: "Steel Tape" },
 ];
