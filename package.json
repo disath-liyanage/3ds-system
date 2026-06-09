@@ -4,7 +4,6 @@
   "packageManager": "pnpm@11.3.0",
   "scripts": {
     "dev:web": "pnpm --filter web dev",
-    "dev:mobile": "pnpm --filter mobile start",
     "build:web": "pnpm --filter web build",
     "lint": "pnpm -r lint"
   },
