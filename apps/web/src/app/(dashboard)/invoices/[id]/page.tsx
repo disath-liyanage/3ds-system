@@ -12,6 +12,7 @@ import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useInvoice } from "@/hooks/useInvoice";
 import { toast } from "@/lib/toast";
 import { PageHeader } from "@/components/page-header";
+import { Printer } from "lucide-react";
 
 export default function InvoiceDetailsPage() {
   const router = useRouter();
@@ -158,8 +159,9 @@ export default function InvoiceDetailsPage() {
               </Button>
             ) : null}
             <Button variant="default" onClick={handlePrint}>
+              <Printer className="mr-2 h-4 w-4" />
               {isQuotation ? "Print Quotation" : "Print Invoice"}
-            </Button>
+              </Button>
             {isAdminOrManager && (
               <Button variant="danger" onClick={handleDelete}>
                 Delete Invoice
