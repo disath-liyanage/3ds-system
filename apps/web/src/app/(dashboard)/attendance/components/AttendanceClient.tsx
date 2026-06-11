@@ -15,6 +15,7 @@ import { Select } from "@/components/ui/select";
 import { getSriLankaHolidays } from "@/lib/sri-lanka-holidays";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { Save } from "lucide-react";
 
 type AttendanceStatus = "present" | "absent" | "half_day" | "leave" | "holiday";
 
@@ -513,6 +514,7 @@ export function AttendanceClient({
             ) : null}
             <div className="md:col-span-2">
               <Button type="submit" disabled={deductionSaving}>
+                <Save className="mr-2 h-4 w-4" />
                 {deductionSaving ? "Saving..." : "Save Advance / Loan"}
               </Button>
             </div>

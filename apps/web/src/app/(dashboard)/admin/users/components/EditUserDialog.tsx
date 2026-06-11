@@ -10,6 +10,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { toast } from "@/lib/toast";
 
 import type { AdminUserRow, CustomRoleSelectOption, UserRoleOption, WorkerSelectOption } from "./types";
+import { Save } from "lucide-react";
 
 type EditUserDialogProps = {
   open: boolean;
@@ -270,6 +271,7 @@ export function EditUserDialog({ open, onOpenChange, user, customRoles, workers,
         {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
+          <Save className="mr-2 h-4 w-4" />
           {isSubmitting ? "Saving changes..." : "Save changes"}
         </Button>
       </form>

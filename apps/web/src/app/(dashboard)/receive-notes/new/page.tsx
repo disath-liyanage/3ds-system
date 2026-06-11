@@ -20,6 +20,7 @@ import { useProducts } from "@/hooks/useProducts";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { CircleDashed, CirclePlus, Eraser, Save } from "lucide-react";
 
 type ReceiveNoteForm = {
   invoice_number: string;
@@ -713,9 +714,11 @@ export default function NewReceiveNotePage() {
 
                 <div className="grid gap-2 md:grid-cols-2">
                   <Button type="button" variant="outline" onClick={handleAddItem}>
+                    <CirclePlus className="mr-2 h-4 w-4" />
                     Add Item
                   </Button>
                   <Button type="button" variant="ghost" onClick={handleResetDraft}>
+                    <Eraser className="mr-2 h-4 w-4" />
                     Reset
                   </Button>
                 </div>
@@ -795,10 +798,12 @@ export default function NewReceiveNotePage() {
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving..." : "Add GRN"}
+              <Save className="mr-2 h-4 w-4" />
+              {isSubmitting ? "Saving..." : "Save GRN"}
             </Button>
           </div>
           <Button type="button" variant="outline" onClick={handleSaveDraft} disabled={isSubmitting}>
+            <CircleDashed className="mr-2 h-4 w-4" />
             Save Draft
           </Button>
         </div>

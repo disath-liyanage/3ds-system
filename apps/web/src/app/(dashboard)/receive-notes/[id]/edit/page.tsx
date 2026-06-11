@@ -16,6 +16,7 @@ import { useReceiveNote } from "@/hooks/useReceiveNote";
 import { useSuppliers } from "@/hooks/useSuppliers";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { CirclePlus, Save, Trash2 } from "lucide-react";
 
 type ReceiveNoteForm = {
   invoice_number: string;
@@ -512,6 +513,7 @@ export default function EditReceiveNotePage() {
                 </div>
 
                 <Button type="button" variant="outline" onClick={handleAddItem}>
+                  <CirclePlus className="mr-2 h-4 w-4" />
                   Add Item
                 </Button>
               </div>
@@ -550,8 +552,12 @@ export default function EditReceiveNotePage() {
         </Card>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="submit">Save Changes</Button>
+          <Button type="submit">
+            <Save className="mr-2 h-4 w-4" />
+            Save Changes
+            </Button>
           <Button type="button" variant="danger" onClick={handleDelete}>
+            <Trash2 className="mr-2 h-4 w-4" />
             Delete GRN
           </Button>
         </div>

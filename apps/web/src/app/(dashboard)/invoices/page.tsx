@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { format } from "date-fns";
-import { ChevronLeft, ChevronRight, Printer, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, CircleCheck, Printer, Search } from "lucide-react";
 import { DayPicker, type DateRange } from "react-day-picker";
+import { Undo2 } from "lucide-react";
 
 import "react-day-picker/dist/style.css";
 
@@ -194,15 +195,16 @@ export default function InvoicesPage() {
         <div className="flex items-center gap-2">
           {user?.role === "admin" || user?.role === "manager" ? (
             <Button asChild variant="outline">
-              <Link href="/invoices/quotations">Quotations</Link>
+              <Undo2 className="mr-2 h-4 w-4" />
+              <Link href="/invoices/return">Returns</Link>
             </Button>
           ) : null}
           {user?.role === "admin" || user?.role === "manager" ? (
-            <Button asChild variant="outline">
-              <Link href="/invoices/return">Return Invoice</Link>
+            <Button asChild>
+              <Link href="/invoices/quotations">Quotations</Link>
             </Button>
           ) : null}
-          <Button asChild>
+          <Button asChild  variant="light">
             <Link href="/invoices/new">New Invoice</Link>
           </Button>
         </div>

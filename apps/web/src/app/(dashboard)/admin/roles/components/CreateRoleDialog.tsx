@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/lib/toast";
 
 import { defaultPermissions, permissionGroups, type PermissionKey } from "./permissions";
+import { CirclePlus } from "lucide-react";
 
 type RoleFormState = {
   name: string;
@@ -182,6 +183,7 @@ export function CreateRoleDialog({ open, onOpenChange, onSaved, initialRole }: C
         {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
+          <CirclePlus className="mr-2 h-4 w-4" />
           {isSubmitting ? "Saving role..." : isEditMode ? "Save changes" : "Create role"}
         </Button>
       </form>

@@ -12,6 +12,7 @@ import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/lib/toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckCheck, ReceiptText, User } from "lucide-react";
 
 type NotificationRow = {
   id: string;
@@ -229,16 +230,19 @@ export default function NotificationsPage() {
                         disabled={isProcessing}
                         onClick={() => handleMarkRead(notification.id)}
                       >
+                        <CheckCheck className="mr-2 h-4 w-4" />
                         Mark as read
                       </Button>
                     ) : null}
                     {showViewCustomer ? (
                       <Button size="sm" variant="outline" onClick={() => setSelectedNotificationId(notification.id)}>
+                        <User className="mr-2 h-4 w-4" />
                         View Customer
                       </Button>
                     ) : null}
                     {showViewInvoice ? (
                       <Button asChild size="sm" variant="outline">
+                        <ReceiptText className="mr-2 h-4 w-4" />
                         <Link href={`/invoices/${invoiceTargetId}`}>View Invoice</Link>
                       </Button>
                     ) : null}

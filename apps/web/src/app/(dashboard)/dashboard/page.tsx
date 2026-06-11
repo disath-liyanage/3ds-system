@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { adminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
+import { CircleAlert, ReceiptText, Wallet } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -218,13 +219,29 @@ export default async function DashboardPage() {
 
   const todayDateParam = new Date().toISOString().slice(0, 10);
   const summary = [
-    { label: "Today's Orders", value: todayOrders.toLocaleString(), href: `/invoices?from=${todayDateParam}&to=${todayDateParam}` },
+    { label: (
+      <div className="flex items-center gap-2">
+        <ReceiptText className="h-4 w-4" />
+        <span>Today&apos;s Orders</span>
+      </div>
+    ),
+    value: todayOrders.toLocaleString(), href: `/invoices?from=${todayDateParam}&to=${todayDateParam}` },
     {
-      label: "Today's Collections",
+      label: (
+      <div className="flex items-center gap-2">
+        <Wallet className="h-4 w-4" />
+        <span>Today&apos;s Collections</span>
+      </div>
+      ),
       value: `LKR ${todayCollectionsAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       href: "/collections"
     },
-    ...(role === "sales_rep" ? [] : [{ label: "Low Stock Items", value: lowStockItemsCount.toLocaleString(), href: "/products?status=low_stock" }])
+    ...(role === "sales_rep" ? [] : [{ label:(
+    <div className="flex items-center gap-2">
+      <CircleAlert className="h-4 w-4" />
+      <span>Low Stock Items</span>
+      </div>
+    ), value: lowStockItemsCount.toLocaleString(), href: "/products?status=low_stock" }])
   ];
 
   return (

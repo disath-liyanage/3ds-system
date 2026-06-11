@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Mail, MapPin, Phone } from "lucide-react";
+import { Printer } from "lucide-react";
+import { Pencil } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 import { approveInvoice, deleteInvoice, rejectInvoice } from "@/app/actions/invoices";
 import { Button } from "@/components/ui/button";
@@ -12,7 +15,6 @@ import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useInvoice } from "@/hooks/useInvoice";
 import { toast } from "@/lib/toast";
 import { PageHeader } from "@/components/page-header";
-import { Printer } from "lucide-react";
 
 export default function InvoiceDetailsPage() {
   const router = useRouter();
@@ -154,7 +156,8 @@ export default function InvoiceDetailsPage() {
                       : `/invoices/new?editId=${invoice.id}`
                   }
                 >
-                  {isQuotation ? "Edit Quotation" : "Edit Invoice"}
+                  <Pencil className="mr-2 h-4 w-4" />
+                  {isQuotation ? "Edit" : "Edit"}
                 </Link>
               </Button>
             ) : null}
@@ -164,7 +167,8 @@ export default function InvoiceDetailsPage() {
               </Button>
             {isAdminOrManager && (
               <Button variant="danger" onClick={handleDelete}>
-                Delete Invoice
+              <Trash2 className="mr-2 h-4 w-4" />
+                Delete
               </Button>
             )}
           </>

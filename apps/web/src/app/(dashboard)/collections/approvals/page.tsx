@@ -18,6 +18,7 @@ import {
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
+import { Check, CircleCheck } from "lucide-react";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-LK", { style: "currency", currency: "LKR", maximumFractionDigits: 2 }).format(value);
@@ -223,7 +224,8 @@ export default function CollectionApprovalsPage() {
               }
               onClick={() => approveMutation.mutate(selectedRepId)}
             >
-              Approve Pending Items
+              <CircleCheck className="mr-2 h-4 w-4" />
+              Approve Collection
             </Button>
           </div>
         </>

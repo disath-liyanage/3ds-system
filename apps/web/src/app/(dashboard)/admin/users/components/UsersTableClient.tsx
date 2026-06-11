@@ -17,6 +17,7 @@ import { formatDate } from "@/lib/utils";
 import { AddUserDialog } from "./AddUserDialog";
 import { EditUserDialog } from "./EditUserDialog";
 import type { AdminUserRow, CustomRoleSelectOption, WorkerSelectOption } from "./types";
+import { Pencil, Shield, ShieldCheck, ShieldMinus, Trash2 } from "lucide-react";
 
 type UsersTableClientProps = {
   users: AdminUserRow[];
@@ -196,7 +197,7 @@ export function UsersTableClient({ users, customRoles, workers, currentUser }: U
                         setIsEditDialogOpen(true);
                       }}
                     >
-                      Edit
+                      &nbsp;&nbsp;<Pencil className="mr-2 h-4 w-4" />
                     </Button>
                     <Button
                       variant="outline"
@@ -204,7 +205,7 @@ export function UsersTableClient({ users, customRoles, workers, currentUser }: U
                       disabled={isProcessing || isSelf || !permissions.canManageUsers}
                       onClick={() => handleToggleActive(user)}
                     >
-                      {user.is_active ? "Deactivate" : "Activate"}
+                      {user.is_active ? <ShieldMinus className="h-4 w-4" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
                     </Button>
                     <Button
                       variant="danger"
@@ -212,7 +213,7 @@ export function UsersTableClient({ users, customRoles, workers, currentUser }: U
                       disabled={isProcessing || isSelf || !permissions.canManageUsers}
                       onClick={() => handleDelete(user)}
                     >
-                      Delete
+                      &nbsp;&nbsp;<Trash2 className="mr-2 h-4 w-4" />
                     </Button>
                   </div>
                 </TableCell>

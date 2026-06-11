@@ -19,6 +19,7 @@ import { COLLECTION_INVOICES_QUERY_KEY, useCollectionInvoices } from "@/hooks/us
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
+import { CirclePlus, Save } from "lucide-react";
 
 type NewCollectionForm = {
   invoice_id: string;
@@ -498,6 +499,7 @@ export default function NewCollectionPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" disabled={!selectedInvoiceId} onClick={handleStageCollection}>
+              <CirclePlus className="mr-2 h-4 w-4" />
               {editingCollectionId ? "Update Entry" : "Add Entry"}
             </Button>
             {editingCollectionId ? (
@@ -642,6 +644,7 @@ export default function NewCollectionPage() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" onClick={handleStageExpense}>
+              <CirclePlus className="mr-2 h-4 w-4" />
               {editingExpenseId ? "Update Expense" : "Add Expense"}
             </Button>
             {editingExpenseId ? (
@@ -724,7 +727,8 @@ export default function NewCollectionPage() {
             </table>
           </div>
           <Button type="button" disabled={isSubmitting || stagedCollections.length === 0} onClick={handleSubmitBatch}>
-            {isSubmitting ? "Submitting..." : "Submit Collection Session"}
+            <Save className="mr-2 h-4 w-4" />
+            {isSubmitting ? "Recording..." : "Record Collection Session"}
           </Button>
         </CardContent>
       </Card>

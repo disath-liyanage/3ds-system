@@ -4,7 +4,7 @@ import type { FormEvent } from "react";
 import type { Product } from "@paintdist/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, CirclePlus, PencilRuler, Save, Search, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -1023,6 +1023,7 @@ function ProductFormDialog({
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold">Add size variants</p>
               <Button type="button" variant="outline" size="sm" onClick={handleAddExtraSize}>
+                <PencilRuler className="mr-2 h-4 w-4" />
                 Add size
               </Button>
             </div>
@@ -1089,9 +1090,11 @@ function ProductFormDialog({
               onClick={() => setIsDeleteDialogOpen(true)}
               disabled={isSubmitting}
             >
+              <Trash2 className="mr-2 h-4 w-4" />
               Delete product
             </Button>
             <Button type="submit" disabled={isSubmitting}>
+              <Save className="mr-2 h-4 w-4" />
               {isSubmitting ? "Saving changes..." : "Save changes"}
             </Button>
           </div>
@@ -1407,6 +1410,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold">Sizes & stock</p>
             <Button type="button" variant="outline" size="sm" onClick={handleAddSize}>
+              <PencilRuler className="mr-2 h-4 w-4" />
               Add size
             </Button>
           </div>
@@ -1458,6 +1462,7 @@ function MultiSizeProductDialog({ open, onOpenChange, onSubmit }: MultiSizeProdu
         {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
+          <CirclePlus className="mr-2 h-4 w-4" />
           {isSubmitting ? "Adding..." : submitLabel}
         </Button>
       </form>
@@ -1877,7 +1882,9 @@ export default function ProductsPage() {
           <h1 className="text-2xl font-bold">Products</h1>
           <p className="text-sm text-muted-foreground">Track inventory levels and pricing in real time.</p>
         </div>
-        {canAddProducts ? <Button onClick={() => setIsAddMultiDialogOpen(true)}>Add Product</Button> : null}
+        {canAddProducts ? <Button onClick={() => setIsAddMultiDialogOpen(true)}>
+          Add Product
+          </Button> : null}
       </div>
 
       {error ? <p className="text-sm text-red-600">Failed to load products: {error.message}</p> : null}

@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { KeyboardEvent } from "react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { format } from "date-fns";
-import { Check, Download, Printer, X } from "lucide-react";
+import { Check, Download, Play, Printer, X } from "lucide-react";
 import { DayPicker, type DateRange } from "react-day-picker";
 import { pdf } from "@react-pdf/renderer";
 import "react-day-picker/dist/style.css";
@@ -999,7 +999,8 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
 
           <div className="flex items-center gap-3">
             <Button type="button" onClick={runReport} disabled={isPending}>
-              {isPending ? "Running..." : "Run Report"}
+              <Play className="mr-2 h-4 w-4" />
+              {isPending ? "Generating..." : "Genetate"}
             </Button>
             <Button
               type="button"
@@ -1014,9 +1015,6 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
               <Printer className="mr-2 h-4 w-4" />
               Print PDF
             </Button>
-            <Link href="/reports" className="text-sm underline-offset-2 hover:underline">
-              Back to all reports
-            </Link>
           </div>
 
           {error ? <p className="text-sm text-red-600">{error}</p> : null}

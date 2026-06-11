@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { DayPicker, type DateRange } from "react-day-picker";
+import { ListCheck } from "lucide-react";
 
 import "react-day-picker/dist/style.css";
 
@@ -271,6 +272,7 @@ export default function CollectionsPage() {
         <div className="flex flex-wrap items-center gap-2">
           {isManagerOrAdmin ? (
             <Button variant="outline" asChild>
+              <ListCheck className="mr-2 h-4 w-4" />
               <Link href="/collections/approvals">Approve Collections</Link>
             </Button>
           ) : null}
@@ -282,7 +284,7 @@ export default function CollectionsPage() {
           {canRecordCollections ? (
             <Button asChild>
               <Link href="/collections/new">
-                {isManagerOrAdmin ? "Record Collection" : "Record Outside Collection"}
+                {isManagerOrAdmin ? "Record Collections" : "Record Outside Collections"}
               </Link>
             </Button>
           ) : null}

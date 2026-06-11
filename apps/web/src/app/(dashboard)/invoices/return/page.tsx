@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { toast } from "@/lib/toast";
 import { useQuery } from "@tanstack/react-query";
+import { Save } from "lucide-react";
 
 export default function ReturnInvoicePage() {
   const router = useRouter();
@@ -233,6 +234,7 @@ export default function ReturnInvoicePage() {
 
           <div className="flex justify-end">
             <Button onClick={handleSave} disabled={!selectedInvoice || isSaving}>
+              <Save className="mr-2 h-4 w-4" />
               {isSaving ? "Saving..." : "Save Return Invoice"}
             </Button>
           </div>

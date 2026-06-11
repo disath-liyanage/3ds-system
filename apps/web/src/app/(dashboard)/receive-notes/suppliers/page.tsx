@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/lib/toast";
+import { Save, Trash2 } from "lucide-react";
 
 type SupplierRow = {
   id: string;
@@ -200,7 +201,8 @@ export default function SuppliersPage() {
             required
           />
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Saving..." : "Add Supplier"}
+            <Save className="mr-2 h-4 w-4" />
+            {isSubmitting ? "Saving..." : "Save Supplier"}
           </Button>
         </form>
       </Dialog>
@@ -236,9 +238,11 @@ export default function SuppliersPage() {
             />
             <div className="flex items-center justify-between gap-2 pt-1">
               <Button type="button" variant="danger" disabled={isDeleting || isUpdating} onClick={handleDeleteSupplier}>
+                <Trash2 className="mr-2 h-4 w-4" />
                 {isDeleting ? "Deleting..." : "Delete supplier"}
               </Button>
               <Button type="button" disabled={isUpdating || isDeleting} onClick={handleSaveSupplier}>
+                <Save className="mr-2 h-4 w-4" />
                 {isUpdating ? "Saving..." : "Save changes"}
               </Button>
             </div>

@@ -15,6 +15,7 @@ import { useCollectionExpenses, COLLECTION_EXPENSES_QUERY_KEY } from "@/hooks/us
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
+import { CirclePlus } from "lucide-react";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-LK", { style: "currency", currency: "LKR", maximumFractionDigits: 2 }).format(value);
@@ -122,6 +123,7 @@ export default function CollectionExpensesPage() {
           </div>
 
           <Button type="button" disabled={addExpenseMutation.isPending} onClick={() => addExpenseMutation.mutate()}>
+            <CirclePlus className="mr-2 h-4 w-4" />
             Add Expense
           </Button>
         </CardContent>
