@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { usePermissions } from "@/hooks/usePermissions";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
-import { Pencil, Save, Trash2, UserRoundPen } from "lucide-react";
+import { CirclePlus, Pencil, Trash2, UserRoundPen } from "lucide-react";
 
 type WorkersManagementClientProps = {
   workers: Worker[];
@@ -309,7 +309,7 @@ export function WorkersManagementClient({ workers, currentUser }: WorkersManagem
           {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>
-            <Save className="mr-2 h-4 w-4" />
+            <CirclePlus className="mr-2 h-4 w-4" />
             {isSubmitting ? "Saving..." : editingWorker ? "Save changes" : "Create worker"}
           </Button>
         </form>
