@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { toast } from "@/lib/toast";
+import { Save } from "lucide-react";
 
 export default function TargetsPage() {
   const [salesRepOptions, setSalesRepOptions] = useState<Array<{ value: string; label: string }>>([]);
@@ -110,6 +111,7 @@ export default function TargetsPage() {
             </div>
             <div className="md:col-span-2">
               <Button type="submit" disabled={targetSaving}>
+                <Save className="mr-2 h-4 w-4" />
                 {targetSaving ? "Saving..." : "Save Target"}
               </Button>
             </div>
@@ -163,6 +165,7 @@ export default function TargetsPage() {
             </div>
             <div className="md:col-span-2">
               <Button type="submit" disabled={managerTargetSaving}>
+                <Save className="mr-2 h-4 w-4" />
                 {managerTargetSaving ? "Saving..." : "Save Target"}
               </Button>
             </div>

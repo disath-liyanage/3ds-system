@@ -20,6 +20,7 @@ import { useProductMinAvailableByPrice } from "@/hooks/useProductMinAvailableByP
 import { useCustomers } from "@/hooks/useCustomers";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { CircleDashed, CirclePlus, Info, Save } from "lucide-react";
 
 type InvoiceForm = {
   customer_id: string;
@@ -885,7 +886,8 @@ export default function NewInvoicePage() {
                     onClick={() => setOpenDetailsAfterSave((prev) => !prev)}
                     className="ml-auto"
                   >
-                    Open Details: {openDetailsAfterSave ? "On" : "Off"}
+                    <Info className="mr-2 h-4 w-4" />
+                    Info page: {openDetailsAfterSave ? "On" : "Off"}
                   </Button>
                 ) : null}
               </div>
@@ -1080,6 +1082,7 @@ export default function NewInvoicePage() {
                 </Dialog>
 
                 <Button type="button" variant="outline" onClick={handleAddItem}>
+                  <CirclePlus className="mr-2 h-4 w-4" />
                   Add Item
                 </Button>
               </div>
@@ -1163,6 +1166,7 @@ export default function NewInvoicePage() {
           <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
               <Button type="submit" disabled={formState.isSubmitting}>
+                <Save className="mr-2 h-4 w-4" />
                 {formState.isSubmitting
                   ? "Saving..."
                   : editId
@@ -1180,6 +1184,7 @@ export default function NewInvoicePage() {
           </div>
             {!editId ? (
               <Button type="button" variant="outline" onClick={handleSaveDraft} disabled={formState.isSubmitting}>
+                <CircleDashed className="mr-2 h-4 w-4" />
                 Save Draft
               </Button>
             ) : null}

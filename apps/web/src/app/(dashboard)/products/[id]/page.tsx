@@ -14,6 +14,7 @@ import { useProducts } from "@/hooks/useProducts";
 import { useProductStockByPrice } from "@/hooks/useProductStockByPrice";
 import { useProductTransactions } from "@/hooks/useProductTransactions";
 import { formatDate } from "@/lib/utils";
+import { Pencil } from "lucide-react";
 
 function toNumber(value: number | string | null | undefined): number {
   const parsed = typeof value === "number" ? value : Number(value ?? 0);
@@ -149,6 +150,7 @@ export default function ProductStockDetailPage() {
                   router.push("/products");
                 }}
               >
+                <Pencil className="mr-2 h-4 w-4" />
                 Edit product
               </Button>
             )}

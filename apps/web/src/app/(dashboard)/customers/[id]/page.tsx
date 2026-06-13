@@ -27,6 +27,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
+import { Pencil, Save, Trash2 } from "lucide-react";
 
 type CustomerFormState = {
   name: string;
@@ -343,7 +344,10 @@ export default function CustomerDetailPage() {
         description="Review customer information, outstanding invoices, and this month's invoices."
         actions={
           <>
-            {canEditCustomer ? <Button onClick={() => setIsEditOpen(true)}>Edit Customer</Button> : null}
+            {canEditCustomer ? <Button onClick={() => setIsEditOpen(true)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit Customer
+              </Button> : null}
             {canApproveCustomer ? (
               <Button variant="outline" onClick={handleApprove} disabled={isApproving}>
                 {isApproving ? "Approving..." : "Approve"}
@@ -494,12 +498,14 @@ export default function CustomerDetailPage() {
                 onClick={() => setIsDeleteOpen(true)}
                 disabled={isSubmitting}
               >
+              <Trash2 className="mr-2 h-4 w-4" />
                 Delete Customer
               </Button>
             ) : (
               <span />
             )}
             <Button type="submit" disabled={isSubmitting}>
+              <Save className="mr-2 h-4 w-4" />
               {isSubmitting ? "Saving changes..." : "Save changes"}
             </Button>
           </div>

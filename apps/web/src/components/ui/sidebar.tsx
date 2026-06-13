@@ -38,7 +38,7 @@ export function Sidebar({ title, logoSrc, items, adminItems = [], adminTitle = "
         className={cn(
           "relative flex items-center gap-2 overflow-hidden rounded-full px-3 py-2 text-sm transition",
           active
-            ? "font-bold text-white bg-brand hover:bg-brand/90"
+            ? "font-bold text-white bg-brand-dark hover:bg-brand-dark/90"
             : "text-gray-500 hover:bg-brand/10 hover:text-brand"
         )}
       >

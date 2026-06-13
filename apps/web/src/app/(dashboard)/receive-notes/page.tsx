@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { DayPicker, type DateRange } from "react-day-picker";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Truck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -131,7 +131,8 @@ export default function ReceiveNotesPage() {
         {canManageReceiveNotes ? (
           <div className="flex items-center gap-2">
             <Button asChild variant="outline">
-              <Link href="/receive-notes/suppliers">View Suppliers</Link>
+              <Truck className="mr-2 h-4 w-4" />
+              <Link href="/receive-notes/suppliers">Suppliers</Link>
             </Button>
             <Button asChild>
               <Link href="/receive-notes/new">New GRN</Link>

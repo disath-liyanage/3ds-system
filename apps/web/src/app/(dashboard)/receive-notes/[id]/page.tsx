@@ -13,6 +13,7 @@ import { useReceiveNote } from "@/hooks/useReceiveNote";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
 import { PageHeader } from "@/components/page-header";
+import { Pencil, Trash2 } from "lucide-react";
 
 export default function ViewReceiveNotePage() {
   const router = useRouter();
@@ -70,9 +71,11 @@ export default function ViewReceiveNotePage() {
             {canManageReceiveNotes && (
               <>
                 <Button asChild variant="default">
+                  <Pencil className="mr-2 h-4 w-4" />
                   <Link href={`/receive-notes/${receiveNoteId}/edit`}>Edit GRN</Link>
                 </Button>
                 <Button variant="danger" onClick={handleDelete}>
+                  <Trash2 className="mr-2 h-4 w-4" />
                   Delete GRN
                 </Button>
               </>

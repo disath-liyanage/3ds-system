@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, CirclePlus, MapPinned, Save, Search } from "lucide-react";
 
 import {
   createArea,
@@ -232,6 +232,7 @@ export default function CustomersPage() {
         <div className="flex items-center gap-2">
           {isAdminOrManager ? (
             <Button variant="outline" onClick={() => setIsAddAreaOpen(true)}>
+              <MapPinned className="mr-2 h-4 w-4" />
               Add Area
             </Button>
           ) : null}
@@ -434,7 +435,8 @@ export default function CustomersPage() {
             ) : null}
           </div>
           <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? "Saving changes..." : "Save changes"}
+            <CirclePlus className="mr-2 h-4 w-4" />
+            {isSubmitting ? "Saving changes..." : "Add Customer"}
           </Button>
         </form>
       </Dialog>
@@ -473,6 +475,7 @@ export default function CustomersPage() {
             required
           />
           <Button type="submit" disabled={isAreaSubmitting}>
+            <Save className="mr-2 h-4 w-4" />
             {isAreaSubmitting ? "Saving..." : "Save Area"}
           </Button>
         </form>

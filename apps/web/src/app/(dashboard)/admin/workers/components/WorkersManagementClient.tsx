@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { usePermissions } from "@/hooks/usePermissions";
 import { toast } from "@/lib/toast";
 import { formatDate } from "@/lib/utils";
+import { CirclePlus, Pencil, Trash2, UserRoundPen } from "lucide-react";
 
 type WorkersManagementClientProps = {
   workers: Worker[];
@@ -178,6 +179,7 @@ export function WorkersManagementClient({ workers, currentUser }: WorkersManagem
           canManageWorkerMaster ? (
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={handleGoUsers}>
+                <UserRoundPen className="mr-2 h-4 w-4" />
                 Users
               </Button>
               <Button onClick={handleOpenCreate}>Add Worker</Button>
@@ -215,10 +217,10 @@ export function WorkersManagementClient({ workers, currentUser }: WorkersManagem
                   <TableCell>
                     <div className="flex flex-wrap gap-2">
                       <Button variant="outline" size="sm" disabled={isProcessing} onClick={() => handleOpenEdit(worker)}>
-                        Edit
+                        &nbsp;&nbsp;<Pencil className="mr-2 h-4 w-4" />
                       </Button>
                       <Button variant="danger" size="sm" disabled={isProcessing} onClick={() => handleDelete(worker)}>
-                        Delete
+                        &nbsp;&nbsp; <Trash2 className="mr-2 h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>
@@ -307,6 +309,7 @@ export function WorkersManagementClient({ workers, currentUser }: WorkersManagem
           {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <CirclePlus className="mr-2 h-4 w-4" />
             {isSubmitting ? "Saving..." : editingWorker ? "Save changes" : "Create worker"}
           </Button>
         </form>

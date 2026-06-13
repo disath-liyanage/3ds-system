@@ -4,6 +4,9 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Mail, MapPin, Phone } from "lucide-react";
+import { Printer } from "lucide-react";
+import { Pencil } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 import { approveInvoice, deleteInvoice, rejectInvoice } from "@/app/actions/invoices";
 import { Button } from "@/components/ui/button";
@@ -12,6 +15,7 @@ import { useCurrentUserPermissions } from "@/hooks/useCurrentUserPermissions";
 import { useInvoice } from "@/hooks/useInvoice";
 import { toast } from "@/lib/toast";
 import { PageHeader } from "@/components/page-header";
+import { InvoiceFooter } from "@/components/print/InvoiceFooter";
 
 export default function InvoiceDetailsPage() {
   const router = useRouter();
@@ -153,16 +157,19 @@ export default function InvoiceDetailsPage() {
                       : `/invoices/new?editId=${invoice.id}`
                   }
                 >
-                  {isQuotation ? "Edit Quotation" : "Edit Invoice"}
+                  <Pencil className="mr-2 h-4 w-4" />
+                  {isQuotation ? "Edit" : "Edit"}
                 </Link>
               </Button>
             ) : null}
             <Button variant="default" onClick={handlePrint}>
+              <Printer className="mr-2 h-4 w-4" />
               {isQuotation ? "Print Quotation" : "Print Invoice"}
-            </Button>
+              </Button>
             {isAdminOrManager && (
               <Button variant="danger" onClick={handleDelete}>
-                Delete Invoice
+              <Trash2 className="mr-2 h-4 w-4" />
+                Delete
               </Button>
             )}
           </>
@@ -171,32 +178,33 @@ export default function InvoiceDetailsPage() {
 
       {/* Printable Area */}
       <div className="print-area invoice-print bg-white p-8 rounded-lg shadow-sm border print:shadow-none print:border-none print:p-0">
-        <div className="invoice-print-header relative mb-4 flex items-center justify-between gap-6 overflow-visible">
-          <div className="invoice-print-logo-wrap min-w-0 flex-1 overflow-visible pr-4">
-            <img
-              src="/images/receipt-logo.svg"
-              alt="Receipt logo"
-              className="invoice-print-logo block h-32 w-auto max-w-[340px] shrink-0 object-contain object-left"
-            />
-          </div>
-          <div className="invoice-print-title pointer-events-none absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center px-4">
-            <img src="/images/invoice-text.svg" alt="Invoice text" className="h-10 w-auto object-contain" />
-          </div>
-          <div className="invoice-print-contact ml-auto w-[320px] max-w-[320px] shrink-0 self-center pl-2 text-[15px] font-bold leading-[1] space-y-1 translate-x-20">
-            <div className="flex items-start gap-1.5 leading-[1]">
-              <MapPin className="h-[18px] w-[18px] mt-[1px] shrink-0" />
-              <span>
-                No 44/1, Tharanga Place
-                <br />
-                Panagoda, Homagama
-              </span>
+        <div className="invoice-print-content">
+          <div className="invoice-print-header relative mb-4 flex items-center justify-between gap-6 overflow-visible">
+            <div className="invoice-print-logo-wrap min-w-0 flex-1 overflow-visible pr-4">
+              <img
+                src="/images/receipt-logo.svg"
+                alt="Receipt logo"
+                className="invoice-print-logo block h-32 w-auto max-w-[340px] shrink-0 object-contain object-left"
+              />
             </div>
-            <div className="flex items-center gap-1.5 leading-[1.25]"><Phone className="h-[18px] w-[18px] shrink-0" /><span className="block leading-[1.25]">077 530 3215 / 011 208 3773</span></div>
-            <div className="flex items-center gap-1.5 leading-[1.25]"><Mail className="h-[18px] w-[18px] shrink-0" /><span className="block leading-[1.25]">sanulapaintshub@gmail.com</span></div>
+            <div className="invoice-print-title pointer-events-none absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center px-4">
+              <img src="/images/invoice-text.svg" alt="Invoice text" className="h-10 w-auto object-contain" />
+            </div>
+            <div className="invoice-print-contact ml-auto w-[320px] max-w-[320px] shrink-0 self-center pl-2 text-[15px] font-bold leading-[1] space-y-1 translate-x-20">
+              <div className="flex items-start gap-1.5 leading-[1]">
+                <MapPin className="h-[18px] w-[18px] mt-[1px] shrink-0" />
+                <span>
+                  No 44/1, Tharanga Place
+                  <br />
+                  Panagoda, Homagama
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 leading-[1.25]"><Phone className="h-[18px] w-[18px] shrink-0" /><span className="block leading-[1.25]">077 530 3215 / 011 208 3773</span></div>
+              <div className="flex items-center gap-1.5 leading-[1.25]"><Mail className="h-[18px] w-[18px] shrink-0" /><span className="block leading-[1.25]">sanulapaintshub@gmail.com</span></div>
+            </div>
           </div>
-        </div>
 
-        <div className="invoice-details-grid grid grid-cols-[1.2fr_0.8fr] gap-4 text-sm mb-4">
+          <div className="invoice-details-grid grid grid-cols-[1.2fr_0.8fr] gap-4 text-sm mb-4">
           <div className="space-y-1 border border-black px-2 py-0.5 leading-[1.1]">
             <div className="grid grid-cols-[137px_10px_auto]">
               <span className="font-semibold">Customer Code</span>
@@ -350,8 +358,8 @@ export default function InvoiceDetailsPage() {
           </div>
         </div>
 
-        {outstandingRows.length > 0 ? (
-          <div className="mt-4">
+          {outstandingRows.length > 0 ? (
+            <div className="mt-4">
             <h3 className="font-semibold text-sm mb-2">Customer Available Credit Invoice List</h3>
             <Table className="invoice-credit-table border border-black" containerClassName="rounded-none border-0 bg-transparent">
               <TableHeader>
@@ -381,18 +389,21 @@ export default function InvoiceDetailsPage() {
                 ))}
               </TableBody>
             </Table>
-          </div>
-        ) : null}
+            </div>
+          ) : null}
+        </div>
+        <InvoiceFooter />
         <style jsx global>{`
           @media print {
             @page {
-              size: Letter;
-              margin: 6mm;
+              size: 8.5in 5.5in;
+              margin: 0.2in 0.3in;
             }
             html,
             body {
-              width: 216mm;
-              min-height: 279mm;
+              width: 8.5in;
+              height: 5.5in;
+              overflow: hidden;
             }
             body * {
               visibility: hidden;
@@ -405,14 +416,35 @@ export default function InvoiceDetailsPage() {
               position: absolute;
               left: 0;
               top: 0;
-              width: 100%;
+              display: flex !important;
+              flex-direction: column !important;
+              width: 7.9in;
+              height: 5.1in;
+              overflow: hidden !important;
               margin: 0 !important;
               padding: 0 !important;
               transform: none !important;
             }
             .invoice-print {
               font-family: "Times New Roman", Times, serif !important;
-              font-size: 12px !important;
+              font-size: 10px !important;
+              line-height: 1.05 !important;
+            }
+            .invoice-print-content {
+              flex: 1 1 auto;
+              min-height: 0;
+              overflow: hidden !important;
+            }
+            .invoice-print-footer {
+              flex: 0 0 auto;
+              display: flex !important;
+              justify-content: space-between;
+              border-top: 1px solid #000;
+              padding-top: 2px;
+              font-family: "Times New Roman", Times, serif;
+              font-size: 8px;
+              line-height: 1;
+              color: #000;
             }
             .invoice-print-header,
             .invoice-print-header * {
@@ -426,6 +458,7 @@ export default function InvoiceDetailsPage() {
               justify-content: space-between !important;
               gap: 1rem !important;
               position: relative !important;
+              margin-bottom: 0.05in !important;
             }
             .invoice-print-header > * {
               min-width: 0;
@@ -464,8 +497,27 @@ export default function InvoiceDetailsPage() {
               text-align: left !important;
               transform: translateX(20mm) !important;
             }
+            .invoice-details-grid {
+              gap: 0.08in !important;
+              margin-bottom: 0.06in !important;
+              font-size: 10px !important;
+            }
+            .invoice-products-table,
+            .invoice-credit-table {
+              font-size: 9px !important;
+              line-height: 1 !important;
+            }
+            .invoice-products-table th,
+            .invoice-products-table td,
+            .invoice-credit-table th,
+            .invoice-credit-table td {
+              padding-top: 0 !important;
+              padding-bottom: 0 !important;
+              line-height: 1 !important;
+            }
             .invoice-totals-box {
               margin-right: 2px !important;
+              margin-bottom: 0.08in !important;
             }
             .invoice-credit-table {
               width: calc(100% - 2px) !important;

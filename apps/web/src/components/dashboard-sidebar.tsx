@@ -4,16 +4,19 @@ import {
   BarChart3,
   Bell,
   CalendarCheck2,
-  ClipboardList,
+  DatabaseBackup,
   FileText,
-  HandCoins,
   Home,
   LogOut,
   Package,
   ReceiptText,
   UserCircle2,
   Users,
-  UserRound
+  UserRound,
+  Target,
+  Wallet,
+  Banknote,
+  HardHat
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
@@ -40,7 +43,7 @@ type DashboardSidebarProps = {
 const baseNavItems: SidebarItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: Home },
   { href: "/invoices", label: "Invoices", icon: FileText },
-  { href: "/collections", label: "Collections", icon: HandCoins },
+  { href: "/collections", label: "Collections", icon: Wallet },
   { href: "/receive-notes", label: "GRN", icon: ReceiptText },
   { href: "/products", label: "Products", icon: Package },
   { href: "/customers", label: "Customers", icon: Users },
@@ -48,7 +51,10 @@ const baseNavItems: SidebarItem[] = [
   { href: "/reports", label: "Reports", icon: BarChart3 }
 ];
 
-const adminNavItems: SidebarItem[] = [{ href: "/admin/workers", label: "Workers", icon: UserRound }];
+const adminNavItems: SidebarItem[] = [
+  { href: "/admin/workers", label: "Workers", icon: HardHat },
+  { href: "/admin/backup", label: "Backup", icon: DatabaseBackup }
+];
 
 export function DashboardSidebar({ isAdmin, isManager, user }: DashboardSidebarProps) {
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -93,8 +99,8 @@ export function DashboardSidebar({ isAdmin, isManager, user }: DashboardSidebarP
         ? [
             ...baseNavItems,
             { href: "/attendance", label: "Attendance", icon: CalendarCheck2 },
-            { href: "/targets", label: "Targets", icon: ClipboardList },
-            { href: "/expenses", label: "Expenses", icon: HandCoins }
+            { href: "/targets", label: "Targets", icon: Target },
+            { href: "/expenses", label: "Expenses", icon: Banknote }
           ]
         : baseNavItems;
 

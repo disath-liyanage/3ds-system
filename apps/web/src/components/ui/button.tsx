@@ -2,11 +2,12 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-type ButtonVariant = "default" | "outline" | "ghost" | "danger";
+type ButtonVariant = "default" | "light" | "outline" | "ghost" | "danger";
 type ButtonSize = "sm" | "md" | "lg";
 
 const variantClasses: Record<ButtonVariant, string> = {
   default: "bg-brand text-white hover:bg-brand-dark",
+  light: "bg-brand-dark text-white hover:bg-brand",
   outline: "border border-brand-muted bg-white text-foreground hover:bg-brand-light",
   ghost: "bg-transparent hover:bg-brand-light hover:text-brand",
   danger: "bg-red-600 text-white hover:bg-red-700"

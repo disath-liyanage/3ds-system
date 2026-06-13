@@ -22,15 +22,9 @@ Web app (`apps/web/.env.local`):
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY` (server-only)
 
-Mobile app (`apps/mobile/.env`):
-
-- `EXPO_PUBLIC_SUPABASE_URL`
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-
 Templates are included in:
 
 - `apps/web/.env.local.example`
-- `apps/mobile/.env.example`
 
 ## 3) How to run dev servers
 
@@ -46,12 +40,6 @@ Run web app:
 pnpm dev:web
 ```
 
-Run mobile app:
-
-```bash
-pnpm dev:mobile
-```
-
 Optional production build check for web:
 
 ```bash
@@ -62,11 +50,10 @@ pnpm build:web
 
 1. Create Supabase project and collect project URL + anon key.
 2. Run `supabase/schema.sql` in Supabase SQL Editor.
-3. Add env vars to `apps/web/.env.local` and `apps/mobile/.env`.
+3. Add env vars to `apps/web/.env.local`.
 4. Install dependencies with `pnpm install` at repo root.
 5. Start web (`pnpm dev:web`) and confirm login route loads.
-6. Start mobile (`pnpm dev:mobile`) and confirm Expo Router screens load.
-7. Create initial users in `auth.users`, then add matching rows in `users_profile` with roles.
+6. Create initial users in `auth.users`, then add matching rows in `users_profile` with roles.
 
 ## 5) Vercel env var reminder (admin user management)
 

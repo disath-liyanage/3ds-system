@@ -10,6 +10,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { toast } from "@/lib/toast";
 
 import type { CustomRoleSelectOption, UserRoleOption, WorkerSelectOption } from "./types";
+import { CirclePlus } from "lucide-react";
 
 type AddUserDialogProps = {
   open: boolean;
@@ -238,6 +239,7 @@ export function AddUserDialog({ open, onOpenChange, customRoles, workers, usedWo
         {submitError ? <p className="text-sm text-red-600">{submitError}</p> : null}
 
         <Button type="submit" className="w-full" disabled={isSubmitting}>
+          <CirclePlus className="mr-2 h-4 w-4" />
           {isSubmitting ? "Creating user..." : "Create user"}
         </Button>
       </form>
